@@ -133,16 +133,14 @@ class RedisCollection:
 
 class Dict(RedisCollection, collections.MutableMapping):
     # http://docs.python.org/2/library/stdtypes.html#mapping-types-dict
-    # http://docs.python.org/2/reference/datamodel.html#emulating-container-types
     # http://redis.io/commands#hash
+
+    __marker = object()
 
     def __init__(self, iterable=None, **kwargs):
         super(Dict, self).__init__(**kwargs)
         if iterable:
-            mapping = dict(iterable)  # conversion to mapping
-            keys = mapping.keys()
-            values = map(self._pickle, mapping.values())  # pickling values
-            self.redis.hmset(self.key, dict(zip(keys, values)))
+            self.update(iterable)
 
     def __len__(self):
         return self.redis.hlen(self.key)
@@ -162,6 +160,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         pipe.hexists(self.key, key)
         pipe.hget(self.key, key)
         exists, value = pipe.execute()
+
         if not exists:
             raise KeyError(key)
         return self._unpickle(value)
@@ -205,19 +204,59 @@ class Dict(RedisCollection, collections.MutableMapping):
         return Dict(self, redis=self.redis, pickler=self.pickler,
                     prefix=self.prefix)
 
-    # def pop(self, key, default=None):
-    #     # http://hg.python.org/cpython/file/2.7/Lib/_abcoll.py#l456
+    def pop(self, key, default=__marker):
+        pipe = self.redis.pipeline()
+        pipe.hget(self.key, key)
+        pipe.hdel(self.key, key)
+        value, existed = pipe.execute()
 
-    # def popitem(self):
-    #     # http://hg.python.org/cpython/file/2.7/Lib/_abcoll.py#l467
+        if not existed:
+            if default is self.__marker:
+                raise KeyError(key)
+            return default
+        return self._unpickle(value)
 
-    # def setdefault(self, key, default=None):
-    #     # http://hg.python.org/cpython/file/2.7/Lib/_abcoll.py#l504
-    #     # http://redis.io/commands/hsetnx
+    def popitem(self):
+        key = None
+        value = None
 
-    # def update(self, other):
-    #     # http://hg.python.org/cpython/file/2.7/Lib/_abcoll.py#l483
-    #     # http://redis.io/commands/hmset
+        with self.redis.pipeline() as pipe:
+            while True:
+                try:
+                    pipe.watch(self.key)
+
+                    try:
+                        key = pipe.hkeys(self.key)[0]
+                    except IndexError:
+                        raise KeyError
+
+                    pipe.multi()
+                    pipe.hget(self.key, key)
+                    pipe.hdel(self.key, key)
+                    value, _ = pipe.execute()
+                    break
+
+                except redis.WatchError:
+                    continue
+
+        return key, self._unpickle(value)
+
+    def setdefault(self, key, default=None):
+        pipe = self.redis.pipeline()
+        pipe.hsetnx(self.key, key, self._pickle(default))
+        pipe.hget(self.key, key)
+        _, value = pipe.execute()
+
+        return self._unpickle(value)
+
+    def update(self, *args, **kwargs):
+        mapping = {}
+        mapping.update(*args, **kwargs)
+
+        keys = mapping.keys()
+        values = map(self._pickle, mapping.values())  # pickling values
+
+        self.redis.hmset(self.key, dict(zip(keys, values)))
 
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):
