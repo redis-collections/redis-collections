@@ -27,6 +27,9 @@ class RedisCollection:
 
     max_key_creation_attempts = 3
 
+    not_impl_msg = ('Cannot be implemented efficiently or atomically '
+                    'due to limitations in Redis command set.')
+
     @abstractmethod
     def __init__(self, redis=None, id=None, pickler=None, prefix=None):
         """Initializes the collection.
@@ -130,6 +133,19 @@ class RedisCollection:
             raise TypeError(msg)
         return self.pickler.loads(string)
 
+    def _create_instance(self, *args, **kwargs):
+        kwargs.setdefault('redis', self.redis)
+        kwargs.setdefault('pickler', self.pickler)
+        kwargs.setdefault('prefix', self.prefix)
+        return self.__class__(*args, **kwargs)
+
+    def clear(self):
+        self.redis.delete(self.key)
+
+    def __repr__(self):
+        cls_name = self.__class__.__name__
+        return '<redis_collections.%s %s>' % (cls_name, self.id)
+
 
 class Dict(RedisCollection, collections.MutableMapping):
     # http://docs.python.org/2/library/stdtypes.html#mapping-types-dict
@@ -137,10 +153,10 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     __marker = object()
 
-    def __init__(self, iterable=None, **kwargs):
+    def __init__(self, values=None, **kwargs):
         super(Dict, self).__init__(**kwargs)
-        if iterable:
-            self.update(iterable)
+        if values:
+            self.update(values)
 
     def __len__(self):
         return self.redis.hlen(self.key)
@@ -197,12 +213,8 @@ class Dict(RedisCollection, collections.MutableMapping):
         result = iter(self.redis.hvals(self.key))
         return (self._unpickle(v) for v in result)
 
-    def clear(self):
-        self.redis.delete(self.key)
-
     def copy(self):
-        return Dict(self, redis=self.redis, pickler=self.pickler,
-                    prefix=self.prefix)
+        return self._create_instance(values=self)
 
     def pop(self, key, default=__marker):
         pipe = self.redis.pipeline()
@@ -220,6 +232,9 @@ class Dict(RedisCollection, collections.MutableMapping):
         key = None
         value = None
 
+        # Cannot use self.redis.transaction, because we need to know the key
+        # and there is probably not a nice way how to get it out of the
+        # closure's scope.
         with self.redis.pipeline() as pipe:
             while True:
                 try:
@@ -260,28 +275,169 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):
-        iterable = ((item, value) for item in seq)
-        return cls(iterable, **kwargs)
+        values = ((item, value) for item in seq)
+        return cls(values, **kwargs)
 
 
 class List(RedisCollection, collections.MutableSequence):
     # http://docs.python.org/2/library/functions.html#list
+    # http://hg.python.org/cpython/file/2.7/Lib/_abcoll.py#l517
     # http://redis.io/commands#list
 
-    def __init__(self):
-        pass
+    def __init__(self, values=None, **kwargs):
+        super(List, self).__init__(**kwargs)
+        if values:
+            self.extend(values)
 
     def __len__(self):
-        pass
+        return self.redis.llen(self.key)
 
     def __iter__(self):
-        pass
+        values = self.redis.lrange(self.key, 0, -1)
+        return (self._unpickle(v) for v in values)
 
-    def __contains__(self, key):
-        pass
+    def __reversed__(self):
+        values = self.redis.lrange(self.key, 0, -1)
+        return (self._unpickle(v) for v in reversed(values))
 
-    def __getitem__(self, key):
-        pass
+    def _recalc_slice(self, start, stop):
+        """Slicing in Redis takes also the item at 'stop' index, so there is
+        some recalculation to be done.
+        """
+        start = start or 0
+        if stop is None:
+            stop = -1
+        else:
+            stop = stop - 1 if stop != 0 else stop
+        return start, stop
+
+    def _calc_overflow(self, size, index):
+        return (index >= size) if (index >= 0) else (abs(index) > size)
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            start, stop = self._recalc_slice(index.start, index.stop)
+            values = self.redis.lrange(self.key, start, stop)
+            if index.step:
+                # step implemented by pure Python slicing
+                values = values[::index.step]
+            return self._create_instance(map(self._unpickle, values))
+
+        pipe = self.redis.pipeline()
+        pipe.llen(self.key)
+        pipe.lindex(self.key, index)
+        size, value = pipe.execute()
+
+        if self._calc_overflow(size, index):
+            raise IndexError(index)
+        return self._unpickle(value)
+
+    def __setitem__(self, index, value):
+        if isinstance(index, slice):
+            if value:
+                # assigning anything else than empty lists not supported
+                raise NotImplementedError(self.not_impl_msg)
+            self.__delitem__(index)
+        else:
+            def set_trans(pipe):
+                size = pipe.llen(self.key)
+                if self._calc_overflow(size, index):
+                    raise IndexError(index)
+                pipe.multi()
+                pipe.lset(self.key, index, self._pickle(value))
+
+            self.redis.transaction(set_trans, self.key)
+
+    def __delitem__(self, index):
+        begin = 0
+        end = -1
+
+        if isinstance(index, slice):
+            if index.step:
+                # stepping not supported
+                raise NotImplementedError(self.not_impl_msg)
+
+            start, stop = self._recalc_slice(index.start, index.stop)
+
+            if start == begin and stop == end:
+                # trim from beginning to end
+                self.clear()
+                return
+
+            pipe = self.redis.pipeline()
+            if start != begin and stop == end:
+                # right trim
+                pipe.ltrim(self.key, begin, start - 1)
+            elif start == begin and stop != end:
+                # left trim
+                pipe.ltrim(self.key, stop + 1, end)
+            else:
+                # only trimming is supported
+                raise NotImplementedError(self.not_impl_msg)
+            pipe.execute()
+        else:
+            if index == begin:
+                self.redis.lpop(self.key)
+            elif index == end:
+                self.redis.rpop(self.key)
+            else:
+                raise NotImplementedError(self.not_impl_msg)
+
+    def remove(self, value):
+        self.redis.lrem(self.key, 1, self._pickle(value))
+
+    def index(self, value, start=None, stop=None):
+        start, stop = self._recalc_slice(start, stop)
+        values = self.redis.lrange(self.key, start, stop)
+
+        for i, v in enumerate(self._unpickle(v) for v in values):
+            if v == value:
+                return i + start
+        raise ValueError(value)
+
+    def insert(self, index, value):
+        def insert_trans(pipe):
+            size = pipe.llen(self.key)
+            pipe.multi()
+
+            pickled_value = self._pickle(value)
+            if index < 0 and abs(index) > size:
+                pipe.lpush(self.key, pickled_value)
+            elif index >= size:
+                pipe.rpush(self.key, pickled_value)
+            else:
+                pipe.lset(self.key, index, pickled_value)
+
+        self.redis.transaction(insert_trans, self.key)
+
+    def extend(self, values):
+        values = map(self._pickle, values)
+        self.redis.rpush(self.key, *values)
+
+    def pop(self, index=-1):
+        if index == 0:
+            value = self.redis.lpop(self.key)
+        elif index == -1:
+            value = self.redis.rpop(self.key)
+        else:
+            raise NotImplementedError(self.not_impl_msg)
+        return self._unpickle(value)
+
+    def __add__(self, values):
+        other = self._create_instance(values=self)
+        other.extend(values)
+        return other
+
+    def __mul__(self, n):
+        if not isinstance(n, int):
+            raise TypeError('Cannot multiply sequence by non-int.')
+        other = self._create_instance()
+        for _ in xrange(0, n):
+            other.extend(self)
+        return other
+
+    def __rmul__(self, n):
+        return self.__mul__(n)
 
 
 class Set(RedisCollection, collections.MutableSet):
