@@ -25,6 +25,8 @@ class RedisCollection:
 
     __metaclass__ = ABCMeta
 
+    max_key_creation_attempts = 3
+
     @abstractmethod
     def __init__(self, redis=None, id=None, pickler=None, prefix=None):
         """Initializes the collection.
@@ -52,17 +54,20 @@ class RedisCollection:
                        empty string.
         :type prefix: str or None
         """
-        self._redis = redis
-        self.pickler = pickler or pickle
-
-        self.id = str(id) if id else self._id_factory()
+        self.redis = redis or self._redis_factory()
+        self.pickler = pickler or pickle  # standard pickle module as default
         self.prefix = prefix
-        self.key = self._key_factory()
+
+        if id:
+            # summoning existing collection
+            self.key, self.id = self._key_factory(id=str(id), prefix=prefix)
+        else:
+            self.key, self.id = self._key_factory(prefix=prefix)
 
     def _id_factory(self):
         """Creates default collection ID using :mod:`uuid`.
 
-        :rtype: str
+        :rtype: string
         """
         return str(uuid4().hex)
 
@@ -73,32 +78,40 @@ class RedisCollection:
         """
         return redis.StrictRedis()
 
-    def _key_factory(self):
-        """Creates Redis key for the collection.
+    def _key_factory(self, id=None, prefix=None):
+        """Creates Redis key for the collection. If ID is not provided, factory
+        searches only for a key which is not ocuppied yet. If it cannot be
+        found, :exc:`RuntimeError` is raised.
 
-        :rtype: str
+        :param id: Collection ID.
+        :type id: string or None
+        :param prefix: Key prefix to use when working with Redis.
+        :type prefix: string or None
+        :rtype: tuple of strings (key, id)
         """
-        # long keys does not matter: http://stackoverflow.com/a/6322977/325365
-        components = [self.prefix, '_redis_collections', self.id]
-        return (filter(None, components)).join('.')
+        def create_key(id):
+            components = [prefix, '_redis_collections', id]
+            return '.'.join(filter(None, components))
 
-    @property
-    def redis(self):
-        """Lazy access to Redis connection. If not set by :func:`__init__`,
-        default Redis connection is created.
+        if id:
+            return (create_key(id), id)
 
-        :rtype: :class:`redis.StrictRedis`
-        """
-        if not self._redis:
-            self._redis = self._redis_factory()
-        return self._redis
+        for attempt in range(0, self.max_key_creation_attempts):
+            id = self._id_factory()
+            key = create_key(id)
+
+            # repeat until an empty key is not found
+            if not self.redis.exists(key):
+                return (key, id)
+
+        raise RuntimeError('Unable to find a free Redis key.')
 
     def _pickle(self, data):
         """Converts given data to string.
 
         :param data: Data to be serialized.
         :type data: anything serializable
-        :rtype: str
+        :rtype: string
         """
         return self.pickler.dumps(data)
 
@@ -107,11 +120,14 @@ class RedisCollection:
         If ``None`` or empty string given, ``None`` is returned.
 
         :param string: String to be unserialized.
-        :type string: str
+        :type string: string
         :rtype: anything serializable or None
         """
         if string is None or string == '':
             return None
+        if not isinstance(string, basestring):
+            msg = 'Only strings can be unpickled (%r given).' % string
+            raise TypeError(msg)
         return self.pickler.loads(string)
 
 
@@ -120,30 +136,92 @@ class Dict(RedisCollection, collections.MutableMapping):
     # http://docs.python.org/2/reference/datamodel.html#emulating-container-types
     # http://redis.io/commands#hash
 
-    def __init__(self, iterable, **kwargs):
+    def __init__(self, iterable=None, **kwargs):
         super(Dict, self).__init__(**kwargs)
+        if iterable:
+            mapping = dict(iterable)  # conversion to mapping
+            keys = mapping.keys()
+            values = map(self._pickle, mapping.values())  # pickling values
+            self.redis.hmset(self.key, dict(zip(keys, values)))
 
     def __len__(self):
-        pass
+        return self.redis.hlen(self.key)
 
     def __iter__(self):
-        pass
+        return self.iterkeys()
 
     def __contains__(self, key):
-        pass
+        return self.redis.hexists(self.key, key)
+
+    def get(self, key, default=None):
+        value = self.redis.hget(self.key, key)
+        return self._unpickle(value) or default
 
     def __getitem__(self, key):
-        pass
+        pipe = self.redis.pipeline()
+        pipe.hexists(self.key, key)
+        pipe.hget(self.key, key)
+        exists, value = pipe.execute()
+        if not exists:
+            raise KeyError(key)
+        return self._unpickle(value)
 
     def __setitem__(self, key, value):
-        pass
+        value = self._pickle(value)
+        self.redis.hset(self.key, key, value)
 
     def __delitem__(self, key):
-        pass
+        self.redis.hdel(self.key, key)
+
+    def items(self):
+        result = self.redis.hgetall(self.key).items()
+        return [(k, self._unpickle(v)) for (k, v) in result]
+
+    def iteritems(self):
+        result = self.redis.hgetall(self.key).iteritems()
+        return ((k, self._unpickle(v)) for (k, v) in result)
+
+    def keys(self):
+        return self.redis.hkeys(self.key)
+
+    def iter(self):
+        return self.iterkeys()
+
+    def iterkeys(self):
+        return iter(self.redis.hkeys(self.key))
+
+    def values(self):
+        result = self.redis.hvals(self.key)
+        return [self._unpickle(v) for v in result]
+
+    def itervalues(self):
+        result = iter(self.redis.hvals(self.key))
+        return (self._unpickle(v) for v in result)
+
+    def clear(self):
+        self.redis.delete(self.key)
+
+    def copy(self):
+        return Dict(self, redis=self.redis, pickler=self.pickler,
+                    prefix=self.prefix)
+
+    # def pop(self, key, default=None):
+    #     # http://hg.python.org/cpython/file/2.7/Lib/_abcoll.py#l456
+
+    # def popitem(self):
+    #     # http://hg.python.org/cpython/file/2.7/Lib/_abcoll.py#l467
+
+    # def setdefault(self, key, default=None):
+    #     # http://hg.python.org/cpython/file/2.7/Lib/_abcoll.py#l504
+    #     # http://redis.io/commands/hsetnx
+
+    # def update(self, other):
+    #     # http://hg.python.org/cpython/file/2.7/Lib/_abcoll.py#l483
+    #     # http://redis.io/commands/hmset
 
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):
-        iterable = [(item, value) for item in seq]
+        iterable = ((item, value) for item in seq)
         return cls(iterable, **kwargs)
 
 
