@@ -53,7 +53,7 @@ class DictTest(unittest.TestCase):
         self.assertEqual(len(d), 1)
         d['c'] = 'd'
         self.assertEqual(len(d), 2)
-        self.assertRaises(KeyError, lambda d: d['x'], d)
+        self.assertRaises(KeyError, lambda: d['x'])
 
     def test_del(self):
         d = self.create_dict()
@@ -62,7 +62,7 @@ class DictTest(unittest.TestCase):
         self.assertEqual(len(d), 1)
         del d['a']
         self.assertEqual(len(d), 0)
-        self.assertRaises(KeyError, lambda d: d['a'], d)
+        self.assertRaises(KeyError, lambda: d['a'])
 
     def test_in(self):
         d = self.create_dict()

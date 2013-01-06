@@ -63,8 +63,8 @@ class ListTest(unittest.TestCase):
         self.assertEqual(l[-1], 3)
         self.assertEqual(l[-2], 2)
         self.assertEqual(l[-3], 1)
-        self.assertRaises(IndexError, lambda l: l[42], l)
-        self.assertRaises(IndexError, lambda l: l[-42], l)
+        self.assertRaises(IndexError, lambda: l[42])
+        self.assertRaises(IndexError, lambda: l[-42])
 
         l = self.create_list([1, 2, 3, 2, 3])
         self.assertEqual(l.index(2), 1)
@@ -96,6 +96,9 @@ class ListTest(unittest.TestCase):
         self.assertEqual(list(l), [1])
         l.append(2013)
         self.assertEqual(list(l), [1, 2013])
+
+    def test_del(self):
+        l = self.create_list([1, 2013])
         del l[0]
         self.assertEqual(list(l), [2013])
         del l[1:]
@@ -106,10 +109,16 @@ class ListTest(unittest.TestCase):
         self.assertEqual(list(l), [2013, 8])
         del l[1:]
         self.assertEqual(list(l), [2013])
+
+    def test_extend_insert(self):
+        l = self.create_list([2013])
         l.extend([4, 5, 6, 7])
         self.assertEqual(list(l), [2013, 4, 5, 6, 7])
         l.insert(0, 3)
         self.assertEqual(list(l), [3, 4, 5, 6, 7])
+
+    def test_pop_remove(self):
+        l = self.create_list([3, 4, 5, 6, 7])
         self.assertEqual(l.pop(), 7)
         self.assertEqual(list(l), [3, 4, 5, 6])
         self.assertEqual(l.pop(0), 3)
@@ -117,10 +126,13 @@ class ListTest(unittest.TestCase):
         l.extend([4, 5, 6])
         l.remove(4)
         self.assertEqual(list(l), [5, 6, 4, 5, 6])
+
+    def test_slice_trim(self):
+        l = self.create_list([5, 6, 4, 5, 6])
         l[2:] = []
         self.assertEqual(list(l), [5, 6])
 
-    def test_sort(self):
+    def test_reverse(self):
         l = self.create_list([1, 2, 3])
         l.reverse()
         self.assertEqual(list(l), [3, 2, 1])
