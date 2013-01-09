@@ -86,6 +86,10 @@ pygments_style = 'sphinx'
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
 
+# This value selects if automatically documented members are sorted
+# alphabetical.
+autodoc_member_order = 'groupwise'
+
 
 # -- Options for HTML output ---------------------------------------------------
 

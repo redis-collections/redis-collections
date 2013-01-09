@@ -56,15 +56,28 @@ class RedisCollection:
                        empty string.
         :type prefix: str or :obj:`None`
         """
+        #: Redis client instance. :class:`StrictRedis` object with default
+        #: connection settings is used if not set by :func:`__init__`.
         self.redis = redis or self._redis_factory()
-        self.pickler = pickler or pickle  # standard pickle module as default
+
+        #: Class or module implementing pickling. Standard :mod:`pickle`
+        #: module is set as default.
+        self.pickler = pickler or pickle
+
+        #: Redis key prefix. Default is empty string.
         self.prefix = prefix
 
         if id:
             # summoning existing collection
-            self.key, self.id = self._key_factory(id=str(id), prefix=prefix)
+            key, id = self._key_factory(id=str(id), prefix=prefix)
         else:
-            self.key, self.id = self._key_factory(prefix=prefix)
+            key, id = self._key_factory(prefix=prefix)
+
+        #: Key used for this collection in Redis.
+        self.key = key
+
+        #: ID of the collection.
+        self.id = id
 
     def _id_factory(self):
         """Creates default collection ID using :mod:`uuid`.
@@ -134,12 +147,19 @@ class RedisCollection:
         return self.pickler.loads(string)
 
     def _create_instance(self, *args, **kwargs):
+        """Creates instance of the same type of collection using the same
+        arguments as were given to :func:`__init__` of current object.
+
+        If some of such arguments are provided in *kwargs* explicitely,
+        they are not overriden.
+        """
         kwargs.setdefault('redis', self.redis)
         kwargs.setdefault('pickler', self.pickler)
         kwargs.setdefault('prefix', self.prefix)
         return self.__class__(*args, **kwargs)
 
     def clear(self):
+        """Completely cleares the collection's data."""
         self.redis.delete(self.key)
 
     def __repr__(self):
