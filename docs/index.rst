@@ -23,11 +23,6 @@ Redis Collections have only one module with several classes representing provide
     :members:
     :special-members:
 
-License: ISC
-------------
-
-.. include:: ../LICENSE
-
 Indices and tables
 ------------------
 
