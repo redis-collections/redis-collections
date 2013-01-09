@@ -19,8 +19,8 @@ except ImportError:
 
 
 class RedisCollection:
-    """Abstract class providing backend functionality for all Redis
-    collections.
+    """Abstract class providing backend functionality for all the other
+    Redis collections.
     """
 
     __metaclass__ = ABCMeta
@@ -36,11 +36,11 @@ class RedisCollection:
 
         :param redis: Redis client instance. If not provided, default Redis
                       connection is used.
-        :type redis: :class:`redis.StrictRedis` or None
+        :type redis: :class:`redis.StrictRedis` or :obj:`None`
         :param id: ID of the collection. Collections with the same IDs point
                    to the same data. If not provided, default random ID string
                    is generated.
-        :type id: str or None
+        :type id: str or :obj:`None`
         :param pickler: Implementation of data serialization. Object with two
                         methods is expected: :func:`dumps` for conversion
                         of data to string and :func:`loads` for the opposite
@@ -55,7 +55,7 @@ class RedisCollection:
                         serialization implementation uses :mod:`pickle`.
         :param prefix: Key prefix to use when working with Redis. Default is
                        empty string.
-        :type prefix: str or None
+        :type prefix: str or :obj:`None`
         """
         self.redis = redis or self._redis_factory()
         self.pickler = pickler or pickle  # standard pickle module as default
@@ -87,13 +87,14 @@ class RedisCollection:
         found, :exc:`RuntimeError` is raised.
 
         :param id: Collection ID.
-        :type id: string or None
+        :type id: string or :obj:`None`
         :param prefix: Key prefix to use when working with Redis.
-        :type prefix: string or None
+        :type prefix: string or :obj:`None`
         :rtype: tuple of strings (key, id)
         """
         def create_key(id):
-            components = [prefix, '_redis_collections', id]
+            name = self.__class__.__name__.lower()
+            components = [prefix, '_redis_collections', '_' + name, id]
             return '.'.join(filter(None, components))
 
         if id:
@@ -120,11 +121,11 @@ class RedisCollection:
 
     def _unpickle(self, string):
         """Converts given string serialization back to corresponding data.
-        If ``None`` or empty string given, ``None`` is returned.
+        If :obj:`None` or empty string given, :obj:`None` is returned.
 
         :param string: String to be unserialized.
         :type string: string
-        :rtype: anything serializable or None
+        :rtype: anything serializable or :obj:`None`
         """
         if string is None or string == '':
             return None
@@ -148,75 +149,153 @@ class RedisCollection:
 
 
 class Dict(RedisCollection, collections.MutableMapping):
-    # http://docs.python.org/2/library/stdtypes.html#mapping-types-dict
-    # http://redis.io/commands#hash
+    """Mutable **mapping** collection aiming to have the same API as the
+    standard mapping type, dict. See `dict
+    <http://docs.python.org/2/library/stdtypes.html#mapping-types-dict>`_ for
+    further details. The Redis implementation is based on the
+    `hash <http://redis.io/commands#hash>`_ type.
+
+    In comparing with original dict type, Dict does not implement
+    methods :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues`.
+    Some operations, which are usually not used so often, can be more
+    efficient than their "popular" equivalents. For example :func:`get`
+    should be preffered over the classic ``d[key]`` approach.
+    """
 
     __marker = object()
 
     def __init__(self, values=None, **kwargs):
+        """Breakes original dict API, because does not support keyword syntax
+        for mapping initialization. The only one way to create Dict object is
+        to pass iterable or mapping as the first argument. Remaining arguments
+        are given to :func:`RedisCollection.__init__`.
+        """
         super(Dict, self).__init__(**kwargs)
         if values:
             self.update(values)
 
     def __len__(self):
+        """Return the number of items in the dictionary."""
         return self.redis.hlen(self.key)
 
     def __iter__(self):
+        """Return an iterator over the keys of the dictionary."""
         return self.iterkeys()
 
     def __contains__(self, key):
+        """Return ``True`` if ``Dict`` instance has a key
+        *key*, else ``False``.
+        """
         return self.redis.hexists(self.key, key)
 
     def get(self, key, default=None):
+        """Return the value for *key* if *key* is in the dictionary, else
+        *default*. If *default* is not given, it defaults to :obj:`None`,
+        so that this method never raises a :exc:`KeyError`.
+
+        Due to implementation on Redis side, this method of retrieving
+        items is more efficient than classic approach over using the
+        :func:`__getitem__` protocol.
+        """
         value = self.redis.hget(self.key, key)
         return self._unpickle(value) or default
 
     def __getitem__(self, key):
+        """Return the item of dictionary with key *key*. Raises a
+        exc:`KeyError` if key is not in the map.
+
+        If a subclass of Dict defines a method :func:`__missing__`, if
+        the key *key* is not present, the ``d[key]`` operation calls that
+        method with the key *key* as argument. The ``d[key]`` operation
+        then returns or raises whatever is returned or raised by
+        the ``__missing__(key)`` call if the key is not present.
+
+        Due to implementation on Redis side, this method of retrieving
+        items is not very efficient. If possible, use :func:`get`.
+        """
         pipe = self.redis.pipeline()
         pipe.hexists(self.key, key)
         pipe.hget(self.key, key)
         exists, value = pipe.execute()
 
         if not exists:
+            if hasattr(self, '__missing__'):
+                return self.__missing__(key)
             raise KeyError(key)
         return self._unpickle(value)
 
     def __setitem__(self, key, value):
+        """Set ``d[key]`` to *value*."""
         value = self._pickle(value)
         self.redis.hset(self.key, key, value)
 
     def __delitem__(self, key):
+        """Remove ``d[key]`` from dictionary. Raises
+        a :func:`KeyError` if *key* is not in the map.
+
+        Due to implementation on Redis side, this method of deleting
+        items is not very efficient. If possible, use :func:`discard`.
+        """
+        pipe = self.redis.pipeline()
+        pipe.hexists(self.key, key)
+        pipe.hdel(self.key, key)
+        exists, _ = pipe.execute()
+
+        if not exists:
+            raise KeyError(key)
+
+    def discard(self, key):
+        """Remove ``d[key]`` from dictionary if it is present.
+
+        Due to implementation on Redis side, this method of retrieving
+        items is more efficient than classic approach over using the
+        :func:`__delitem__` protocol.
+        """
         self.redis.hdel(self.key, key)
 
     def items(self):
+        """Return a copy of the dictionary's list of ``(key, value)`` pairs."""
         result = self.redis.hgetall(self.key).items()
         return [(k, self._unpickle(v)) for (k, v) in result]
 
     def iteritems(self):
+        """Return an iterator over the dictionary's ``(key, value)`` pairs."""
         result = self.redis.hgetall(self.key).iteritems()
         return ((k, self._unpickle(v)) for (k, v) in result)
 
     def keys(self):
+        """Return a copy of the dictionary's list of keys."""
         return self.redis.hkeys(self.key)
 
     def iter(self):
+        """Return an iterator over the keys of the dictionary.
+        This is a shortcut for :func:`iterkeys()`.
+        """
         return self.iterkeys()
 
     def iterkeys(self):
+        """Return an iterator over the dictionary's keys."""
         return iter(self.redis.hkeys(self.key))
 
     def values(self):
+        """Return a copy of the dictionary's list of values."""
         result = self.redis.hvals(self.key)
         return [self._unpickle(v) for v in result]
 
     def itervalues(self):
+        """Return an iterator over the dictionary's values."""
         result = iter(self.redis.hvals(self.key))
         return (self._unpickle(v) for v in result)
 
     def copy(self):
+        """Return a copy of the dictionary."""
         return self._create_instance(values=self)
 
     def pop(self, key, default=__marker):
+        """If *key* is in the dictionary, remove it and return its value,
+        else return *default*. If *default* is not given and *key* is not
+        in the dictionary, a :exc:`KeyError` is raised.
+        """
         pipe = self.redis.pipeline()
         pipe.hget(self.key, key)
         pipe.hdel(self.key, key)
@@ -229,6 +308,14 @@ class Dict(RedisCollection, collections.MutableMapping):
         return self._unpickle(value)
 
     def popitem(self):
+        """Remove and return an arbitrary ``(key, value)`` pair from
+        the dictionary.
+
+        :func:`popitem` is useful to destructively iterate over
+        a dictionary, as often used in set algorithms. If
+        the dictionary is empty, calling :func:`popitem` raises
+        a :exc:`KeyError`.
+        """
         key = None
         value = None
 
@@ -257,6 +344,10 @@ class Dict(RedisCollection, collections.MutableMapping):
         return key, self._unpickle(value)
 
     def setdefault(self, key, default=None):
+        """If *key* is in the dictionary, return its value.
+        If not, insert *key* with a value of *default* and
+        return *default*. *default* defaults to :obj:`None`.
+        """
         pipe = self.redis.pipeline()
         pipe.hsetnx(self.key, key, self._pickle(default))
         pipe.hget(self.key, key)
@@ -265,6 +356,16 @@ class Dict(RedisCollection, collections.MutableMapping):
         return self._unpickle(value)
 
     def update(self, *args, **kwargs):
+        """
+        Update the dictionary with the key/value pairs from *other*,
+        overwriting existing keys. Return :obj:`None`.
+
+        :func:`update` accepts either another dictionary object or
+        an iterable of key/value pairs (as tuples or other iterables
+        of length two). If keyword arguments are specified, the
+        dictionary is then updated with those key/value pairs:
+        ``d.update(red=1, blue=2)``.
+        """
         mapping = {}
         mapping.update(*args, **kwargs)
 
@@ -275,34 +376,62 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):
+        """Create a new dictionary with keys from *seq* and values set to
+        *value*.
+
+        :func:`fromkeys` is a class method that returns a new dictionary.
+        *value* defaults to :obj:`None`. It is possible to specify
+        additional keyword arguments to be passed to :func:`__init__` of
+        the new object.
+        """
         values = ((item, value) for item in seq)
         return cls(values, **kwargs)
 
 
 class List(RedisCollection, collections.MutableSequence):
-    # http://docs.python.org/2/library/functions.html#list
-    # http://hg.python.org/cpython/file/2.7/Lib/_abcoll.py#l517
-    # http://redis.io/commands#list
+    """Mutable **sequence** collection aiming to have the same API as the
+    standard sequence type, list. See `list
+    <http://docs.python.org/2/library/functions.html#list>`_ for
+    further details. The Redis implementation is based on the
+    `list <http://redis.io/commands#list>`_ type.
+
+    In comparing with original list type, List does not implement
+    methods :func:`sort` and :func:`reverse`. Some operations, which
+    are usually not used so often, can be more  efficient than their
+    "popular" equivalents. Some operations are shortened in its
+    capabilities and can raise :exc:`NotImplementedError` for some
+    inputs (e.g. slicing).
+    """
 
     def __init__(self, values=None, **kwargs):
+        """Pass iterable as the first argument. Remaining arguments are given
+        to :func:`RedisCollection.__init__`.
+        """
         super(List, self).__init__(**kwargs)
         if values:
             self.extend(values)
 
     def __len__(self):
+        """Length of the sequence."""
         return self.redis.llen(self.key)
 
     def __iter__(self):
+        """Return an iterator over the sequence."""
         values = self.redis.lrange(self.key, 0, -1)
         return (self._unpickle(v) for v in values)
 
     def __reversed__(self):
+        """Returns iterator for the sequence in reversed order."""
         values = self.redis.lrange(self.key, 0, -1)
         return (self._unpickle(v) for v in reversed(values))
 
     def _recalc_slice(self, start, stop):
         """Slicing in Redis takes also the item at 'stop' index, so there is
-        some recalculation to be done.
+        some recalculation to be done. Method returns tuple ``(start, stop)``
+        where both values are recalculated to numbers in Redis terms.
+
+        :param start: Index starting the range (in Python terms).
+        :param stop: Index where the range ends (in Python terms).
         """
         start = start or 0
         if stop is None:
@@ -312,9 +441,21 @@ class List(RedisCollection, collections.MutableSequence):
         return start, stop
 
     def _calc_overflow(self, size, index):
+        """Index overflow detection. Returns :obj:`True` if *index* is out of
+        range for the given *size*. Otherwise returns :obj:`False`.
+
+        :param size: Size of the collection.
+        :param index: Index to be examined.
+        """
         return (index >= size) if (index >= 0) else (abs(index) > size)
 
     def __getitem__(self, index):
+        """Returns item of sequence on index *index*.
+        Origin of indexes is 0. Accepts also slicing.
+
+        Due to implementation on Redis side, this method of retrieving
+        items is not very efficient. If possible, use :func:`get`.
+        """
         if isinstance(index, slice):
             start, stop = self._recalc_slice(index.start, index.stop)
             values = self.redis.lrange(self.key, start, stop)
@@ -332,7 +473,28 @@ class List(RedisCollection, collections.MutableSequence):
             raise IndexError(index)
         return self._unpickle(value)
 
+    def get(self, index, default=None):
+        """Return the value for *index* if *index* is not out of range, else
+        *default*. If *default* is not given, it defaults to :obj:`None`, so
+        that this method never raises a :exc:`IndexError`.
+
+        Due to implementation on Redis side, this method of retrieving
+        items is more efficient than classic approach over using the
+        :func:`__getitem__` protocol.
+        """
+        value = self.redis.lindex(self.key, index)
+        return self._unpickle(value) or default
+
     def __setitem__(self, index, value):
+        """Item of index *index* is replaced by *value*.
+
+        Slicing is generally not supported. Only empty lists are accepted if
+        the operation leads into trimming::
+
+            l[2:] = []
+            l[:2] = []
+            l[:] = []
+        """
         if isinstance(index, slice):
             if value:
                 # assigning anything else than empty lists not supported
@@ -349,6 +511,15 @@ class List(RedisCollection, collections.MutableSequence):
             self.redis.transaction(set_trans, self.key)
 
     def __delitem__(self, index):
+        """Item of index *index* is deleted.
+
+        Slicing is generally not supported. Only empty lists are accepted if
+        the operation leads into trimming::
+
+            del l[2:]
+            del l[:2]
+            del l[:]
+        """
         begin = 0
         end = -1
 
@@ -384,9 +555,15 @@ class List(RedisCollection, collections.MutableSequence):
                 raise NotImplementedError(self.not_impl_msg)
 
     def remove(self, value):
+        """Remove the first occurence of *value*."""
         self.redis.lrem(self.key, 1, self._pickle(value))
 
     def index(self, value, start=None, stop=None):
+        """Returns index of the first occurence of *value*.
+
+        If *start* or *stop* are provided, returns the smallest
+        index such that ``s[index] == value`` and ``start <= index < stop``.
+        """
         start, stop = self._recalc_slice(start, stop)
         values = self.redis.lrange(self.key, start, stop)
 
@@ -396,6 +573,9 @@ class List(RedisCollection, collections.MutableSequence):
         raise ValueError(value)
 
     def insert(self, index, value):
+        """Item of index *index* is replaced by *value*. If *index* is out of
+        range, the *value* is prepended or appended (no error is raised).
+        """
         def insert_trans(pipe):
             size = pipe.llen(self.key)
             pipe.multi()
@@ -411,10 +591,18 @@ class List(RedisCollection, collections.MutableSequence):
         self.redis.transaction(insert_trans, self.key)
 
     def extend(self, values):
+        """*values* are appended at the end of the list. Any iterable
+        is accepted.
+        """
         values = map(self._pickle, values)
         self.redis.rpush(self.key, *values)
 
     def pop(self, index=-1):
+        """Item on *index* is removed and returned.
+
+        Only indexes ``0`` and ``-1`` (default) are supported, otherwise
+        :exc:`NotImplementedError` is raised.
+        """
         if index == 0:
             value = self.redis.lpop(self.key)
         elif index == -1:
@@ -424,25 +612,44 @@ class List(RedisCollection, collections.MutableSequence):
         return self._unpickle(value)
 
     def __add__(self, values):
+        """Returns concatenation of the list and given iterable.
+
+        New List instance is returned. The same arguments given to
+        :func:`__init__` of the list are used for creation of the new
+        instance.
+        """
         other = self._create_instance(values=self)
         other.extend(values)
         return other
 
     def __mul__(self, n):
+        """Returns *n* copies of the list, concatenated.
+
+        New List instance is returned. The same arguments given to
+        :func:`__init__` of this list are used for creation of the new
+        instance.
+        """
         if not isinstance(n, int):
             raise TypeError('Cannot multiply sequence by non-int.')
-        other = self._create_instance()
-        for _ in xrange(0, n):
-            other.extend(self)
-        return other
+        return self._create_instance(list(self) * n)
 
     def __rmul__(self, n):
+        """Returns *n* copies of the list, concatenated.
+
+        New List instance is returned. The same arguments given to
+        :func:`__init__` of this list are used for creation of the new
+        instance.
+        """
         return self.__mul__(n)
 
 
 class Set(RedisCollection, collections.MutableSet):
-    # http://docs.python.org/2/library/stdtypes.html#set
-    # http://redis.io/commands#set
+    """Mutable **set** collection aiming to have the same API as the standard
+    set type. See `set
+    <http://docs.python.org/2/library/stdtypes.html#set>`_ for
+    further details. The Redis implementation is based on the
+    `list <http://redis.io/commands#set>`_ type.
+    """
 
     def __init__(self):
         pass
@@ -464,8 +671,14 @@ class Set(RedisCollection, collections.MutableSet):
 
 
 class SortedSet(RedisCollection, collections.MutableSet):
-    # http://docs.python.org/2/library/stdtypes.html#set
-    # http://redis.io/commands#sorted_set
+    """Mutable **sorted set** collection aiming to have the same API as the
+    standard set type. See `set
+    <http://docs.python.org/2/library/stdtypes.html#set>`_ for
+    further details. The Redis implementation is based on the
+    `list <http://redis.io/commands#sorted_set>`_ type.
+    """
+
+    # http://code.activestate.com/recipes/576694/
 
     def __init__(self):
         pass
@@ -484,3 +697,15 @@ class SortedSet(RedisCollection, collections.MutableSet):
 
     def discard(self, value):
         pass
+
+
+class Deque(List):
+    pass
+
+
+class Counter(Dict):
+    pass
+
+
+class DefaultDict(Dict):
+    pass

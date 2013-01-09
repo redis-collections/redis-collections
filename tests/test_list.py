@@ -47,13 +47,19 @@ class ListTest(unittest.TestCase):
         self.assertEqual(list(l1 * 0), [])
         self.assertEqual(list(l1 * -1), [])
 
-    def test_set_overflow(self):
+    def test_set_get_overflow(self):
         l = self.create_list([1, 2, 3])
+
+        def get_overflow(l):
+            return l[42]
 
         def set_overflow(l):
             l[42] = 5
 
+        self.assertRaises(IndexError, get_overflow, l)
         self.assertRaises(IndexError, set_overflow, l)
+        self.assertEqual(l.get(42), None)
+        self.assertEqual(l.get(1), 2)
 
     def test_index_count(self):
         l = self.create_list([1, 2, 3])
