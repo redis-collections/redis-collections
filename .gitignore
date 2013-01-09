@@ -21,6 +21,9 @@ pip-log.txt
 .tox
 .noseids
 
+# Docs by Sphinx
+_build
+
 # Environment
 .env
 
