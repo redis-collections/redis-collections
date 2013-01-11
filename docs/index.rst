@@ -31,7 +31,7 @@ The value is pickled, because Redis can store only strings mostly. On Python sid
     >>> dict(d.items())
     {'jagr': 68, 'hasek': 39}
 
-Every such operation atomically changes data in Redis.
+Every such operation changes data in Redis.
 
 Installation
 ------------
@@ -94,7 +94,7 @@ If you don't like the standard way of data serialization made by :mod:`pickle`, 
 Additional notes
 ----------------
 
-*   All operations are atomic.
+*   Most operations are atomic. Documentation warns in case of race conditions.
 *   Redis Collections try to stick to API of the original data structures known from pure Python.
     To have the same (expected) behaviour is considered to be more important than efficiency.
 
@@ -121,6 +121,10 @@ Redis Collections have only one module with several classes representing provide
     :special-members:
 
 .. autoclass:: List
+    :members:
+    :special-members:
+
+.. autoclass:: Set
     :members:
     :special-members:
 

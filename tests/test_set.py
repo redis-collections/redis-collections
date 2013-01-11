@@ -29,7 +29,7 @@ class SetTest(unittest.TestCase):
         s = self.create_set('abc')
         self.assertEqual(sorted(s), ['a', 'b', 'c'])
         s = self.create_set('antananarivo')
-        self.assertEqual(sorted(s), ['a', 'i', 'o', 'n', 'r', 't', 'v'])
+        self.assertEqual(sorted(s), ['a', 'i', 'n', 'o', 'r', 't', 'v'])
         s = self.create_set()
         self.assertEqual(sorted(s), [])
 
@@ -123,13 +123,8 @@ class SetTest(unittest.TestCase):
         l = [6]
         self.assertEqual(sorted(s1 ^ s2), [1, 2, 4, 5])
         self.assertEqual(sorted(s1.symmetric_difference(s2)), [1, 2, 4, 5])
-        self.assertEqual(sorted(s1 ^ s2 ^ s3),
-                         [1, 2, 4, 5, 6])
-        self.assertEqual(sorted(s1.symmetric_difference(s2, s3)),
-                         [1, 2, 4, 5, 6])
+        self.assertEqual(sorted(s1 ^ s2 ^ s3), [1, 2, 4, 5, 6])
         self.assertRaises(TypeError, lambda: s1 ^ s2 ^ l)
-        self.assertEqual(sorted(s1.symmetric_difference(s2, l)),
-                         [1, 2, 4, 5, 6])
 
     def test_copy(self):
         s1 = self.create_set('abc')
@@ -140,7 +135,7 @@ class SetTest(unittest.TestCase):
 
     def test_result_type(self):
         s1 = self.create_set('ab')
-        s2 = frozenset('bc')
+        s2 = set('bc')
         s3 = s1 | s2
         s4 = s2 | s1
         self.assertEqual(s3.__class__, s1.__class__)
@@ -162,7 +157,7 @@ class SetTest(unittest.TestCase):
         s1 &= s2
         self.assertEqual(sorted(s1), ['b'])
         s1.intersection_update(s2, st)
-        self.assertEqual(sorted(s1), [''])
+        self.assertEqual(sorted(s1), [])
 
     def test_difference_update(self):
         s1 = self.create_set('ab')
@@ -179,7 +174,7 @@ class SetTest(unittest.TestCase):
         st = 'cd'
         s1 ^= s2
         self.assertEqual(sorted(s1), ['a', 'c'])
-        s1.symmetric_difference_update(s2, st)
+        s1.symmetric_difference_update(st)
         self.assertEqual(sorted(s1), ['a', 'd'])
 
     def test_add(self):
