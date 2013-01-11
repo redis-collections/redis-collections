@@ -12,7 +12,7 @@ Under active development and maintenance.
 Documentation
 -------------
 
-→ `redis_collections.readthedocs.org <https://redis_collections.readthedocs.org/>`_.
+**→** `redis-collections.readthedocs.org <https://redis-collections.readthedocs.org/>`_
 
 License: ISC
 ------------
