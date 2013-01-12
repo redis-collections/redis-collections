@@ -197,6 +197,17 @@ class SetTest(unittest.TestCase):
         self.assertEqual(sorted(s), [])
         self.assertRaises(KeyError, s.pop)
 
+    def test_random_sample(self):
+        s = self.create_set('a')
+        self.assertEqual(s.random_sample(), ['a'])
+
+        version = map(int, self.redis.info()['redis_version'].split('.'))
+        major_ver, minor_ver, _ = version
+
+        if major_ver >= 2 and minor_ver >= 6:
+            s = self.create_set('ab')
+            self.assertEqual(s.random_sample(2), ['a', 'b'])
+
     def test_clear(self):
         s = self.create_set('abcdefg')
         s.clear()
