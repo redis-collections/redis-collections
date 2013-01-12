@@ -81,6 +81,13 @@ class Dict(RedisCollection, collections.MutableMapping):
         value = self.redis.hget(self.key, key)
         return self._unpickle(value) or default
 
+    def get_many(self, *keys):
+        """Return the value for *keys*. If particular key is not in the
+        dictionary, return :obj:`None`.
+        """
+        values = self.redis.hmget(self.key, *keys)
+        return map(self._unpickle, values)
+
     def __getitem__(self, key):
         """Return the item of dictionary with key *key*. Raises a
         :exc:`KeyError` if key is not in the map.

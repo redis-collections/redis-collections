@@ -28,6 +28,13 @@ class DictTest(unittest.TestCase):
         d['a'] = 'b'
         self.assertEqual(d['a'], 'b')
 
+    def test_get_many(self):
+        d = self.create_dict()
+        d['a'] = 'b'
+        d['c'] = 'd'
+        d['e'] = 'f'
+        self.assertEqual(d.get_many('a', 'e', 'x'), ['b', 'f', None])
+
     def test_init(self):
         d = self.create_dict(zip(['one', 'two', 'three'], [1, 2, 3]))
         self.assertEqual(sorted(d.items()),
