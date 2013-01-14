@@ -93,10 +93,10 @@ class Set(RedisCollection, collections.MutableSet):
         """Remove and return an arbitrary element from the set.
         Raises :exc:`KeyError` if the set is empty.
         """
-        pipe = self.redis.pipeline()
-        pipe.scard(self.key)
-        pipe.spop(self.key)
-        size, elem = pipe.execute()
+        with self.redis.pipeline() as pipe:
+            pipe.scard(self.key)
+            pipe.spop(self.key)
+            size, elem = pipe.execute()
 
         if not size:
             raise KeyError
@@ -512,10 +512,10 @@ class Set(RedisCollection, collections.MutableSet):
 
         if isinstance(other, Set):
             # operation can be performed partly in Redis and returned to Python
-            pipe = self.redis.pipeline()
-            pipe.sdiff(self.key, other.key)
-            pipe.sdiff(other.key, self.key)
-            diff1, diff2 = pipe.execute()
+            with self.redis.pipeline() as pipe:
+                pipe.sdiff(self.key, other.key)
+                pipe.sdiff(other.key, self.key)
+                diff1, diff2 = pipe.execute()
             elements = map(self._unpickle, diff1 | diff2)
             return self._create_new(elements, type=return_type)
 
@@ -565,10 +565,10 @@ class Set(RedisCollection, collections.MutableSet):
         """
         if isinstance(other, Set):
             # operation can be performed in Redis completely
-            pipe = self.redis.pipeline()
-            pipe.sdiff(self.key, other.key)
-            pipe.sdiff(other.key, self.key)
-            diff1, diff2 = pipe.execute()
+            with self.redis.pipeline() as pipe:
+                pipe.sdiff(self.key, other.key)
+                pipe.sdiff(other.key, self.key)
+                diff1, diff2 = pipe.execute()
             elements = diff1 | diff2
             return self._create_new(elements, id=self.id)
 
@@ -600,10 +600,10 @@ class Set(RedisCollection, collections.MutableSet):
         if not isinstance(other, collections.Set):
             return NotImplemented
         if isinstance(other, Set):
-            pipe = self.redis.pipeline()
-            pipe.smembers(self.key)
-            pipe.smembers(other.key)
-            members1, members2 = pipe.execute()
+            with self.redis.pipeline() as pipe:
+                pipe.smembers(self.key)
+                pipe.smembers(other.key)
+                members1, members2 = pipe.execute()
             return members1 == members2
         return frozenset(self) == frozenset(other)
 
@@ -616,10 +616,10 @@ class Set(RedisCollection, collections.MutableSet):
         if not isinstance(other, collections.Set):
             return NotImplemented
         if isinstance(other, Set):
-            pipe = self.redis.pipeline()
-            pipe.smembers(self.key)
-            pipe.sinter(self.key, other.key)
-            pipe.scard(other.key)
+            with self.redis.pipeline() as pipe:
+                pipe.smembers(self.key)
+                pipe.sinter(self.key, other.key)
+                pipe.scard(other.key)
             members, inters, other_size = pipe.execute()
             return (members == inters and len(members) != other_size)
         return frozenset(self) < frozenset(other)
@@ -631,10 +631,10 @@ class Set(RedisCollection, collections.MutableSet):
         :rtype: boolean
         """
         if isinstance(other, Set):
-            pipe = self.redis.pipeline()
-            pipe.smembers(self.key)
-            pipe.sinter(self.key, other.key)
-            members, inters = pipe.execute()
+            with self.redis.pipeline() as pipe:
+                pipe.smembers(self.key)
+                pipe.sinter(self.key, other.key)
+                members, inters = pipe.execute()
             return members == inters
         return frozenset(self) <= frozenset(other)
 

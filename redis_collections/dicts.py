@@ -125,10 +125,10 @@ class Dict(RedisCollection, collections.MutableMapping):
             Due to implementation on Redis side, this method of retrieving
             items is not very efficient. If possible, use :func:`get`.
         """
-        pipe = self.redis.pipeline()
-        pipe.hexists(self.key, key)
-        pipe.hget(self.key, key)
-        exists, value = pipe.execute()
+        with self.redis.pipeline() as pipe:
+            pipe.hexists(self.key, key)
+            pipe.hget(self.key, key)
+            exists, value = pipe.execute()
 
         if not exists:
             if hasattr(self, '__missing__'):
@@ -149,10 +149,10 @@ class Dict(RedisCollection, collections.MutableMapping):
             Due to implementation on Redis side, this method of deleting
             items is not very efficient. If possible, use :func:`discard`.
         """
-        pipe = self.redis.pipeline()
-        pipe.hexists(self.key, key)
-        pipe.hdel(self.key, key)
-        exists, _ = pipe.execute()
+        with self.redis.pipeline() as pipe:
+            pipe.hexists(self.key, key)
+            pipe.hdel(self.key, key)
+            exists, _ = pipe.execute()
 
         if not exists:
             raise KeyError(key)
@@ -210,10 +210,10 @@ class Dict(RedisCollection, collections.MutableMapping):
         else return *default*. If *default* is not given and *key* is not
         in the dictionary, a :exc:`KeyError` is raised.
         """
-        pipe = self.redis.pipeline()
-        pipe.hget(self.key, key)
-        pipe.hdel(self.key, key)
-        value, existed = pipe.execute()
+        with self.redis.pipeline() as pipe:
+            pipe.hget(self.key, key)
+            pipe.hdel(self.key, key)
+            value, existed = pipe.execute()
 
         if not existed:
             if default is self.__marker:
@@ -230,13 +230,10 @@ class Dict(RedisCollection, collections.MutableMapping):
         the dictionary is empty, calling :func:`popitem` raises
         a :exc:`KeyError`.
         """
-        results = []
-
         def popitem_trans(pipe):
             # get an 'arbitrary' key
             try:
                 key = pipe.hkeys(self.key)[0]
-                results.append(key)
             except IndexError:
                 raise KeyError
 
@@ -245,10 +242,10 @@ class Dict(RedisCollection, collections.MutableMapping):
             pipe.hget(self.key, key)
             pipe.hdel(self.key, key)
             value, _ = pipe.execute()
-            results.append(value)
 
-        self.redis.transaction(popitem_trans, self.key)
-        key, value = results
+            return key, value
+
+        key, value = self._transaction(popitem_trans)
         return key, self._unpickle(value)
 
     def setdefault(self, key, default=None):
@@ -256,11 +253,10 @@ class Dict(RedisCollection, collections.MutableMapping):
         If not, insert *key* with a value of *default* and
         return *default*. *default* defaults to :obj:`None`.
         """
-        pipe = self.redis.pipeline()
-        pipe.hsetnx(self.key, key, self._pickle(default))
-        pipe.hget(self.key, key)
-        _, value = pipe.execute()
-
+        with self.redis.pipeline() as pipe:
+            pipe.hsetnx(self.key, key, self._pickle(default))
+            pipe.hget(self.key, key)
+            _, value = pipe.execute()
         return self._unpickle(value)
 
     def _update(self, data, pipe=None):

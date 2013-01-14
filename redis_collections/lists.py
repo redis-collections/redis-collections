@@ -111,10 +111,8 @@ class List(RedisCollection, collections.MutableSequence):
     def _get_slice(self, index):
         """Helper for getting a slice."""
         assert isinstance(index, slice)
-        new_id, new_key = self._create_new_id()
-        results = []
 
-        def slice_trans(pipe):
+        def slice_trans(pipe, new_id):
             start, stop = self._recalc_slice(index.start, index.stop)
             values = pipe.lrange(self.key, start, stop)
             if index.step:
@@ -123,11 +121,9 @@ class List(RedisCollection, collections.MutableSequence):
             values = map(self._unpickle, values)
 
             pipe.multi()
-            new_list = self._create_new(values, id=new_id, pipe=pipe)
-            results.append(new_list)
+            return self._create_new(values, id=new_id, pipe=pipe)
 
-        self.redis.transaction(slice_trans, self.key, new_key)
-        return results[0]
+        return self._transaction_with_new(slice_trans)
 
     def __getitem__(self, index):
         """Returns item of sequence on *index*.
@@ -141,8 +137,10 @@ class List(RedisCollection, collections.MutableSequence):
         if isinstance(index, slice):
             return self._get_slice(index)
 
-        pipe = self.redis.pipeline()
-        size, value = pipe.llen(self.key).lindex(self.key, index).execute()
+        with self.redis.pipeline() as pipe:
+            pipe.llen(self.key)
+            pipe.lindex(self.key, index)
+            size, value = pipe.execute()
 
         if self._calc_overflow(size, index):
             raise IndexError(index)
@@ -161,6 +159,15 @@ class List(RedisCollection, collections.MutableSequence):
         value = self.redis.lindex(self.key, index)
         return self._unpickle(value) or default
 
+    def _set_slice(self, index, value):
+        """Helper for setting a slice."""
+        assert isinstance(index, slice)
+
+        if value:
+            # assigning anything else than empty lists not supported
+            raise NotImplementedError(self.not_impl_msg)
+        self.__delitem__(index)
+
     def __setitem__(self, index, value):
         """Item of *index* is replaced by *value*.
 
@@ -173,10 +180,7 @@ class List(RedisCollection, collections.MutableSequence):
                 l[:] = []
         """
         if isinstance(index, slice):
-            if value:
-                # assigning anything else than empty lists not supported
-                raise NotImplementedError(self.not_impl_msg)
-            self.__delitem__(index)
+            self._set_slice(index, value)
         else:
             def set_trans(pipe):
                 size = pipe.llen(self.key)
@@ -185,7 +189,37 @@ class List(RedisCollection, collections.MutableSequence):
                 pipe.multi()
                 pipe.lset(self.key, index, self._pickle(value))
 
-            self.redis.transaction(set_trans, self.key)
+            self._transaction(set_trans)
+
+    def _del_slice(self, index):
+        """Helper for deleting a slice."""
+        assert isinstance(index, slice)
+
+        begin = 0
+        end = -1
+
+        if index.step:
+            # stepping not supported
+            raise NotImplementedError(self.not_impl_msg)
+
+        start, stop = self._recalc_slice(index.start, index.stop)
+
+        if start == begin and stop == end:
+            # trim from beginning to end
+            self.clear()
+            return
+
+        with self.redis.pipeline() as pipe:
+            if start != begin and stop == end:
+                # right trim
+                pipe.ltrim(self.key, begin, start - 1)
+            elif start == begin and stop != end:
+                # left trim
+                pipe.ltrim(self.key, stop + 1, end)
+            else:
+                # only trimming is supported
+                raise NotImplementedError(self.not_impl_msg)
+            pipe.execute()
 
     def __delitem__(self, index):
         """Item of *index* is deleted.
@@ -202,28 +236,7 @@ class List(RedisCollection, collections.MutableSequence):
         end = -1
 
         if isinstance(index, slice):
-            if index.step:
-                # stepping not supported
-                raise NotImplementedError(self.not_impl_msg)
-
-            start, stop = self._recalc_slice(index.start, index.stop)
-
-            if start == begin and stop == end:
-                # trim from beginning to end
-                self.clear()
-                return
-
-            pipe = self.redis.pipeline()
-            if start != begin and stop == end:
-                # right trim
-                pipe.ltrim(self.key, begin, start - 1)
-            elif start == begin and stop != end:
-                # left trim
-                pipe.ltrim(self.key, stop + 1, end)
-            else:
-                # only trimming is supported
-                raise NotImplementedError(self.not_impl_msg)
-            pipe.execute()
+            self._del_slice(index)
         else:
             if index == begin:
                 self.redis.lpop(self.key)
@@ -266,7 +279,7 @@ class List(RedisCollection, collections.MutableSequence):
             else:
                 pipe.lset(self.key, index, pickled_value)
 
-        self.redis.transaction(insert_trans, self.key)
+        self._transaction(insert_trans)
 
     def _update(self, data, pipe=None):
         redis = pipe or self.redis
@@ -301,12 +314,10 @@ class List(RedisCollection, collections.MutableSequence):
         .. warning::
             **Operation is not atomic.**
         """
-        pipe = self.redis.pipeline()
-
-        other = self._create_new(self, pipe=pipe)
-        other._update(values, pipe=pipe)
-
-        pipe.execute()
+        with self.redis.pipeline() as pipe:
+            other = self._create_new(self, pipe=pipe)
+            other._update(values, pipe=pipe)
+            pipe.execute()
         return other
 
     def __mul__(self, n):

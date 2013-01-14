@@ -286,11 +286,11 @@ class RedisCollection:
         self._clear()
 
     def _transaction(self, fn):
-        """Helper simplifying code within transaction.
+        """Helper simplifying code within watched transaction.
 
-        Takes *fn*, function treated as a transaction. Returns
-        whatever this *fn* returns. ``self.key`` is watched.
-        *fn* takes *pipe* as the only argument.
+        Takes *fn*, function treated as a transaction. Returns whatever
+        *fn* returns. ``self.key`` is watched. *fn* takes *pipe* as the
+        only argument.
         """
         results = []
 
@@ -304,10 +304,9 @@ class RedisCollection:
         """Helper simplifying code within transaction which
         creates a new instance of a Redis collection.
 
-        Takes *fn*, function treated as a transaction. Returns
-        whatever this *fn* returns. ``self.key`` and the new key
-        are watched. *fn* takes *pipe* as the first argument and
-        the new ID as the second.
+        Takes *fn*, function treated as a transaction. Returns whatever
+        *fn* returns. ``self.key`` and the new key are watched.
+        *fn* takes *pipe* as the first argument and the new ID as the second.
         """
         results = []
         new_id, new_key = self._create_new_id()
