@@ -620,7 +620,7 @@ class Set(RedisCollection, collections.MutableSet):
                 pipe.smembers(self.key)
                 pipe.sinter(self.key, other.key)
                 pipe.scard(other.key)
-            members, inters, other_size = pipe.execute()
+                members, inters, other_size = pipe.execute()
             return (members == inters and len(members) != other_size)
         return frozenset(self) < frozenset(other)
 
