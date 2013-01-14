@@ -310,33 +310,32 @@ class List(RedisCollection, collections.MutableSequence):
     def __add__(self, values):
         """Returns concatenation of the list and given iterable. New
         :class:`List` instance is returned.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        with self.redis.pipeline() as pipe:
-            other = self._create_new(self, pipe=pipe)
-            other._update(values, pipe=pipe)
-            pipe.execute()
-        return other
+        def add_trans(pipe, new_id):
+            data = self._data(pipe=pipe)  # retrieve
+            pipe.multi()
+            new = self._create_new(data, id=new_id, pipe=pipe)  # save
+            new._update(values, pipe=pipe)
+            return new
+        return self._transaction_with_new(add_trans)
 
     def __mul__(self, n):
         """Returns *n* copies of the list, concatenated. New :class:`List`
         instance is returned.
-
-        .. warning::
-            **Operation is not atomic.**
         """
         if not isinstance(n, int):
             raise TypeError('Cannot multiply sequence by non-int.')
-        return self._create_new(list(self) * n)
+
+        def mul_trans(pipe, new_id):
+            data = self._data(pipe=pipe)  # retrieve
+            data = list(data) * n
+            pipe.multi()
+            return self._create_new(data, id=new_id, pipe=pipe)  # save
+        return self._transaction_with_new(mul_trans)
 
     def __rmul__(self, n):
         """Returns *n* copies of the list, concatenated. New :class:`List`
         instance is returned.
-
-        .. warning::
-            **Operation is not atomic.**
         """
         return self.__mul__(n)
 
