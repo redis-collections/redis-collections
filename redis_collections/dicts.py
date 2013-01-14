@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-dict
-~~~~
+dicts
+~~~~~
 """
 
 
@@ -282,3 +282,15 @@ class Dict(RedisCollection, collections.MutableMapping):
         """
         values = ((item, value) for item in seq)
         return cls(values, **kwargs)
+
+
+class NumericDict(Dict):
+    pass  # hincrby, hincrbyfloat, own versions of _pickle, _unpickle
+
+
+class Counter(NumericDict):
+    pass
+
+
+class DefaultDict(Dict):
+    pass

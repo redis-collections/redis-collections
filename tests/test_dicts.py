@@ -2,22 +2,13 @@
 # -*- coding: utf-8 -*-
 
 
-import redis
 import unittest
 
+from .base import RedisTestCase
 from redis_collections import Dict
 
 
-class DictTest(unittest.TestCase):
-    # http://docs.python.org/2/library/stdtypes.html#mapping-types-dict
-
-    db = 15
-
-    def setUp(self):
-        self.redis = redis.StrictRedis(db=self.db)
-        if self.redis.dbsize():
-            raise EnvironmentError('Redis database number %d is not empty, '
-                                   'tests could harm your data.' % self.db)
+class DictTest(RedisTestCase):
 
     def create_dict(self, *args, **kwargs):
         kwargs['redis'] = self.redis
@@ -187,10 +178,6 @@ class DictTest(unittest.TestCase):
         d.update(c=None)
         self.assertEqual(sorted(d.items()),
                          [('a', 'g'), ('c', None), ('x', 38)])
-
-    def tearDown(self):
-        self.redis.flushdb()
-
 
 if __name__ == '__main__':
     unittest.main()

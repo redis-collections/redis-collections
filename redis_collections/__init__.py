@@ -9,12 +9,6 @@ __copyright__ = 'Copyright 2013 Jan Javorek'
 
 from .base import RedisCollection
 
-from .set import Set
-from .list import List
-from .dict import Dict
-
-from .deque import Deque
-from .counter import Counter
-from .sorted_set import SortedSet
-from .default_dict import DefaultDict
-from .numeric_dict import NumericDict
+from .sets import Set
+from .lists import List
+from .dicts import Dict

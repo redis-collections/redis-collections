@@ -2,22 +2,13 @@
 # -*- coding: utf-8 -*-
 
 
-import redis
 import unittest
 
+from .base import RedisTestCase
 from redis_collections import List
 
 
-class ListTest(unittest.TestCase):
-    # http://docs.python.org/2/library/functions.html#list
-
-    db = 15
-
-    def setUp(self):
-        self.redis = redis.StrictRedis(db=self.db)
-        if self.redis.dbsize():
-            raise EnvironmentError('Redis database number %d is not empty, '
-                                   'tests could harm your data.' % self.db)
+class ListTest(RedisTestCase):
 
     def create_list(self, *args, **kwargs):
         kwargs['redis'] = self.redis
@@ -142,9 +133,6 @@ class ListTest(unittest.TestCase):
         l = self.create_list([1, 2, 3])
         l.reverse()
         self.assertEqual(list(l), [3, 2, 1])
-
-    def tearDown(self):
-        self.redis.flushdb()
 
 
 if __name__ == '__main__':

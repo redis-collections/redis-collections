@@ -107,22 +107,28 @@ Additional notes
 API Documentation
 -----------------
 
-Redis Collections have only one module with several classes representing provided collections.
+Redis Collections have only several classes representing provided collections.
 
-.. automodule:: redis_collections
+.. automodule:: redis_collections.base
 
 .. autoclass:: RedisCollection
     :members:
     :special-members:
     :exclude-members: __metaclass__, __weakref__
 
+.. automodule:: redis_collections.dicts
+
 .. autoclass:: Dict
     :members:
     :special-members:
 
+.. automodule:: redis_collections.lists
+
 .. autoclass:: List
     :members:
     :special-members:
+
+.. automodule:: redis_collections.sets
 
 .. autoclass:: Set
     :members:

@@ -1,0 +1,19 @@
+# -*- coding: utf-8 -*-
+
+
+import redis
+import unittest
+
+
+class RedisTestCase(unittest.TestCase):
+
+    db = 15
+
+    def setUp(self):
+        self.redis = redis.StrictRedis(db=self.db)
+        if self.redis.dbsize():
+            raise EnvironmentError('Redis database number %d is not empty, '
+                                   'tests could harm your data.' % self.db)
+
+    def tearDown(self):
+        self.redis.flushdb()

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-list
-~~~~
+lists
+~~~~~
 """
 
 
@@ -290,3 +290,7 @@ class List(RedisCollection, collections.MutableSequence):
             instance.
         """
         return self.__mul__(n)
+
+
+class Deque(List):
+    pass

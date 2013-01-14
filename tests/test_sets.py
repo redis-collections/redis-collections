@@ -2,22 +2,13 @@
 # -*- coding: utf-8 -*-
 
 
-import redis
 import unittest
 
+from .base import RedisTestCase
 from redis_collections import Set
 
 
-class SetTest(unittest.TestCase):
-    # http://docs.python.org/2/library/stdtypes.html#set-types-set-frozenset
-
-    db = 15
-
-    def setUp(self):
-        self.redis = redis.StrictRedis(db=self.db)
-        if self.redis.dbsize():
-            raise EnvironmentError('Redis database number %d is not empty, '
-                                   'tests could harm your data.' % self.db)
+class SetTest(RedisTestCase):
 
     def create_set(self, *args, **kwargs):
         kwargs['redis'] = self.redis
@@ -212,9 +203,6 @@ class SetTest(unittest.TestCase):
         s = self.create_set('abcdefg')
         s.clear()
         self.assertEqual(sorted(s), [])
-
-    def tearDown(self):
-        self.redis.flushdb()
 
 
 if __name__ == '__main__':
