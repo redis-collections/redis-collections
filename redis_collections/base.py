@@ -285,23 +285,51 @@ class RedisCollection:
         """Completely cleares the collection's data."""
         self._clear()
 
+    def _transaction(self, fn):
+        """Helper simplifying code within transaction.
+
+        Takes *fn*, function treated as a transaction. Returns
+        whatever this *fn* returns. ``self.key`` is watched.
+        *fn* takes *pipe* as the only argument.
+        """
+        results = []
+
+        def trans(pipe):
+            results.append(fn(pipe))
+
+        self.redis.transaction(trans, self.key)
+        return results[0]
+
+    def _transaction_with_new(self, fn):
+        """Helper simplifying code within transaction which
+        creates a new instance of a Redis collection.
+
+        Takes *fn*, function treated as a transaction. Returns
+        whatever this *fn* returns. ``self.key`` and the new key
+        are watched. *fn* takes *pipe* as the first argument and
+        the new ID as the second.
+        """
+        results = []
+        new_id, new_key = self._create_new_id()
+
+        def trans(pipe):
+            results.append(fn(pipe, new_id))
+
+        self.redis.transaction(trans, self.key, new_key)
+        return results[0]
+
     def copy(self, id=None):
         """Return a copy of the collection.
 
         :param id: ID of the new collection. Defaults to auto-generated.
         :type id: string
         """
-        results = []
-        new_id, new_key = self._create_new_id()
-
-        def copy_trans(pipe):
+        def copy_trans(pipe, new_id):
             data = self._data(pipe=pipe)  # retrieve
             pipe.multi()
-            new = self._create_new(data, id=new_id, pipe=pipe)  # save
-            results.append(new)
+            return self._create_new(data, id=new_id, pipe=pipe)  # save
 
-        self.redis.transaction(copy_trans, self.key, new_key)
-        return results[0]
+        return self._transaction_with_new(copy_trans)
 
     def __repr__(self):
         cls_name = self.__class__.__name__
