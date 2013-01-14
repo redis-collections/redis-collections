@@ -62,7 +62,7 @@ class List(RedisCollection, collections.MutableSequence):
             If you are not satisfied with its `collision
             probability <http://stackoverflow.com/a/786541/325365>`_,
             make your own implementation by subclassing and overriding method
-            :func:`_create_id`.
+            :func:`_create_new_id`.
         """
         super(List, self).__init__(*args, **kwargs)
 
@@ -70,10 +70,14 @@ class List(RedisCollection, collections.MutableSequence):
         """Length of the sequence."""
         return self.redis.llen(self.key)
 
+    def _data(self, pipe=None):
+        redis = pipe or self.redis
+        values = redis.lrange(self.key, 0, -1)
+        return (self._unpickle(v) for v in values)
+
     def __iter__(self):
         """Return an iterator over the sequence."""
-        values = self.redis.lrange(self.key, 0, -1)
-        return (self._unpickle(v) for v in values)
+        return self._data()
 
     def __reversed__(self):
         """Returns iterator for the sequence in reversed order."""
@@ -104,6 +108,27 @@ class List(RedisCollection, collections.MutableSequence):
         """
         return (index >= size) if (index >= 0) else (abs(index) > size)
 
+    def _get_slice(self, index):
+        """Helper for getting a slice."""
+        assert isinstance(index, slice)
+        new_id, new_key = self._create_new_id()
+        results = []
+
+        def slice_trans(pipe):
+            start, stop = self._recalc_slice(index.start, index.stop)
+            values = pipe.lrange(self.key, start, stop)
+            if index.step:
+                # step implemented by pure Python slicing
+                values = values[::index.step]
+            values = map(self._unpickle, values)
+
+            pipe.multi()
+            new_list = self._create_new(values, id=new_id, pipe=pipe)
+            results.append(new_list)
+
+        self.redis.transaction(slice_trans, self.key, new_key)
+        return results[0]
+
     def __getitem__(self, index):
         """Returns item of sequence on *index*.
         Origin of indexes is 0. Accepts also slicing.
@@ -112,22 +137,12 @@ class List(RedisCollection, collections.MutableSequence):
             Due to implementation on Redis side, ``l[index]`` is not very
             efficient operation. If possible, use :func:`get`. Slicing without
             steps is efficient. Steps are implemented only on Python side.
-
-        .. warning::
-            **Operation is not atomic.**
         """
         if isinstance(index, slice):
-            start, stop = self._recalc_slice(index.start, index.stop)
-            values = self.redis.lrange(self.key, start, stop)
-            if index.step:
-                # step implemented by pure Python slicing
-                values = values[::index.step]
-            return self._create(map(self._unpickle, values))
+            return self._get_slice(index)
 
         pipe = self.redis.pipeline()
-        pipe.llen(self.key)
-        pipe.lindex(self.key, index)
-        size, value = pipe.execute()
+        size, value = pipe.llen(self.key).lindex(self.key, index).execute()
 
         if self._calc_overflow(size, index):
             raise IndexError(index)
@@ -280,41 +295,37 @@ class List(RedisCollection, collections.MutableSequence):
         return self._unpickle(value)
 
     def __add__(self, values):
-        """Returns concatenation of the list and given iterable.
-
-        New :class:`List` instance is returned. The same arguments given to
-        :func:`__init__` of the list are used for creation of the new
-        instance.
+        """Returns concatenation of the list and given iterable. New
+        :class:`List` instance is returned.
 
         .. warning::
             **Operation is not atomic.**
         """
-        other = self._create(self)
-        other.extend(values)
+        pipe = self.redis.pipeline()
+
+        other = self._create_new(self, pipe=pipe)
+        other._update(values, pipe=pipe)
+
+        pipe.execute()
         return other
 
     def __mul__(self, n):
-        """Returns *n* copies of the list, concatenated.
-
-        .. note::
-            New :class:`List` instance is returned. The same arguments given to
-            :func:`__init__` of this list are used for creation of the new
-            instance.
+        """Returns *n* copies of the list, concatenated. New :class:`List`
+        instance is returned.
 
         .. warning::
             **Operation is not atomic.**
         """
         if not isinstance(n, int):
             raise TypeError('Cannot multiply sequence by non-int.')
-        return self._create(list(self) * n)
+        return self._create_new(list(self) * n)
 
     def __rmul__(self, n):
-        """Returns *n* copies of the list, concatenated.
+        """Returns *n* copies of the list, concatenated. New :class:`List`
+        instance is returned.
 
-        .. note::
-            New :class:`List` instance is returned. The same arguments given to
-            :func:`__init__` of this list are used for creation of the new
-            instance.
+        .. warning::
+            **Operation is not atomic.**
         """
         return self.__mul__(n)
 

@@ -53,7 +53,7 @@ class Set(RedisCollection, collections.MutableSet):
             If you are not satisfied with its `collision
             probability <http://stackoverflow.com/a/786541/325365>`_,
             make your own implementation by subclassing and overriding method
-            :func:`_create_id`.
+            :func:`_create_new_id`.
         """
         super(Set, self).__init__(*args, **kwargs)
 
@@ -61,9 +61,13 @@ class Set(RedisCollection, collections.MutableSet):
         """Return cardinality of the set."""
         return self.redis.scard(self.key)
 
+    def _data(self, pipe=None):
+        redis = pipe or self.redis
+        return (self._unpickle(v) for v in redis.smembers(self.key))
+
     def __iter__(self):
         """Return an iterator over elements of the set."""
-        return (self._unpickle(v) for v in self.redis.smembers(self.key))
+        return self._data()
 
     def __contains__(self, elem):
         """Test for membership of *elem* in the set."""
@@ -117,14 +121,6 @@ class Set(RedisCollection, collections.MutableSet):
             elements = self.redis.srandmember(self.key, k)
         return map(self._unpickle, elements)
 
-    def copy(self):
-        """Return a copy of the set.
-
-        .. warning::
-            **Operation is not atomic.**
-        """
-        return self._create(self)
-
     def _are_redis_sets(self, iterables):
         """Helper method deciding whether given *iterables* are all instances
         of the :class:`Set` class.
@@ -167,7 +163,7 @@ class Set(RedisCollection, collections.MutableSet):
 
             if issubclass(return_type, self.__class__):
                 # operation can be performed in Redis completely
-                return_obj = self._create(type=return_type, id=return_id)
+                return_obj = self._create_new(type=return_type, id=return_id)
                 fn = getattr(self.redis, redisopstore)
                 fn(return_obj.key, self.key, *keys)
                 return return_obj
@@ -175,7 +171,8 @@ class Set(RedisCollection, collections.MutableSet):
                 # operation can be performed in Redis and returned to Python
                 fn = getattr(self.redis, redisop)
                 elements = fn(self.key, *keys)
-                return self._create(elements, type=return_type, id=return_id)
+                return self._create_new(elements, type=return_type,
+                                        id=return_id)
 
         # else do it in Python completely,
         # simulating the same operation on standard set
@@ -184,7 +181,7 @@ class Set(RedisCollection, collections.MutableSet):
         result = fn(*map(frozenset, others))
         elements = python_set if update else result
 
-        return self._create(elements, type=return_type, id=return_id)
+        return self._create_new(elements, type=return_type, id=return_id)
 
     def _binary_operation(self, op, redisopstore, other, update=False,
                           right=False):
@@ -219,14 +216,14 @@ class Set(RedisCollection, collections.MutableSet):
         return_type = left_operand.__class__
 
         if isinstance(other, Set):
-            return_obj = self._create(id=return_id, type=return_type)
+            return_obj = self._create_new(id=return_id, type=return_type)
             fn = getattr(self.redis, redisopstore)
             fn(return_obj.key, left_operand.key, right_operand.key)
             return return_obj
 
         fn = getattr(operator, op)  # standard operator module
         elements = fn(frozenset(left_operand), frozenset(right_operand))
-        return self._create(elements, id=return_id, type=return_type)
+        return self._create_new(elements, id=return_id, type=return_type)
 
     def difference(self, *others, **kwargs):
         """Return a new set with elements in the set that are
@@ -520,12 +517,12 @@ class Set(RedisCollection, collections.MutableSet):
             pipe.sdiff(other.key, self.key)
             diff1, diff2 = pipe.execute()
             elements = map(self._unpickle, diff1 | diff2)
-            return self._create(elements, type=return_type)
+            return self._create_new(elements, type=return_type)
 
         # else do it in Python completely,
         # simulating the same operation on standard set
         elements = set(self).symmetric_difference(other)
-        return self._create(elements, type=return_type)
+        return self._create_new(elements, type=return_type)
 
     def __xor__(self, other):
         """Update the set, keeping only elements found in either set, but not
@@ -573,12 +570,12 @@ class Set(RedisCollection, collections.MutableSet):
             pipe.sdiff(other.key, self.key)
             diff1, diff2 = pipe.execute()
             elements = diff1 | diff2
-            return self._create(elements, id=self.id)
+            return self._create_new(elements, id=self.id)
 
         # else do it in Python completely,
         # simulating the same operation on standard set
         elements = frozenset(self) ^ frozenset(other)
-        return self._create(elements, id=self.id)
+        return self._create_new(elements, id=self.id)
 
     def __ixor__(self, other):
         """Update the set, keeping only elements found in either set, but not

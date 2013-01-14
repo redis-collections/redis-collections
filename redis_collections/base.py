@@ -57,8 +57,8 @@ class RedisCollection:
             :func:`uuid.uuid4` is used for default ID generation.
             If you are not satisfied with its `collision
             probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding method
-            :func:`_create_id`.
+            make your own implementation by subclassing and overriding
+            internal method :func:`_create_id`.
         """
         #: Redis client instance. :class:`StrictRedis` object with default
         #: connection settings is used if not set by :func:`__init__`.
@@ -77,7 +77,7 @@ class RedisCollection:
 
         # data initialization
         if data is not None:
-            self._init_data(data)
+            self._init_data(data)  # touches Redis
 
     @classmethod
     def fromanother(cls, obj, data=None, id=None, pipe=None):
@@ -111,7 +111,7 @@ class RedisCollection:
             return new
         return cls(data, **settings)
 
-    def _create(self, data=None, id=None, pipe=None, type=None):
+    def _create_new(self, data=None, id=None, pipe=None, type=None):
         """Shorthand for creating instances of any collections. *type*
         specifies the type of collection to be created. If subclass of
         :class:`RedisCollection` given, all settings from current ``self``
@@ -134,6 +134,18 @@ class RedisCollection:
         if issubclass(cls, RedisCollection):
             return cls.fromanother(self, data, id, pipe)
         return cls(data)
+
+    def _create_new_id(self):
+        """Shorthand for creating new ID with id's key.
+        Used in transactions.
+
+        :rtype: tuple of strings (id, key)
+        """
+        id = self._create_id()
+        return (
+            id,
+            self._create_key(id, prefix=self.prefix)
+        )
 
     def _init_data(self, data, pipe=None):
         """Data initialization helper.
@@ -211,6 +223,17 @@ class RedisCollection:
         type_name = (type or self.__class__).__name__
         return self._create_key_name(type_name, id, prefix=prefix)
 
+    @abstractmethod
+    def _data(self, pipe=None):
+        """Helper for getting collection's data within a transaction.
+
+        :param pipe: Redis pipe in case creation is performed as a part
+                     of transaction.
+        :type pipe: :class:`redis.client.StrictPipeline` or
+                    :class:`redis.client.StrictRedis`
+        """
+        pass
+
     def _pickle(self, data):
         """Converts given data to string.
 
@@ -261,6 +284,24 @@ class RedisCollection:
     def clear(self):
         """Completely cleares the collection's data."""
         self._clear()
+
+    def copy(self, id=None):
+        """Return a copy of the collection.
+
+        :param id: ID of the new collection. Defaults to auto-generated.
+        :type id: string
+        """
+        results = []
+        new_id, new_key = self._create_new_id()
+
+        def copy_trans(pipe):
+            data = self._data(pipe=pipe)  # retrieve
+            pipe.multi()
+            new = self._create_new(data, id=new_id, pipe=pipe)  # save
+            results.append(new)
+
+        self.redis.transaction(copy_trans, self.key, new_key)
+        return results[0]
 
     def __repr__(self):
         cls_name = self.__class__.__name__

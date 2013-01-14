@@ -5,7 +5,6 @@ dicts
 """
 
 
-import redis
 import collections
 
 from .base import RedisCollection
@@ -84,7 +83,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def __iter__(self):
         """Return an iterator over the keys of the dictionary."""
-        return self.iterkeys()
+        return iter(self.redis.hkeys(self.key))
 
     def __contains__(self, key):
         """Return ``True`` if ``Dict`` instance has a key
@@ -168,10 +167,14 @@ class Dict(RedisCollection, collections.MutableMapping):
         """
         self.redis.hdel(self.key, key)
 
+    def _data(self, pipe=None):
+        redis = pipe or self.redis
+        result = redis.hgetall(self.key).items()
+        return [(k, self._unpickle(v)) for (k, v) in result]
+
     def items(self):
         """Return a copy of the dictionary's list of ``(key, value)`` pairs."""
-        result = self.redis.hgetall(self.key).items()
-        return [(k, self._unpickle(v)) for (k, v) in result]
+        return self._data()
 
     def iteritems(self):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
@@ -186,11 +189,11 @@ class Dict(RedisCollection, collections.MutableMapping):
         """Return an iterator over the keys of the dictionary.
         This is a shortcut for :func:`iterkeys()`.
         """
-        return self.iterkeys()
+        return self.__iter__()
 
     def iterkeys(self):
         """Return an iterator over the dictionary's keys."""
-        return iter(self.redis.hkeys(self.key))
+        return self.__iter__()
 
     def values(self):
         """Return a copy of the dictionary's list of values."""
@@ -201,14 +204,6 @@ class Dict(RedisCollection, collections.MutableMapping):
         """Return an iterator over the dictionary's values."""
         result = iter(self.redis.hvals(self.key))
         return (self._unpickle(v) for v in result)
-
-    def copy(self):
-        """Return a copy of the dictionary.
-
-        .. warning::
-            **Operation is not atomic.**
-        """
-        return self._create(self)
 
     def pop(self, key, default=__marker):
         """If *key* is in the dictionary, remove it and return its value,
@@ -235,31 +230,25 @@ class Dict(RedisCollection, collections.MutableMapping):
         the dictionary is empty, calling :func:`popitem` raises
         a :exc:`KeyError`.
         """
-        key = None
-        value = None
+        results = []
 
-        # Cannot use self.redis.transaction, because we need to know the key
-        # and there is probably not a nice way how to get it out of the
-        # closure's scope.
-        with self.redis.pipeline() as pipe:
-            while True:
-                try:
-                    pipe.watch(self.key)
+        def popitem_trans(pipe):
+            # get an 'arbitrary' key
+            try:
+                key = pipe.hkeys(self.key)[0]
+                results.append(key)
+            except IndexError:
+                raise KeyError
 
-                    try:
-                        key = pipe.hkeys(self.key)[0]
-                    except IndexError:
-                        raise KeyError
+            # pop its value
+            pipe.multi()
+            pipe.hget(self.key, key)
+            pipe.hdel(self.key, key)
+            value, _ = pipe.execute()
+            results.append(value)
 
-                    pipe.multi()
-                    pipe.hget(self.key, key)
-                    pipe.hdel(self.key, key)
-                    value, _ = pipe.execute()
-                    break
-
-                except redis.WatchError:
-                    continue
-
+        self.redis.transaction(popitem_trans, self.key)
+        key, value = results
         return key, self._unpickle(value)
 
     def setdefault(self, key, default=None):
