@@ -31,7 +31,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     class __missing_value(object):
         def __repr__(self):
-            return '<missing value>'  # for documentation purposes
+            return '<missing value>'  # for purposes of generated documentation
     __marker = __missing_value()
 
     def __init__(self, values=None, **kwargs):
@@ -43,16 +43,9 @@ class Dict(RedisCollection, collections.MutableMapping):
         .. warning::
             As mentioned, :class:`Dict` does not support following
             initialization syntax: ``d = Dict(a=1, b=2)``
-
-        .. warning::
-            **Operation is not atomic.**
         """
         super(Dict, self).__init__(**kwargs)
-
-        if values is not None:
-            self.clear()
-        if values:
-            self.update(values)
+        self._init(values)
 
     def __len__(self):
         """Return the number of items in the dictionary."""
@@ -250,6 +243,15 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         return self._unpickle(value)
 
+    def _update(self, data, pipe=None):
+        redis = pipe or self.redis
+
+        data = dict(data)
+        keys = data.keys()
+        values = map(self._pickle, data.values())  # pickling values
+
+        redis.hmset(self.key, dict(zip(keys, values)))
+
     def update(self, *args, **kwargs):
         """
         Update the dictionary with the key/value pairs from *other*,
@@ -263,11 +265,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         """
         mapping = {}
         mapping.update(*args, **kwargs)
-
-        keys = mapping.keys()
-        values = map(self._pickle, mapping.values())  # pickling values
-
-        self.redis.hmset(self.key, dict(zip(keys, values)))
+        self._update(mapping)
 
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):

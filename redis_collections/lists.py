@@ -32,16 +32,9 @@ class List(RedisCollection, collections.MutableSequence):
     def __init__(self, values=None, **kwargs):
         """Pass iterable as the first argument. Remaining arguments are given
         to :func:`RedisCollection.__init__`.
-
-        .. warning::
-            **Operation is not atomic.**
         """
         super(List, self).__init__(**kwargs)
-
-        if values is not None:
-            self.clear()
-        if values:
-            self.extend(values)
+        self._init(values)
 
     def __len__(self):
         """Length of the sequence."""
@@ -230,12 +223,16 @@ class List(RedisCollection, collections.MutableSequence):
 
         self.redis.transaction(insert_trans, self.key)
 
+    def _update(self, data, pipe=None):
+        redis = pipe or self.redis
+        values = map(self._pickle, data)
+        redis.rpush(self.key, *values)
+
     def extend(self, values):
         """*values* are appended at the end of the list. Any iterable
         is accepted.
         """
-        values = map(self._pickle, values)
-        self.redis.rpush(self.key, *values)
+        self._update(values)
 
     def pop(self, index=-1):
         """Item on *index* is removed and returned.

@@ -169,9 +169,48 @@ class RedisCollection:
             }
         return collection_type(values, **settings)
 
+    def _init(self, data, pipe=None):
+        """Helper for init operations.
+
+        :param data: Data for initialization.
+        :param pipe: Redis pipe in case update is performed as a part
+                     of transaction.
+        """
+        if data is not None:
+            if not pipe:
+                exc_pipe = True
+                pipe = self.redis.pipeline()
+
+            self._clear(pipe=pipe)
+            if data:
+                # non-empty data
+                self._update(data, pipe=pipe)
+
+            if exc_pipe:
+                pipe.execute()
+
+    @abstractmethod
+    def _update(self, data, pipe=None):
+        """Helper for update operations.
+
+        :param data: Data for update.
+        :param pipe: Redis pipe in case update is performed as a part
+                     of transaction.
+        """
+        pass
+
+    def _clear(self, pipe=None):
+        """Helper for clear operations.
+
+        :param pipe: Redis pipe in case update is performed as a part
+                     of transaction.
+        """
+        redis = pipe or self.redis
+        redis.delete(self.key)
+
     def clear(self):
         """Completely cleares the collection's data."""
-        self.redis.delete(self.key)
+        self._clear()
 
     def __repr__(self):
         cls_name = self.__class__.__name__

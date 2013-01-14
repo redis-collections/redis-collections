@@ -20,19 +20,12 @@ class Set(RedisCollection, collections.MutableSet):
     `set <http://redis.io/commands#set>`_ type.
     """
 
-    def __init__(self, values=None, **kwargs):
+    def __init__(self, elements=None, **kwargs):
         """Pass iterable as the first argument. Remaining arguments are given
         to :func:`RedisCollection.__init__`.
-
-        .. warning::
-            **Operation is not atomic.**
         """
         super(Set, self).__init__(**kwargs)
-
-        if values is not None:
-            self.clear()
-        if values:
-            self.update(values)
+        self._init(elements)
 
     def __len__(self):
         """Return cardinality of the set."""
@@ -429,6 +422,18 @@ class Set(RedisCollection, collections.MutableSet):
     def __ror__(self, other):
         return self._binary_operation('or_', 'sunionstore', other, right=True)
 
+    def _update(self, data, others=None, pipe=None):
+        redis = pipe or self.redis
+        others = [data] + list(others or [])
+
+        if self._are_redis_sets(others):
+            # operation can be performed in Redis completely
+            keys = [other.key for other in others]
+            redis.sunionstore(self.key, self.key, *keys)
+        else:
+            elements = map(self._pickle, frozenset(itertools.chain(*others)))
+            redis.sadd(self.key, *elements)
+
     def update(self, *others):
         """Update the set, adding elements from all *others*.
 
@@ -445,13 +450,7 @@ class Set(RedisCollection, collections.MutableSet):
         .. warning::
             **Operation is not atomic.**
         """
-        if self._are_redis_sets(others):
-            # operation can be performed in Redis completely
-            keys = [other.key for other in others]
-            self.redis.sunionstore(self.key, self.key, *keys)
-        else:
-            elements = map(self._pickle, frozenset(itertools.chain(*others)))
-            self.redis.sadd(self.key, *elements)
+        self._update(others[0], others=others[1:])
 
     def __ior__(self, other):
         """Update the set, adding elements from the *other*.
