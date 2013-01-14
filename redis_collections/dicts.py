@@ -34,18 +34,49 @@ class Dict(RedisCollection, collections.MutableMapping):
             return '<missing value>'  # for purposes of generated documentation
     __marker = __missing_value()
 
-    def __init__(self, values=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         """Breakes the original :class:`dict` API, because there is no support
         for keyword syntax. The only single way to create :class:`Dict`
         object is to pass iterable or mapping as the first argument.
-        Remaining arguments are given to :func:`RedisCollection.__init__`.
+
+        :param data: Initial data.
+        :type data: iterable or mapping
+        :param redis: Redis client instance. If not provided, default Redis
+                      connection is used.
+        :type redis: :class:`redis.StrictRedis` or :obj:`None`
+        :param id: ID of the collection. Collections with the same IDs point
+                   to the same data. If not provided, default random ID string
+                   is generated. If no non-conflicting ID can be found,
+                   :exc:`RuntimeError` is raised.
+        :type id: str or :obj:`None`
+        :param pickler: Implementation of data serialization. Object with two
+                        methods is expected: :func:`dumps` for conversion
+                        of data to string and :func:`loads` for the opposite
+                        direction. Examples::
+
+                            import json, pickle
+                            Dict(pickler=json)
+                            Dict(pickler=pickle)  # default
+
+                        Of course, you can construct your own pickling object
+                        (it can be class, module, whatever). Default
+                        serialization implementation uses :mod:`pickle`.
+        :param prefix: Key prefix to use when working with Redis. Default is
+                       empty string.
+        :type prefix: str or :obj:`None`
+
+        .. note::
+            :func:`uuid.uuid4` is used for default ID generation.
+            If you are not satisfied with its `collision
+            probability <http://stackoverflow.com/a/786541/325365>`_,
+            make your own implementation by subclassing and overriding method
+            :func:`_create_id`.
 
         .. warning::
             As mentioned, :class:`Dict` does not support following
             initialization syntax: ``d = Dict(a=1, b=2)``
         """
-        super(Dict, self).__init__(**kwargs)
-        self._init(values)
+        super(Dict, self).__init__(*args, **kwargs)
 
     def __len__(self):
         """Return the number of items in the dictionary."""
@@ -177,7 +208,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         .. warning::
             **Operation is not atomic.**
         """
-        return self._create_instance(self)
+        return self._create(self)
 
     def pop(self, key, default=__marker):
         """If *key* is in the dictionary, remove it and return its value,

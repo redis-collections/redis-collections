@@ -29,12 +29,42 @@ class List(RedisCollection, collections.MutableSequence):
         functionality).
     """
 
-    def __init__(self, values=None, **kwargs):
-        """Pass iterable as the first argument. Remaining arguments are given
-        to :func:`RedisCollection.__init__`.
+    def __init__(self, *args, **kwargs):
         """
-        super(List, self).__init__(**kwargs)
-        self._init(values)
+        :param data: Initial data.
+        :type data: iterable
+        :param redis: Redis client instance. If not provided, default Redis
+                      connection is used.
+        :type redis: :class:`redis.StrictRedis` or :obj:`None`
+        :param id: ID of the collection. Collections with the same IDs point
+                   to the same data. If not provided, default random ID string
+                   is generated. If no non-conflicting ID can be found,
+                   :exc:`RuntimeError` is raised.
+        :type id: str or :obj:`None`
+        :param pickler: Implementation of data serialization. Object with two
+                        methods is expected: :func:`dumps` for conversion
+                        of data to string and :func:`loads` for the opposite
+                        direction. Examples::
+
+                            import json, pickle
+                            Dict(pickler=json)
+                            Dict(pickler=pickle)  # default
+
+                        Of course, you can construct your own pickling object
+                        (it can be class, module, whatever). Default
+                        serialization implementation uses :mod:`pickle`.
+        :param prefix: Key prefix to use when working with Redis. Default is
+                       empty string.
+        :type prefix: str or :obj:`None`
+
+        .. note::
+            :func:`uuid.uuid4` is used for default ID generation.
+            If you are not satisfied with its `collision
+            probability <http://stackoverflow.com/a/786541/325365>`_,
+            make your own implementation by subclassing and overriding method
+            :func:`_create_id`.
+        """
+        super(List, self).__init__(*args, **kwargs)
 
     def __len__(self):
         """Length of the sequence."""
@@ -92,7 +122,7 @@ class List(RedisCollection, collections.MutableSequence):
             if index.step:
                 # step implemented by pure Python slicing
                 values = values[::index.step]
-            return self._create_instance(map(self._unpickle, values))
+            return self._create(map(self._unpickle, values))
 
         pipe = self.redis.pipeline()
         pipe.llen(self.key)
@@ -259,7 +289,7 @@ class List(RedisCollection, collections.MutableSequence):
         .. warning::
             **Operation is not atomic.**
         """
-        other = self._create_instance(self)
+        other = self._create(self)
         other.extend(values)
         return other
 
@@ -276,7 +306,7 @@ class List(RedisCollection, collections.MutableSequence):
         """
         if not isinstance(n, int):
             raise TypeError('Cannot multiply sequence by non-int.')
-        return self._create_instance(list(self) * n)
+        return self._create(list(self) * n)
 
     def __rmul__(self, n):
         """Returns *n* copies of the list, concatenated.
@@ -290,4 +320,5 @@ class List(RedisCollection, collections.MutableSequence):
 
 
 class Deque(List):
+    # http://rediscookbook.org/implement_a_fifo_queue.html
     pass

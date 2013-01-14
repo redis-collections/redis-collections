@@ -5,9 +5,9 @@ base
 """
 
 
+import uuid
 import redis
 from abc import ABCMeta, abstractmethod
-from uuid import uuid4
 
 try:
     import cPickle as pickle
@@ -22,22 +22,20 @@ class RedisCollection:
 
     __metaclass__ = ABCMeta
 
-    max_key_creation_attempts = 3
-
     not_impl_msg = ('Cannot be implemented efficiently or atomically '
                     'due to limitations in Redis command set.')
 
     @abstractmethod
-    def __init__(self, redis=None, id=None, pickler=None, prefix=None):
-        """Initializes the collection.
-
+    def __init__(self, data=None, redis=None, id=None, pickler=None,
+                 prefix=None):
+        """
+        :param data: Initial data.
         :param redis: Redis client instance. If not provided, default Redis
                       connection is used.
         :type redis: :class:`redis.StrictRedis` or :obj:`None`
         :param id: ID of the collection. Collections with the same IDs point
                    to the same data. If not provided, default random ID string
-                   is generated. If no non-conflicting ID can be found,
-                   :exc:`RuntimeError` is raised.
+                   is generated.
         :type id: str or :obj:`None`
         :param pickler: Implementation of data serialization. Object with two
                         methods is expected: :func:`dumps` for conversion
@@ -54,72 +52,164 @@ class RedisCollection:
         :param prefix: Key prefix to use when working with Redis. Default is
                        empty string.
         :type prefix: str or :obj:`None`
+
+        .. note::
+            :func:`uuid.uuid4` is used for default ID generation.
+            If you are not satisfied with its `collision
+            probability <http://stackoverflow.com/a/786541/325365>`_,
+            make your own implementation by subclassing and overriding method
+            :func:`_create_id`.
         """
         #: Redis client instance. :class:`StrictRedis` object with default
         #: connection settings is used if not set by :func:`__init__`.
-        self.redis = redis or self._redis_factory()
+        self.redis = redis or self._create_redis()
 
         #: Class or module implementing pickling. Standard :mod:`pickle`
         #: module is set as default.
         self.pickler = pickler or pickle
 
-        #: Redis key prefix. Default is empty string.
+        #: Redis key prefix. Defaults to an empty string.
         self.prefix = prefix
 
-        if id:
-            # summoning existing collection
-            key, id = self._key_factory(id=str(id), prefix=prefix)
-        else:
-            key, id = self._key_factory(prefix=prefix)
-
-        #: Key used for this collection in Redis.
-        self.key = key
-
         #: ID of the collection.
-        self.id = id
+        self.id = id or self._create_id()
+        self.key = self._create_key(self.id, prefix=prefix)
 
-    def _id_factory(self):
-        """Creates default collection ID using :mod:`uuid`.
+        # data initialization
+        if data is not None:
+            self._init_data(data)
 
-        :rtype: string
+    @classmethod
+    def fromanother(cls, obj, data=None, id=None, pipe=None):
+        """Collection factory. Takes another object *obj* and
+        creates collection with the same settings and data *data*.
+
+        :param obj: Another :class:`RedisCollection` instance.
+        :type obj: :class:`RedisCollection`
+        :param data: Initial data.
+        :param id: ID of the new collection.
+        :type id: string
+        :param pipe: Redis pipe in case creation is performed as a part
+                     of transaction.
+        :type pipe: :class:`redis.client.StrictPipeline` or
+                    :class:`redis.client.StrictRedis`
         """
-        return str(uuid4().hex)
+        assert isinstance(obj, RedisCollection)
 
-    def _redis_factory(self):
+        settings = {
+            'id': id,
+            'redis': obj.redis,
+            'pickler': obj.pickler,
+            'prefix': obj.prefix,
+        }
+
+        if pipe and data:
+            # here we cannot use cls(data, **settings), because
+            # that would not be atomic within the transaction
+            new = cls(**settings)
+            new._init_data(data, pipe=pipe)
+            return new
+        return cls(data, **settings)
+
+    def _create(self, data=None, id=None, pipe=None, type=None):
+        """Shorthand for creating instances of any collections. *type*
+        specifies the type of collection to be created. If subclass of
+        :class:`RedisCollection` given, all settings from current ``self``
+        are propagated.
+
+        :param data: Initial data.
+        :param id: ID of instance. Ignored if *type* is not a
+                   :class:`RedisCollection` subclass.
+        :type id: string
+        :param pipe: Redis pipe in case creation is performed as a part
+                     of transaction. Ignored if *type* is not a
+                     :class:`RedisCollection` subclass.
+        :type pipe: :class:`redis.client.StrictPipeline` or
+                    :class:`redis.client.StrictRedis`
+        :param type: Type of the collection. Defaults to the same
+                     type as ``self``.
+        :type type: Class object.
+        """
+        cls = type or self.__class__
+        if issubclass(cls, RedisCollection):
+            return cls.fromanother(self, data, id, pipe)
+        return cls(data)
+
+    def _init_data(self, data, pipe=None):
+        """Data initialization helper.
+
+        :param data: Initial data.
+        :param pipe: Redis pipe in case creation is performed as a part
+                     of transaction.
+        :type pipe: :class:`redis.client.StrictPipeline` or
+                    :class:`redis.client.StrictRedis`
+        """
+        p = pipe or self.redis.pipeline()  # if not in pipe, make your own
+        if data is not None:
+            self._clear(pipe=p)
+            if data:
+                # non-empty data, populate collection
+                self._update(data, pipe=p)
+        if not pipe:
+            # own pipe, execute it
+            p.execute()
+
+    def _create_redis(self):
         """Creates default Redis connection.
 
         :rtype: :class:`redis.StrictRedis`
         """
         return redis.StrictRedis()
 
-    def _key_factory(self, id=None, prefix=None):
-        """Creates Redis key for the collection. If ID is not provided, factory
-        searches only for a key which is not ocuppied yet. If it cannot be
-        found, :exc:`RuntimeError` is raised.
+    def _create_id(self):
+        """Creates default collection ID.
 
-        :param id: Collection ID.
-        :type id: string or :obj:`None`
+        :rtype: string
+
+        .. note::
+            :func:`uuid.uuid4` is used. If you are not satisfied with its
+            `collision
+            probability <http://stackoverflow.com/a/786541/325365>`_,
+            make your own implementation by subclassing and overriding this
+            method.
+        """
+        return uuid.uuid4().hex
+
+    def _create_key_name(self, namespace, item, prefix=None):
+        """
+        Simple key name factory. Puts all the parts together.
+
+        :param namespace: Key namespace.
+        :type namespace: string
+        :param item: Item in given *namespace*.
+        :type item: string
         :param prefix: Key prefix to use when working with Redis.
         :type prefix: string or :obj:`None`
-        :rtype: tuple of strings (key, id)
+        :rtype: string
         """
-        def create_key(id):
-            name = self.__class__.__name__.lower()
-            components = [prefix, '_redis_collections', '_' + name, id]
-            return '.'.join(filter(None, components))
+        components = [
+            prefix,
+            '_redis_collections',
+            '_' + namespace.lower(),
+            item.lower(),
+        ]
+        return '.'.join(filter(None, components))
 
-        if id:
-            return (create_key(id), id)
+    def _create_key(self, id, type=None, prefix=None):
+        """Creates Redis key for collection.
 
-        for attempt in range(0, self.max_key_creation_attempts):
-            id = self._id_factory()
-            key = create_key(id)
-
-            # repeat until an empty key is not found
-            if not self.redis.exists(key):
-                return (key, id)
-
-        raise RuntimeError('Unable to find a free Redis key.')
+        :param id: Collection ID.
+        :type id: string
+        :param type: Type of the collection. Defaults to the same
+                     type as ``self``. Only subclasses of
+                     :class:`RedisCollection` are expected.
+        :type type: Class object.
+        :param prefix: Key prefix to use when working with Redis.
+        :type prefix: string or :obj:`None`
+        :rtype: string
+        """
+        type_name = (type or self.__class__).__name__
+        return self._create_key_name(type_name, id, prefix=prefix)
 
     def _pickle(self, data):
         """Converts given data to string.
@@ -145,50 +235,6 @@ class RedisCollection:
             raise TypeError(msg)
         return self.pickler.loads(string)
 
-    def _create_instance(self, values=None, type=None, id=None):
-        """Creates instance of a collection. If subclass of
-        :class:`RedisCollection` is requested, the same settings
-        are applied as were for the current object. Otherwise no extra
-        settings are passed, only *values* are propagated.
-
-        :param values: Initial values.
-        :param type: Type of the collection. Defaults to the same
-                     type as ``self``.
-        :param id: ID of requested instance. Ignored if *type* is
-                   not a :class:`RedisCollection` subclass.
-        """
-        collection_type = type or self.__class__
-        settings = {}
-
-        if issubclass(collection_type, RedisCollection):
-            settings = {
-                'redis': self.redis,
-                'pickler': self.pickler,
-                'prefix': self.prefix,
-                'id': id,
-            }
-        return collection_type(values, **settings)
-
-    def _init(self, data, pipe=None):
-        """Helper for init operations.
-
-        :param data: Data for initialization.
-        :param pipe: Redis pipe in case update is performed as a part
-                     of transaction.
-        """
-        if data is not None:
-            if not pipe:
-                exc_pipe = True
-                pipe = self.redis.pipeline()
-
-            self._clear(pipe=pipe)
-            if data:
-                # non-empty data
-                self._update(data, pipe=pipe)
-
-            if exc_pipe:
-                pipe.execute()
-
     @abstractmethod
     def _update(self, data, pipe=None):
         """Helper for update operations.
@@ -196,6 +242,8 @@ class RedisCollection:
         :param data: Data for update.
         :param pipe: Redis pipe in case update is performed as a part
                      of transaction.
+        :type pipe: :class:`redis.client.StrictPipeline` or
+                    :class:`redis.client.StrictRedis`
         """
         pass
 
@@ -204,6 +252,8 @@ class RedisCollection:
 
         :param pipe: Redis pipe in case update is performed as a part
                      of transaction.
+        :type pipe: :class:`redis.client.StrictPipeline` or
+                    :class:`redis.client.StrictRedis`
         """
         redis = pipe or self.redis
         redis.delete(self.key)

@@ -20,12 +20,42 @@ class Set(RedisCollection, collections.MutableSet):
     `set <http://redis.io/commands#set>`_ type.
     """
 
-    def __init__(self, elements=None, **kwargs):
-        """Pass iterable as the first argument. Remaining arguments are given
-        to :func:`RedisCollection.__init__`.
+    def __init__(self, *args, **kwargs):
         """
-        super(Set, self).__init__(**kwargs)
-        self._init(elements)
+        :param data: Initial data.
+        :type data: iterable
+        :param redis: Redis client instance. If not provided, default Redis
+                      connection is used.
+        :type redis: :class:`redis.StrictRedis` or :obj:`None`
+        :param id: ID of the collection. Collections with the same IDs point
+                   to the same data. If not provided, default random ID string
+                   is generated. If no non-conflicting ID can be found,
+                   :exc:`RuntimeError` is raised.
+        :type id: str or :obj:`None`
+        :param pickler: Implementation of data serialization. Object with two
+                        methods is expected: :func:`dumps` for conversion
+                        of data to string and :func:`loads` for the opposite
+                        direction. Examples::
+
+                            import json, pickle
+                            Dict(pickler=json)
+                            Dict(pickler=pickle)  # default
+
+                        Of course, you can construct your own pickling object
+                        (it can be class, module, whatever). Default
+                        serialization implementation uses :mod:`pickle`.
+        :param prefix: Key prefix to use when working with Redis. Default is
+                       empty string.
+        :type prefix: str or :obj:`None`
+
+        .. note::
+            :func:`uuid.uuid4` is used for default ID generation.
+            If you are not satisfied with its `collision
+            probability <http://stackoverflow.com/a/786541/325365>`_,
+            make your own implementation by subclassing and overriding method
+            :func:`_create_id`.
+        """
+        super(Set, self).__init__(*args, **kwargs)
 
     def __len__(self):
         """Return cardinality of the set."""
@@ -93,7 +123,7 @@ class Set(RedisCollection, collections.MutableSet):
         .. warning::
             **Operation is not atomic.**
         """
-        return self._create_instance(self)
+        return self._create(self)
 
     def _are_redis_sets(self, iterables):
         """Helper method deciding whether given *iterables* are all instances
@@ -137,8 +167,7 @@ class Set(RedisCollection, collections.MutableSet):
 
             if issubclass(return_type, self.__class__):
                 # operation can be performed in Redis completely
-                return_obj = self._create_instance(type=return_type,
-                                                   id=return_id)
+                return_obj = self._create(type=return_type, id=return_id)
                 fn = getattr(self.redis, redisopstore)
                 fn(return_obj.key, self.key, *keys)
                 return return_obj
@@ -146,8 +175,7 @@ class Set(RedisCollection, collections.MutableSet):
                 # operation can be performed in Redis and returned to Python
                 fn = getattr(self.redis, redisop)
                 elements = fn(self.key, *keys)
-                return self._create_instance(elements, type=return_type,
-                                             id=return_id)
+                return self._create(elements, type=return_type, id=return_id)
 
         # else do it in Python completely,
         # simulating the same operation on standard set
@@ -156,8 +184,7 @@ class Set(RedisCollection, collections.MutableSet):
         result = fn(*map(frozenset, others))
         elements = python_set if update else result
 
-        return self._create_instance(elements, type=return_type,
-                                     id=return_id)
+        return self._create(elements, type=return_type, id=return_id)
 
     def _binary_operation(self, op, redisopstore, other, update=False,
                           right=False):
@@ -192,14 +219,14 @@ class Set(RedisCollection, collections.MutableSet):
         return_type = left_operand.__class__
 
         if isinstance(other, Set):
-            return_obj = self._create_instance(id=return_id, type=return_type)
+            return_obj = self._create(id=return_id, type=return_type)
             fn = getattr(self.redis, redisopstore)
             fn(return_obj.key, left_operand.key, right_operand.key)
             return return_obj
 
         fn = getattr(operator, op)  # standard operator module
         elements = fn(frozenset(left_operand), frozenset(right_operand))
-        return self._create_instance(elements, id=return_id, type=return_type)
+        return self._create(elements, id=return_id, type=return_type)
 
     def difference(self, *others, **kwargs):
         """Return a new set with elements in the set that are
@@ -493,12 +520,12 @@ class Set(RedisCollection, collections.MutableSet):
             pipe.sdiff(other.key, self.key)
             diff1, diff2 = pipe.execute()
             elements = map(self._unpickle, diff1 | diff2)
-            return self._create_instance(elements, type=return_type)
+            return self._create(elements, type=return_type)
 
         # else do it in Python completely,
         # simulating the same operation on standard set
         elements = set(self).symmetric_difference(other)
-        return self._create_instance(elements, type=return_type)
+        return self._create(elements, type=return_type)
 
     def __xor__(self, other):
         """Update the set, keeping only elements found in either set, but not
@@ -546,12 +573,12 @@ class Set(RedisCollection, collections.MutableSet):
             pipe.sdiff(other.key, self.key)
             diff1, diff2 = pipe.execute()
             elements = diff1 | diff2
-            return self._create_instance(elements, id=self.id)
+            return self._create(elements, id=self.id)
 
         # else do it in Python completely,
         # simulating the same operation on standard set
         elements = frozenset(self) ^ frozenset(other)
-        return self._create_instance(elements, id=self.id)
+        return self._create(elements, id=self.id)
 
     def __ixor__(self, other):
         """Update the set, keeping only elements found in either set, but not
