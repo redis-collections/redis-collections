@@ -77,39 +77,15 @@ class RedisCollection:
 
         # data initialization
         if data is not None:
-            self._init_data(data)  # touches Redis
-
-    @classmethod
-    def fromanother(cls, obj, data=None, id=None, pipe=None):
-        """Collection factory. Takes another object *obj* and
-        creates collection with the same settings and data *data*.
-
-        :param obj: Another :class:`RedisCollection` instance.
-        :type obj: :class:`RedisCollection`
-        :param data: Initial data.
-        :param id: ID of the new collection.
-        :type id: string
-        :param pipe: Redis pipe in case creation is performed as a part
-                     of transaction.
-        :type pipe: :class:`redis.client.StrictPipeline` or
-                    :class:`redis.client.StrictRedis`
-        """
-        assert isinstance(obj, RedisCollection)
-
-        settings = {
-            'id': id,
-            'redis': obj.redis,
-            'pickler': obj.pickler,
-            'prefix': obj.prefix,
-        }
-
-        if pipe and data:
-            # here we cannot use cls(data, **settings), because
-            # that would not be atomic within the transaction
-            new = cls(**settings)
-            new._init_data(data, pipe=pipe)
-            return new
-        return cls(data, **settings)
+            if isinstance(data, RedisCollection):
+                # wrap into transaction
+                def init_trans(pipe):
+                    d = data._data(pipe=pipe)  # retrieve
+                    pipe.multi()
+                    self._init_data(d, pipe=pipe)  # store
+                self._transaction(init_trans)
+            else:
+                self._init_data(data)
 
     def _create_new(self, data=None, id=None, pipe=None, type=None):
         """Shorthand for creating instances of any collections. *type*
@@ -117,7 +93,7 @@ class RedisCollection:
         :class:`RedisCollection` given, all settings from current ``self``
         are propagated.
 
-        :param data: Initial data.
+        :param data: Initial data in form of a classic, built-in collection.
         :param id: ID of instance. Ignored if *type* is not a
                    :class:`RedisCollection` subclass.
         :type id: string
@@ -130,10 +106,27 @@ class RedisCollection:
                      type as ``self``.
         :type type: Class object.
         """
+        assert not isinstance(data, RedisCollection), \
+            "Not atomic. Use '_data()' within a transaction first."
+
         cls = type or self.__class__
         if issubclass(cls, RedisCollection):
-            return cls.fromanother(self, data, id, pipe)
-        return cls(data)
+            settings = {
+                'id': id,
+                'redis': self.redis,
+                'pickler': self.pickler,
+                'prefix': self.prefix,
+            }
+
+            if pipe and data:
+                # here we cannot use cls(data, **settings), because
+                # that would not be atomic within the transaction
+                new = cls(**settings)
+                new._init_data(data, pipe=pipe)
+                return new
+            return cls(data, **settings)
+
+        return cls(data) if data else cls()
 
     def _create_new_id(self):
         """Shorthand for creating new ID with id's key.
@@ -150,12 +143,15 @@ class RedisCollection:
     def _init_data(self, data, pipe=None):
         """Data initialization helper.
 
-        :param data: Initial data.
+        :param data: Initial data in form of a classic, built-in collection.
         :param pipe: Redis pipe in case creation is performed as a part
                      of transaction.
         :type pipe: :class:`redis.client.StrictPipeline` or
                     :class:`redis.client.StrictRedis`
         """
+        assert not isinstance(data, RedisCollection), \
+            "Not atomic. Use '_data()' within a transaction first."
+
         p = pipe or self.redis.pipeline()  # if not in pipe, make your own
         if data is not None:
             self._clear(pipe=p)
@@ -262,13 +258,14 @@ class RedisCollection:
     def _update(self, data, pipe=None):
         """Helper for update operations.
 
-        :param data: Data for update.
+        :param data: Data for update in form of a classic, built-in collection.
         :param pipe: Redis pipe in case update is performed as a part
                      of transaction.
         :type pipe: :class:`redis.client.StrictPipeline` or
                     :class:`redis.client.StrictRedis`
         """
-        pass
+        assert not isinstance(data, RedisCollection), \
+            "Not atomic. Use '_data()' within a transaction first."
 
     def _clear(self, pipe=None):
         """Helper for clear operations.
@@ -285,36 +282,58 @@ class RedisCollection:
         """Completely cleares the collection's data."""
         self._clear()
 
-    def _transaction(self, fn):
+    def _transaction(self, fn, extra_keys=None):
         """Helper simplifying code within watched transaction.
 
         Takes *fn*, function treated as a transaction. Returns whatever
         *fn* returns. ``self.key`` is watched. *fn* takes *pipe* as the
         only argument.
+
+        :param fn: Closure treated as a transaction.
+        :type fn: function *fn(pipe)*
+        :param extra_keys: Optional list of additional keys to watch.
+        :type extra_keys: list
+        :rtype: whatever *fn* returns
         """
         results = []
+        extra_keys = extra_keys or []
 
         def trans(pipe):
             results.append(fn(pipe))
 
-        self.redis.transaction(trans, self.key)
+        self.redis.transaction(trans, self.key, *extra_keys)
         return results[0]
 
-    def _transaction_with_new(self, fn):
+    def _transaction_with_new(self, fn, new_id=None, extra_keys=None):
         """Helper simplifying code within transaction which
         creates a new instance of a Redis collection.
 
         Takes *fn*, function treated as a transaction. Returns whatever
         *fn* returns. ``self.key`` and the new key are watched.
         *fn* takes *pipe* as the first argument and the new ID as the second.
+
+        If *new_id* given, it is used instead of a newly generated one.
+
+        :param fn: Closure treated as a transaction.
+        :type fn: function *fn(pipe, new_id, new_key)*
+        :param new_id: ID used for new instance creation.
+        :type new_id: string
+        :param extra_keys: Optional list of additional keys to watch.
+        :type extra_keys: list
+        :rtype: whatever *fn* returns
         """
         results = []
-        new_id, new_key = self._create_new_id()
+        extra_keys = extra_keys or []
+
+        if new_id:
+            new_key = self._create_key(new_id, prefix=self.prefix)
+        else:
+            new_id, new_key = self._create_new_id()
 
         def trans(pipe):
-            results.append(fn(pipe, new_id))
+            results.append(fn(pipe, new_id, new_key))
 
-        self.redis.transaction(trans, self.key, new_key)
+        self.redis.transaction(trans, self.key, new_key, *extra_keys)
         return results[0]
 
     def copy(self, id=None):
@@ -323,12 +342,24 @@ class RedisCollection:
         :param id: ID of the new collection. Defaults to auto-generated.
         :type id: string
         """
-        def copy_trans(pipe, new_id):
+        def copy_trans(pipe, new_id, new_key):
             data = self._data(pipe=pipe)  # retrieve
             pipe.multi()
-            return self._create_new(data, id=new_id, pipe=pipe)  # save
-
+            return self._create_new(data, id=new_id, pipe=pipe)  # store
         return self._transaction_with_new(copy_trans)
+
+    @classmethod
+    def _is_class_of(cls, *others):
+        """Helper method deciding whether given *others* are instances
+        of this particular :class:`RedisCollection` (sub)class.
+
+        :param others: Any objects.
+        :rtype: boolean
+        """
+        test = lambda other: isinstance(other, cls)
+        if len(others) == 1:
+            return test(others[0])
+        return all(map(test, others))
 
     def __repr__(self):
         cls_name = self.__class__.__name__

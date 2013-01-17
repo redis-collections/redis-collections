@@ -260,6 +260,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         return self._unpickle(value)
 
     def _update(self, data, pipe=None):
+        super(Dict, self)._update(data, pipe)
         redis = pipe or self.redis
 
         data = dict(data)
@@ -268,9 +269,8 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         redis.hmset(self.key, dict(zip(keys, values)))
 
-    def update(self, *args, **kwargs):
-        """
-        Update the dictionary with the key/value pairs from *other*,
+    def update(self, other=None, **kwargs):
+        """Update the dictionary with the key/value pairs from *other*,
         overwriting existing keys. Return :obj:`None`.
 
         :func:`update` accepts either another dictionary object or
@@ -279,9 +279,18 @@ class Dict(RedisCollection, collections.MutableMapping):
         dictionary is then updated with those key/value pairs:
         ``d.update(red=1, blue=2)``.
         """
-        mapping = {}
-        mapping.update(*args, **kwargs)
-        self._update(mapping)
+        other = other or {}
+        if isinstance(other, RedisCollection):
+            # wrap into transaction
+            def update_trans(pipe):
+                d = other._data(pipe=pipe)  # retrieve
+                pipe.multi()
+                self._update(d, pipe=pipe)  # store
+            self._transaction(update_trans)
+        else:
+            mapping = {}
+            mapping.update(other, **kwargs)
+            self._update(mapping)
 
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):

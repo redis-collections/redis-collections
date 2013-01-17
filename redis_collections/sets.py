@@ -5,11 +5,273 @@ sets
 """
 
 
-import operator
 import itertools
 import collections
+from abc import ABCMeta, abstractmethod
 
 from .base import RedisCollection
+
+
+class SetOperation(object):
+    """Helper class for implementing standard set operations."""
+
+    __metaclass__ = ABCMeta
+
+    def __init__(self, s, update=False, flipped=False, type=None):
+        """
+        :param s: :class:`collections.Set` instance.
+        :param update: If :obj:`True`, operation is considered to be *update*.
+                       That means it affects directly the *s* object and
+                       returns the original object itself.
+         :param flipped: Specifies whether the operation is in reversed mode,
+                         where *s* is the right operand and *other* given to
+                         :func:`__call__` is the left one. With this option
+                         *update* must be :obj:`False` and only one other
+                         operand is accepted in :func:`__call__`.
+        :param type: Class object specifying the type to be used for result
+                     of the operation. If *update* or *flipped* are
+                     :obj:`True`, this argument is ignored.
+        """
+        assert not (update and flipped)
+
+        self.s = s
+        self.update = update
+        self.flipped = flipped
+
+        if update or flipped:
+            self.type = None
+        else:
+            self.type = type
+
+    def _to_set(self, c, pipe=None):
+        if isinstance(c, RedisCollection):
+            return set(c._data(pipe=pipe))
+        return set(c)
+
+    def _op(self, new_id, new_type, others):
+        """:func:`op` wrapper. Takes care of proper transaction
+        handling and result instantiation.
+        """
+        if self.flipped:
+            assert len(others) == 1
+            left = others[0]
+            right = [self.s]
+        else:
+            left = self.s
+            right = others
+
+        def trans(pipe, new_id, new_key):
+            # retrieve
+            data = self._to_set(left, pipe=pipe)
+            other_sets = [self._to_set(o, pipe=pipe) for o in right]
+
+            # operation
+            elements = self.op(data, other_sets)
+            pipe.multi()
+
+            # store within the transaction
+            return self.s._create_new(elements, id=new_id, type=new_type,
+                                      pipe=pipe)
+        return self.s._transaction_with_new(trans, new_id=new_id)
+
+    @abstractmethod
+    def op(self, s, other_sets):
+        """Implementation of the operation on standard :class:`set`.
+
+        :param s: Data of the original collection as set (first operand).
+        :type s: :class:`set`
+        :param other_sets: Data of all the other collections participating
+                           in this operation as sets (other operands).
+        :type other_keys: iterable of :class:`frozenset` instances
+        :rtype: resulting iterable
+        """
+        pass
+
+    def _redisop(self, new_id, new_type, other_keys):
+        """:func:`redisop` wrapper. Takes care of proper transaction
+        handling and result instantiation.
+        """
+        if self.flipped:
+            assert len(other_keys) == 1
+            left = other_keys[0]
+            right = [self.s.key]
+        else:
+            left = self.s.key
+            right = other_keys
+
+        def trans(pipe, new_id, new_key):
+            # operation
+            elements = self.redisop(pipe, left, right)
+            pipe.multi()
+
+            # store within the transaction
+            return self.s._create_new(elements, id=new_id, type=new_type,
+                                      pipe=pipe)
+        return self.s._transaction_with_new(trans, new_id=new_id,
+                                            extra_keys=other_keys)
+
+    @abstractmethod
+    def redisop(self, pipe, key, other_keys):
+        """Implementation of the operation in Redis. Results
+        are returned to Python.
+
+        :param pipe: Redis transaction pipe.
+        :type pipe: :class:`redis.client.StrictPipeline`
+        :param key: Redis key from the original collection (first operand).
+        :type key: string
+        :param other_keys: Redis keys of all the other collections
+                           participating in this operation (other operands).
+        :type other_keys: iterable of strings
+        :rtype: resulting iterable
+        """
+        pass
+
+    def _redisopstore(self, new_id, new_type, other_keys):
+        """:func:`redisopstore` wrapper. Takes care of proper transaction
+        handling and result instantiation.
+        """
+        if self.flipped:
+            assert len(other_keys) == 1
+            left = other_keys[0]
+            right = [self.s.key]
+        else:
+            left = self.s.key
+            right = other_keys
+
+        def trans(pipe, new_id, new_key):
+            # operation & possible store (in self.redisopstore)
+            new = self.s._create_new(id=new_id, type=new_type)
+            self.redisopstore(pipe, new_key, left, right)
+            return new
+        return self.s._transaction_with_new(trans, new_id=new_id,
+                                            extra_keys=other_keys)
+
+    @abstractmethod
+    def redisopstore(self, pipe, new_key, key, other_keys):
+        """Implementation of the operation in Redis. Results
+        are stored to another key within Redis.
+
+        :param pipe: Redis transaction pipe.
+        :type pipe: :class:`redis.client.StrictPipeline`
+        :param new_key: Redis key of the new collection (destination).
+        :type new_key: string
+        :param key: Redis key from the original collection (first operand).
+        :type key: string
+        :param other_keys: Redis keys of all the other collections
+                           participating in this operation (other operands).
+        :type other_keys: iterable of strings
+        :rtype: :obj:`None`
+        """
+        pass
+
+    def __call__(self, *others):
+        """Operation trigger.
+
+        :param others: Iterable of one or more iterables, which are part
+                       of this operation.
+        """
+        if self.flipped:
+            # should return type of the left operand
+            assert len(others) == 1
+            new_type = others[0].__class__
+        elif self.update:
+            # should return the original set
+            new_type = self.s.__class__
+        else:
+            # should return type of the left operand or type
+            # specified in self.type
+            new_type = self.type or Set
+
+        new_id = self.s.id if self.update else None
+
+        if Set._is_class_of(*others):
+            # all others are of Set type
+            other_keys = [other.key for other in others]
+
+            if issubclass(new_type, self.s.__class__):
+                # operation can be performed in Redis completely
+                return self._redisopstore(new_id, new_type, other_keys)
+            else:
+                # operation can be performed in Redis and returned to Python
+                return self._redisop(new_id, new_type, other_keys)
+
+        # else do it in Python completely,
+        # simulating the same operation on standard set
+        return self._op(new_id, new_type, others)
+
+
+class SetDifference(SetOperation):
+
+    def op(self, s, other_sets):
+        if self.update:
+            s.difference_update(*other_sets)
+            return s
+        return s.difference(*other_sets)
+
+    def redisop(self, pipe, key, other_keys):
+        return pipe.sdiff(key, *other_keys)
+
+    def redisopstore(self, pipe, new_key, key, other_keys):
+        pipe.multi()
+        pipe.sdiffstore(new_key, key, *other_keys)
+
+
+class SetIntersection(SetOperation):
+
+    def op(self, s, other_sets):
+        if self.update:
+            s.intersection_update(*other_sets)
+            return s
+        return s.intersection(*other_sets)
+
+    def redisop(self, pipe, key, other_keys):
+        return pipe.sinter(key, *other_keys)
+
+    def redisopstore(self, pipe, new_key, key, other_keys):
+        pipe.multi()
+        pipe.sinterstore(new_key, key, *other_keys)
+
+
+class SetUnion(SetOperation):
+
+    def op(self, s, other_sets):
+        if self.update:
+            s.update(*other_sets)
+            return s
+        return s.union(*other_sets)
+
+    def redisop(self, pipe, key, other_keys):
+        return pipe.suninon(key, *other_keys)
+
+    def redisopstore(self, pipe, new_key, key, other_keys):
+        pipe.multi()
+        pipe.sunionstore(new_key, key, *other_keys)
+
+
+class SetSymmetricDifference(SetOperation):
+
+    def op(self, s, other_sets):
+        if self.update:
+            s.symmetric_difference_update(*other_sets)
+            return s
+        return s.symmetric_difference(*other_sets)
+
+    def _simulate_redisop(self, pipe, key, other_key):
+        diff1 = pipe.sdiff(key, other_key)
+        diff2 = pipe.sdiff(other_key, key)
+        return diff1 | diff2  # return still pickled
+
+    def redisop(self, pipe, key, other_keys):
+        other_key = other_keys[0]  # sym. diff. supports only one operand
+        elements = self._simulate_redisop(pipe, key, other_key)
+        return map(self.s._unpickle, elements)
+
+    def redisopstore(self, pipe, new_key, key, other_keys):
+        other_key = other_keys[0]  # sym. diff. supports only one operand
+        elements = self._simulate_redisop(pipe, key, other_key)  # pickled
+        pipe.multi()
+        pipe.delete(new_key)
+        pipe.sadd(new_key, *elements)  # store pickled elements
 
 
 class Set(RedisCollection, collections.MutableSet):
@@ -121,110 +383,6 @@ class Set(RedisCollection, collections.MutableSet):
             elements = self.redis.srandmember(self.key, k)
         return map(self._unpickle, elements)
 
-    def _are_redis_sets(self, iterables):
-        """Helper method deciding whether given *iterables* are all instances
-        of the :class:`Set` class.
-
-        :param iterables: Any iterable of iterables.
-        :rtype: boolean
-        """
-        is_redis_set = lambda i: isinstance(i, Set)
-        return all(map(is_redis_set, iterables))
-
-    def _operation(self, op, redisop, redisopstore, others, type=None,
-                   update=False):
-        """Helper method implementing standard operations.
-
-        :param op: Name of the operation as known from standard :class:`set`
-                   module. For example ``difference`` or
-                   ``intersection_update``.
-        :param redisop: Lowercase name of Redis command implementing
-                        the operation.
-        :param redisopstore: Lowercase name of the *STORE* version
-                             of *redisop*.
-        :param others: Iterable of one or more iterables, which are part
-                       of this operation.
-        :param type: Class object specifying the type to be used for result
-                     of the operation. If *update* is :obj:`True`, this
-                     argument is ignored as update operations have no return
-                     values.
-        :param update: If :obj:`True`, operation is considered to be *update*.
-                       That means it affects current object given in *self* and
-                       does not return any value.
-
-        .. warning::
-            **Operation is not atomic.**
-        """
-        return_type = self.__class__ if update else (type or Set)
-        return_id = self.id if update else None
-
-        if self._are_redis_sets(others):
-            keys = [other.key for other in others]
-
-            if issubclass(return_type, self.__class__):
-                # operation can be performed in Redis completely
-                return_obj = self._create_new(type=return_type, id=return_id)
-                fn = getattr(self.redis, redisopstore)
-                fn(return_obj.key, self.key, *keys)
-                return return_obj
-            else:
-                # operation can be performed in Redis and returned to Python
-                fn = getattr(self.redis, redisop)
-                elements = fn(self.key, *keys)
-                return self._create_new(elements, type=return_type,
-                                        id=return_id)
-
-        # else do it in Python completely,
-        # simulating the same operation on standard set
-        python_set = set(self)
-        fn = getattr(python_set, op)
-        result = fn(*map(frozenset, others))
-        elements = python_set if update else result
-
-        return self._create_new(elements, type=return_type, id=return_id)
-
-    def _binary_operation(self, op, redisopstore, other, update=False,
-                          right=False):
-        """Helper method implementing standard **binary** operations.
-
-        :param op: Name of the operation as known from :mod:`operator` module.
-        :param redisopstore: Lowercase name of the *STORE* version
-                             of Redis command implementing the operation.
-        :param other: Iterable, which is operand in this operation.
-        :param update: If :obj:`True`, operation is considered to be *update*.
-                       That means it affects current object given in *self* and
-                       does not return any value.
-        :param right: Specifies whether the operation is in reversed mode,
-                      where *self* is the right operand and *other* is
-                      the left one.
-
-        .. warning::
-            **Operation is not atomic.**
-        """
-        return_id = self.id if update else None
-
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
-
-        if right:
-            left_operand = other
-            right_operand = self
-        else:
-            left_operand = self
-            right_operand = other
-
-        return_type = left_operand.__class__
-
-        if isinstance(other, Set):
-            return_obj = self._create_new(id=return_id, type=return_type)
-            fn = getattr(self.redis, redisopstore)
-            fn(return_obj.key, left_operand.key, right_operand.key)
-            return return_obj
-
-        fn = getattr(operator, op)  # standard operator module
-        elements = fn(frozenset(left_operand), frozenset(right_operand))
-        return self._create_new(elements, id=return_id, type=return_type)
-
     def difference(self, *others, **kwargs):
         """Return a new set with elements in the set that are
         not in the *others*.
@@ -264,12 +422,9 @@ class Set(RedisCollection, collections.MutableSet):
 
                 # Redis (operation) → Python → Redis (new key with List)
                 s1.difference(s2, type=List)  # = List
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return self._operation('difference', 'sdiff', 'sdiffstore',
-                               others, type=kwargs.get('type'))
+        op = SetDifference(self, type=kwargs.get('type'))
+        return op(*others)
 
     def __sub__(self, other):
         """Return a new set with elements in the set that are
@@ -284,14 +439,16 @@ class Set(RedisCollection, collections.MutableSet):
             If *other* is instance of :class:`Set`, operation
             is performed completely in Redis. Otherwise it's performed
             in Python and results are sent to Redis.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return self._binary_operation('sub', 'sdiffstore', other)
+        if not isinstance(other, collections.Set):  # collections.Set is ABC
+            raise TypeError('Only sets are supported as operand types.')
+        return self.difference(other)
 
     def __rsub__(self, other):
-        return self._binary_operation('sub', 'sdiffstore', other, right=True)
+        if not isinstance(other, collections.Set):  # collections.Set is ABC
+            raise TypeError('Only sets are supported as operand types.')
+        op = SetDifference(self, flipped=True)
+        return op(other)
 
     def difference_update(self, *others):
         """Update the set, removing elements found in *others*.
@@ -316,12 +473,9 @@ class Set(RedisCollection, collections.MutableSet):
 
                 # Python (operation) → Redis (update)
                 s1.difference(s2, s3, s2)  # = None
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return self._operation('difference_update', 'sdiff', 'sdiffstore',
-                               others, update=True)
+        op = SetDifference(self, update=True)
+        op(*others)
 
     def __isub__(self, other):
         """Update the set, removing elements found in *other*.
@@ -335,12 +489,11 @@ class Set(RedisCollection, collections.MutableSet):
             If *other* is instance of :class:`Set`, operation
             is performed completely in Redis. Otherwise it's performed
             in Python and results are sent to Redis.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return self._binary_operation('sub', 'sdiffstore', other,
-                                      update=True)
+        if not isinstance(other, collections.Set):  # collections.Set is ABC
+            raise TypeError('Only sets are supported as operand types.')
+        op = SetDifference(self, update=True)
+        return op(other)
 
     def intersection(self, *others, **kwargs):
         """Return a new set with elements common to the set and all *others*.
@@ -352,12 +505,9 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             The same behavior as at :func:`difference` applies.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return self._operation('intersection', 'sinter', 'sinterstore',
-                               others, type=kwargs.get('type'))
+        op = SetIntersection(self, type=kwargs.get('type'))
+        return op(*others)
 
     def __and__(self, other):
         """Return a new set with elements common to the set and the *other*.
@@ -369,14 +519,16 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             The same behavior as at :func:`__sub__` applies.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return self._binary_operation('and_', 'sinterstore', other)
+        if not isinstance(other, collections.Set):  # collections.Set is ABC
+            raise TypeError('Only sets are supported as operand types.')
+        return self.intersection(other)
 
     def __rand__(self, other):
-        return self._binary_operation('and_', 'sinterstore', other, right=True)
+        if not isinstance(other, collections.Set):  # collections.Set is ABC
+            raise TypeError('Only sets are supported as operand types.')
+        op = SetIntersection(self, flipped=True)
+        return op(other)
 
     def intersection_update(self, *others):
         """Update the set, keeping only elements found in it and all *others*.
@@ -386,12 +538,9 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             The same behavior as at :func:`difference_update` applies.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return self._operation('intersection_update', 'sinter', 'sinterstore',
-                               others, update=True)
+        op = SetIntersection(self, update=True)
+        op(*others)
 
     def __iand__(self, other):
         """Update the set, keeping only elements found in it and the *other*.
@@ -403,12 +552,11 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             The same behavior as at :func:`__isub__` applies.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return self._binary_operation('and_', 'sinterstore', other,
-                                      update=True)
+        if not isinstance(other, collections.Set):  # collections.Set is ABC
+            raise TypeError('Only sets are supported as operand types.')
+        op = SetIntersection(self, update=True)
+        return op(other)
 
     def union(self, *others, **kwargs):
         """Return a new set with elements from the set and all *others*.
@@ -420,12 +568,9 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             The same behavior as at :func:`difference` applies.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return self._operation('union', 'suninon', 'sunionstore',
-                               others, type=kwargs.get('type'))
+        op = SetUnion(self, type=kwargs.get('type'))
+        return op(*others)
 
     def __or__(self, other):
         """Return a new set with elements from the set and the *other*.
@@ -437,26 +582,24 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             The same behavior as at :func:`__sub__` applies.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return self._binary_operation('or_', 'sunionstore', other)
+        if not isinstance(other, collections.Set):  # collections.Set is ABC
+            raise TypeError('Only sets are supported as operand types.')
+        return self.union(other)
 
     def __ror__(self, other):
-        return self._binary_operation('or_', 'sunionstore', other, right=True)
+        if not isinstance(other, collections.Set):  # collections.Set is ABC
+            raise TypeError('Only sets are supported as operand types.')
+        return self.union(other, type=other.__class__)
 
     def _update(self, data, others=None, pipe=None):
+        super(Set, self)._update(data, pipe)
         redis = pipe or self.redis
-        others = [data] + list(others or [])
 
-        if self._are_redis_sets(others):
-            # operation can be performed in Redis completely
-            keys = [other.key for other in others]
-            redis.sunionstore(self.key, self.key, *keys)
-        else:
-            elements = map(self._pickle, frozenset(itertools.chain(*others)))
-            redis.sadd(self.key, *elements)
+        others = [data] + list(others or [])
+        elements = map(self._pickle, frozenset(itertools.chain(*others)))
+
+        redis.sadd(self.key, *elements)
 
     def update(self, *others):
         """Update the set, adding elements from all *others*.
@@ -465,16 +608,10 @@ class Set(RedisCollection, collections.MutableSet):
         :rtype: None
 
         .. note::
-            A bit different behavior takes place in comparing
-            with the one described at :func:`difference_update`. Operation
-            is **always performed in Redis**, regardless the types given.
-            If *others* are instances of :class:`Set`, the performance
-            should be better as no transfer of data is necessary at all.
-
-        .. warning::
-            **Operation is not atomic.**
+            The same behavior as at :func:`difference_update` applies.
         """
-        self._update(others[0], others=others[1:])
+        op = SetUnion(self, update=True)
+        op(*others)
 
     def __ior__(self, other):
         """Update the set, adding elements from the *other*.
@@ -486,12 +623,11 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             The same behavior as at :func:`__isub__` applies.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return self._binary_operation('or_', 'sinterstore', other,
-                                      update=True)
+        if not isinstance(other, collections.Set):  # collections.Set is ABC
+            raise TypeError('Only sets are supported as operand types.')
+        op = SetUnion(self, update=True)
+        return op(other)
 
     def symmetric_difference(self, other, **kwargs):
         """Return a new set with elements in either the set or *other* but not
@@ -504,25 +640,9 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             The same behavior as at :func:`difference` applies.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        return_type = kwargs.get('type') or Set
-
-        if isinstance(other, Set):
-            # operation can be performed partly in Redis and returned to Python
-            with self.redis.pipeline() as pipe:
-                pipe.sdiff(self.key, other.key)
-                pipe.sdiff(other.key, self.key)
-                diff1, diff2 = pipe.execute()
-            elements = map(self._unpickle, diff1 | diff2)
-            return self._create_new(elements, type=return_type)
-
-        # else do it in Python completely,
-        # simulating the same operation on standard set
-        elements = set(self).symmetric_difference(other)
-        return self._create_new(elements, type=return_type)
+        op = SetSymmetricDifference(self, type=kwargs.get('type'))
+        return op(other)
 
     def __xor__(self, other):
         """Update the set, keeping only elements found in either set, but not
@@ -535,16 +655,15 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             The same behavior as at :func:`__sub__` applies.
-
-        .. warning::
-            **Operation is not atomic.**
         """
         if not isinstance(other, collections.Set):  # collections.Set is ABC
             raise TypeError('Only sets are supported as operand types.')
         return self.symmetric_difference(other)
 
     def __rxor__(self, other):
-        return self.__xor__(other)  # commutative
+        if not isinstance(other, collections.Set):  # collections.Set is ABC
+            raise TypeError('Only sets are supported as operand types.')
+        return self.symmetric_difference(other, type=other.__class__)
 
     def symmetric_difference_update(self, other):
         """Update the set, keeping only elements found in either set, but not
@@ -559,23 +678,9 @@ class Set(RedisCollection, collections.MutableSet):
             is **always performed in Redis**, regardless the types given.
             If *others* are instances of :class:`Set`, the performance
             should be better as no transfer of data is necessary at all.
-
-        .. warning::
-            **Operation is not atomic.**
         """
-        if isinstance(other, Set):
-            # operation can be performed in Redis completely
-            with self.redis.pipeline() as pipe:
-                pipe.sdiff(self.key, other.key)
-                pipe.sdiff(other.key, self.key)
-                diff1, diff2 = pipe.execute()
-            elements = diff1 | diff2
-            return self._create_new(elements, id=self.id)
-
-        # else do it in Python completely,
-        # simulating the same operation on standard set
-        elements = frozenset(self) ^ frozenset(other)
-        return self._create_new(elements, id=self.id)
+        op = SetSymmetricDifference(self, update=True)
+        op(other)
 
     def __ixor__(self, other):
         """Update the set, keeping only elements found in either set, but not
@@ -588,13 +693,11 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             The same behavior as at :func:`__isub__` applies.
-
-        .. warning::
-            **Operation is not atomic.**
         """
         if not isinstance(other, collections.Set):  # collections.Set is ABC
             raise TypeError('Only sets are supported as operand types.')
-        return self.symmetric_difference_update(other)
+        op = SetSymmetricDifference(self, update=True)
+        return op(other)
 
     def __eq__(self, other):
         if not isinstance(other, collections.Set):
@@ -639,6 +742,11 @@ class Set(RedisCollection, collections.MutableSet):
         return frozenset(self) <= frozenset(other)
 
     def issuperset(self, other):
+        """Test whether every element in other is in the set.
+
+        :param other: Any kind of iterable.
+        :rtype: boolean
+        """
         if isinstance(other, collections.Set):
             return other <= self
         else:

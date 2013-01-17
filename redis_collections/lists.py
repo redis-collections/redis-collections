@@ -112,7 +112,7 @@ class List(RedisCollection, collections.MutableSequence):
         """Helper for getting a slice."""
         assert isinstance(index, slice)
 
-        def slice_trans(pipe, new_id):
+        def slice_trans(pipe, new_id, new_key):
             start, stop = self._recalc_slice(index.start, index.stop)
             values = pipe.lrange(self.key, start, stop)
             if index.step:
@@ -282,7 +282,9 @@ class List(RedisCollection, collections.MutableSequence):
         self._transaction(insert_trans)
 
     def _update(self, data, pipe=None):
+        super(List, self)._update(data, pipe)
         redis = pipe or self.redis
+
         values = map(self._pickle, data)
         redis.rpush(self.key, *values)
 
@@ -290,7 +292,15 @@ class List(RedisCollection, collections.MutableSequence):
         """*values* are appended at the end of the list. Any iterable
         is accepted.
         """
-        self._update(values)
+        if isinstance(values, RedisCollection):
+            # wrap into transaction
+            def extend_trans(pipe):
+                d = values._data(pipe=pipe)  # retrieve
+                pipe.multi()
+                self._update(d, pipe=pipe)  # store
+            self._transaction(extend_trans)
+        else:
+            self._update(values)
 
     def pop(self, index=-1):
         """Item on *index* is removed and returned.
@@ -311,13 +321,20 @@ class List(RedisCollection, collections.MutableSequence):
         """Returns concatenation of the list and given iterable. New
         :class:`List` instance is returned.
         """
-        def add_trans(pipe, new_id):
-            data = self._data(pipe=pipe)  # retrieve
+        def add_trans(pipe, new_id, new_key):
+            d1 = list(self._data(pipe=pipe))  # retrieve
+
+            if isinstance(values, RedisCollection):
+                d2 = list(values._data(pipe=pipe))  # retrieve
+            else:
+                d2 = list(values)
+
             pipe.multi()
-            new = self._create_new(data, id=new_id, pipe=pipe)  # save
-            new._update(values, pipe=pipe)
-            return new
+            return self._create_new(d1 + d2, id=new_id, pipe=pipe)  # store
         return self._transaction_with_new(add_trans)
+
+    def __radd__(self, values):
+        return self.__add__(values)
 
     def __mul__(self, n):
         """Returns *n* copies of the list, concatenated. New :class:`List`
@@ -326,17 +343,13 @@ class List(RedisCollection, collections.MutableSequence):
         if not isinstance(n, int):
             raise TypeError('Cannot multiply sequence by non-int.')
 
-        def mul_trans(pipe, new_id):
-            data = self._data(pipe=pipe)  # retrieve
-            data = list(data) * n
+        def mul_trans(pipe, new_id, new_key):
+            data = list(self._data(pipe=pipe))  # retrieve
             pipe.multi()
-            return self._create_new(data, id=new_id, pipe=pipe)  # save
+            return self._create_new(data * n, id=new_id, pipe=pipe)  # store
         return self._transaction_with_new(mul_trans)
 
     def __rmul__(self, n):
-        """Returns *n* copies of the list, concatenated. New :class:`List`
-        instance is returned.
-        """
         return self.__mul__(n)
 
 

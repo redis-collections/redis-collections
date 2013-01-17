@@ -94,6 +94,7 @@ class SetTest(RedisTestCase):
         self.assertEqual(sorted(s1.intersection(s2, s3)), [])
         self.assertRaises(TypeError, lambda: s1 & s2 & l)
         self.assertEqual(sorted(s1.intersection(s2, l)), [])
+        self.assertEqual(sorted(s3 & s2), [])
 
     def test_difference(self):
         s1 = self.create_set([1, 2, 3, 3])
@@ -106,6 +107,7 @@ class SetTest(RedisTestCase):
         self.assertEqual(sorted(s1.difference(s2, s3)), [1, 2])
         self.assertRaises(TypeError, lambda: s1 - s2 - l)
         self.assertEqual(sorted(s1.difference(s2, l)), [1, 2])
+        self.assertEqual(sorted(s3 - s1), [6])
 
     def test_symmetric_difference(self):
         s1 = self.create_set([1, 2, 3, 3])
@@ -116,6 +118,7 @@ class SetTest(RedisTestCase):
         self.assertEqual(sorted(s1.symmetric_difference(s2)), [1, 2, 4, 5])
         self.assertEqual(sorted(s1 ^ s2 ^ s3), [1, 2, 4, 5, 6])
         self.assertRaises(TypeError, lambda: s1 ^ s2 ^ l)
+        self.assertEqual(sorted(s3 ^ s1 ^ s2), [1, 2, 4, 5, 6])
 
     def test_copy(self):
         s1 = self.create_set('abc')

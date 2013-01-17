@@ -105,6 +105,8 @@ Philosophy
     .. warning::
         If a collection has the requested method, but does not behave as the original built-in and does not raise NotImplementedError, it is a bug. Please, `report it <https://github.com/honzajavorek/redis-collections/issues>`_.
 
+*   Behavior of **nested Redis Collections** containing other Redis Collections is **undefined**.
+    It is not recommended to create such structures. Use IDs instead.
 *   Sometimes API is extended with a couple of extra methods to expose more efficient approaches.
 *   Cases where different than standard approach would lead to better efficiency are mentioned and highlighted in API documentation as notes. Known incompatibilities with the original API are marked as warnings.
 
