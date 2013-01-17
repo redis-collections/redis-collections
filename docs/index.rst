@@ -91,17 +91,21 @@ If you don't like the standard way of data serialization made by :mod:`pickle`, 
     >>> import json
     >>> l = List(pickler=json)
 
-Additional notes
-----------------
+Philosophy
+----------
 
-*   Most operations are atomic. Documentation warns in case of race conditions.
-*   Redis Collections try to stick to API of the original data structures known from pure Python.
+*   All operations are atomic.
+
+    .. warning::
+        If an operation has race conditions, it is a bug. Please, `report it <https://github.com/honzajavorek/redis-collections/issues>`_.
+
+*   Redis Collections stick to API of the original data structures known from Python standard library.
     To have the same (expected) behaviour is considered to be more important than efficiency.
 
     .. warning::
         If a collection has the requested method, but does not behave as the original built-in and does not raise NotImplementedError, it is a bug. Please, `report it <https://github.com/honzajavorek/redis-collections/issues>`_.
 
-*   Sometimes API is extended with a couple of extra methods to expose some more efficient approaches.
+*   Sometimes API is extended with a couple of extra methods to expose more efficient approaches.
 *   Cases where different than standard approach would lead to better efficiency are mentioned and highlighted in API documentation as notes. Known incompatibilities with the original API are marked as warnings.
 
 API Documentation
