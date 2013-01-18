@@ -36,13 +36,15 @@ Every such operation atomically changes data in Redis.
 Installation
 ------------
 
+Current version is |release|.
+
 The Cheese Shop::
 
     pip install redis-collections
 
 In case you have an adventurous mind, give a try to the source::
 
-    git clone git://github.com/honzajavorek/redis-collections.git
+    pip install git+https://github.com/honzajavorek/redis-collections.git#egg=redis-collections
 
 Persistence
 -----------
