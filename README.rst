@@ -9,6 +9,17 @@ Status: ACTIVE
 
 Under active development and maintenance.
 
+Installation
+------------
+
+The Cheese Shop::
+
+    pip install redis-collections
+
+In case you have an adventurous mind, give a try to the source::
+
+    pip install git+https://github.com/honzajavorek/redis-collections.git#egg=redis-collections
+
 Example
 -------
 
