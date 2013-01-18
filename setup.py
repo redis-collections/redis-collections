@@ -3,6 +3,9 @@
 
 import os
 import re
+import sys
+import shlex
+import subprocess
 
 try:
     from setuptools import setup, find_packages
@@ -24,8 +27,17 @@ else:
     raise RuntimeError('Missing version number.')
 
 
+# release a version, publish to GitHub and PyPI
+if sys.argv[-1] == 'publish':
+    command = lambda cmd: subprocess.check_call(shlex.split(cmd))
+    command('git tag v' + version)
+    command('git push --tags origin master:master')
+    command('python setup.py sdist upload')
+    sys.exit()
+
+
 setup(
-    name='redis_collections',
+    name='redis-collections',
     version=version,
     description='Set of basic Python collections backed by Redis.',
     long_description=open('README.rst').read(),
