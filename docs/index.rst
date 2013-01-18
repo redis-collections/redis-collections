@@ -22,7 +22,7 @@ In my Redis I can see a ``hash`` under key ``_redis_collections._dict.fe267c1dde
 
     {'answer': 'I42\n.'}
 
-The value is pickled, because Redis can store only strings mostly. On Python side, you can do almost any stuff you are used to do with standard :class:`dict` instances:
+The value is pickled, because Redis can store only strings. On Python side, you can do almost any stuff you are used to do with standard :class:`dict` instances:
 
     >>> d.update({'hasek': 39, 'jagr': 68})
     >>> dict(d.items())
@@ -31,12 +31,18 @@ The value is pickled, because Redis can store only strings mostly. On Python sid
     >>> dict(d.items())
     {'jagr': 68, 'hasek': 39}
 
-Every such operation changes data in Redis.
+Every such operation atomically changes data in Redis.
 
 Installation
 ------------
 
-Once complete, Redis Collections will be available on PyPI (probably as ``redis-collections``).
+The Cheese Shop::
+
+    pip install redis-collections
+
+In case you have an adventurous mind, give a try to the source::
+
+    git clone git://github.com/honzajavorek/redis-collections.git
 
 Persistence
 -----------
@@ -61,15 +67,8 @@ If I look to my Redis, key ``_redis_collections._dict.fe267c1dde5d4f648e7bac836a
 .. note::
     If you provide your own ID string, collection will be successfully created. If there is no key corresponding to such ID in Redis, it will be created and initialized as an empty collection. This means you can set up your own way of assigning unique keys dependent on your other code. For example, by using IDs of records from your relational database you can have exactly one unique collection in Redis for every record from your SQL storage.
 
-If you wish to add a prefix to keys used as collection identification in Redis, use ``prefix`` keyword argument::
-
-    >>> from redis_collections import List
-    >>> l = List(prefix='antananarivo')
-    >>> l.key
-    'antananarivo._redis_collections._list.db6081d57d9345ac8f853fc9ab648b2d'
-
-Custom Redis connection
------------------------
+Redis connection
+----------------
 
 By default, collection uses a new Redis connection with its default values. If you wish to use your own :class:`Redis` instance, pass it in ``redis`` keyword argument::
 
@@ -77,6 +76,25 @@ By default, collection uses a new Redis connection with its default values. If y
     >>> r = StrictRedis()
     >>> d = Dict(redis=r)
     >>> l = List(redis=r)  # using the same connection as Dict above
+
+There are several operations between collections resulting into creation of new instances of Redis Collections. These new instances
+always use the same Redis connection as the original object::
+
+    >>> from redis import StrictRedis
+    >>> from redis_collections import List
+    >>> r = StrictRedis()
+    >>> l = List([1, 2], redis=r)
+    >>> l
+    <redis_collections.List 196e407f8fc142728318a999ec821368>
+    >>> l + [4, 5, 6]  # result is using the same connection
+    <redis_collections.List 7790ef98639043c9abeacc80c2de0b93>
+
+If you wish to add a prefix to keys used as collection identification in Redis, use ``prefix`` keyword argument::
+
+    >>> from redis_collections import List
+    >>> l = List(prefix='antananarivo')
+    >>> l.key
+    'antananarivo._redis_collections._list.db6081d57d9345ac8f853fc9ab648b2d'
 
 Pickling
 --------
@@ -103,17 +121,18 @@ Philosophy
     To have the same (expected) behaviour is considered to be more important than efficiency.
 
     .. warning::
-        If a collection has the requested method, but does not behave as the original built-in and does not raise NotImplementedError, it is a bug. Please, `report it <https://github.com/honzajavorek/redis-collections/issues>`_.
+        If a collection has the method you want to use, but it does not behave as the original built-in and it does not raise NotImplementedError, then it is a bug. Please, `report it <https://github.com/honzajavorek/redis-collections/issues>`_.
 
+    If there is more efficient approach than the one complying with the model interface, new method exposing this approach should be introduced.
+
+*   Cases where different than standard approach would lead to better efficiency are mentioned and highlighted in API documentation as notes. Known incompatibilities with the original API are marked as warnings.
 *   Behavior of **nested Redis Collections** containing other Redis Collections is **undefined**.
     It is not recommended to create such structures. Use IDs instead.
-*   Sometimes API is extended with a couple of extra methods to expose more efficient approaches.
-*   Cases where different than standard approach would lead to better efficiency are mentioned and highlighted in API documentation as notes. Known incompatibilities with the original API are marked as warnings.
 
 API Documentation
 -----------------
 
-Redis Collections have only several classes representing provided collections.
+Redis Collections are composed of only several classes. All items listed below are exposed as public API, so you can (and you should) import them directly from ``redis_collections`` package.
 
 .. automodule:: redis_collections.base
 

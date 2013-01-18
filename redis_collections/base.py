@@ -348,19 +348,6 @@ class RedisCollection:
             return self._create_new(data, id=new_id, pipe=pipe)  # store
         return self._transaction_with_new(copy_trans)
 
-    @classmethod
-    def _is_class_of(cls, *others):
-        """Helper method deciding whether given *others* are instances
-        of this particular :class:`RedisCollection` (sub)class.
-
-        :param others: Any objects.
-        :rtype: boolean
-        """
-        test = lambda other: isinstance(other, cls)
-        if len(others) == 1:
-            return test(others[0])
-        return all(map(test, others))
-
     def __repr__(self):
         cls_name = self.__class__.__name__
         return '<redis_collections.%s %s>' % (cls_name, self.id)

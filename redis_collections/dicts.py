@@ -2,6 +2,8 @@
 """
 dicts
 ~~~~~
+
+Collections based on dict interface.
 """
 
 
@@ -45,8 +47,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         :type redis: :class:`redis.StrictRedis` or :obj:`None`
         :param id: ID of the collection. Collections with the same IDs point
                    to the same data. If not provided, default random ID string
-                   is generated. If no non-conflicting ID can be found,
-                   :exc:`RuntimeError` is raised.
+                   is generated.
         :type id: str or :obj:`None`
         :param pickler: Implementation of data serialization. Object with two
                         methods is expected: :func:`dumps` for conversion
@@ -104,7 +105,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         value = self.redis.hget(self.key, key)
         return self._unpickle(value) or default
 
-    def get_many(self, *keys):
+    def getmany(self, *keys):
         """Return the value for *keys*. If particular key is not in the
         dictionary, return :obj:`None`.
         """
@@ -305,15 +306,3 @@ class Dict(RedisCollection, collections.MutableMapping):
         """
         values = ((item, value) for item in seq)
         return cls(values, **kwargs)
-
-
-class NumericDict(Dict):
-    pass  # hincrby, hincrbyfloat, own versions of _pickle, _unpickle
-
-
-class Counter(NumericDict):
-    pass
-
-
-class DefaultDict(Dict):
-    pass

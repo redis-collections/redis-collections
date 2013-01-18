@@ -2,6 +2,8 @@
 """
 sets
 ~~~~
+
+Collections based on set interface.
 """
 
 
@@ -42,6 +44,18 @@ class SetOperation(object):
             self.type = None
         else:
             self.type = type
+
+    def _are_set_instances(self, *others):
+        """Helper method deciding whether given *others* are instances
+        of :class:`Set` (sub)class.
+
+        :param others: Any objects.
+        :rtype: boolean
+        """
+        test = lambda other: isinstance(other, Set)
+        if len(others) == 1:
+            return test(others[0])
+        return all(map(test, others))
 
     def _to_set(self, c, pipe=None):
         if isinstance(c, RedisCollection):
@@ -184,7 +198,7 @@ class SetOperation(object):
 
         new_id = self.s.id if self.update else None
 
-        if Set._is_class_of(*others):
+        if self._are_set_instances(*others):
             # all others are of Set type
             other_keys = [other.key for other in others]
 
@@ -291,8 +305,7 @@ class Set(RedisCollection, collections.MutableSet):
         :type redis: :class:`redis.StrictRedis` or :obj:`None`
         :param id: ID of the collection. Collections with the same IDs point
                    to the same data. If not provided, default random ID string
-                   is generated. If no non-conflicting ID can be found,
-                   :exc:`RuntimeError` is raised.
+                   is generated.
         :type id: str or :obj:`None`
         :param pickler: Implementation of data serialization. Object with two
                         methods is expected: :func:`dumps` for conversion
@@ -397,7 +410,6 @@ class Set(RedisCollection, collections.MutableSet):
             is performed completely in Redis. If *type* is provided,
             operation is still performed in Redis, but results are sent
             back to Python and returned with corresponding type. All other
-            combinations are performed only on Python side. All other
             combinations are performed in Python and results are sent
             to Redis. See examples::
 
@@ -751,32 +763,3 @@ class Set(RedisCollection, collections.MutableSet):
             return other <= self
         else:
             return frozenset(other) <= self
-
-
-class SortedSet(RedisCollection, collections.MutableSet):
-    """Mutable **sorted set** collection aiming to have the same API as the
-    standard set type. See `set
-    <http://docs.python.org/2/library/stdtypes.html#set>`_ for
-    further details. The Redis implementation is based on the
-    `sorted set <http://redis.io/commands#sorted_set>`_ type.
-    """
-
-    # http://code.activestate.com/recipes/576694/
-
-    def __init__(self):
-        pass
-
-    def __len__(self):
-        pass
-
-    def __iter__(self):
-        pass
-
-    def __contains__(self, elem):
-        pass
-
-    def add(self, elem):
-        pass
-
-    def discard(self, elem):
-        pass

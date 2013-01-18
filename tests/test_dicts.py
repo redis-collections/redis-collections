@@ -19,12 +19,12 @@ class DictTest(RedisTestCase):
         d['a'] = 'b'
         self.assertEqual(d['a'], 'b')
 
-    def test_get_many(self):
+    def test_getmany(self):
         d = self.create_dict()
         d['a'] = 'b'
         d['c'] = 'd'
         d['e'] = 'f'
-        self.assertEqual(d.get_many('a', 'e', 'x'), ['b', 'f', None])
+        self.assertEqual(d.getmany('a', 'e', 'x'), ['b', 'f', None])
 
     def test_init(self):
         d = self.create_dict(zip(['one', 'two', 'three'], [1, 2, 3]))

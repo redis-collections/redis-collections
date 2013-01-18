@@ -2,6 +2,8 @@
 """
 lists
 ~~~~~
+
+Collections based on list interface.
 """
 
 
@@ -38,8 +40,7 @@ class List(RedisCollection, collections.MutableSequence):
         :type redis: :class:`redis.StrictRedis` or :obj:`None`
         :param id: ID of the collection. Collections with the same IDs point
                    to the same data. If not provided, default random ID string
-                   is generated. If no non-conflicting ID can be found,
-                   :exc:`RuntimeError` is raised.
+                   is generated.
         :type id: str or :obj:`None`
         :param pickler: Implementation of data serialization. Object with two
                         methods is expected: :func:`dumps` for conversion
@@ -351,8 +352,3 @@ class List(RedisCollection, collections.MutableSequence):
 
     def __rmul__(self, n):
         return self.__mul__(n)
-
-
-class Deque(List):
-    # http://rediscookbook.org/implement_a_fifo_queue.html
-    pass
