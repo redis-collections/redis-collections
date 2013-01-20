@@ -86,29 +86,28 @@ class RedisCollection:
             else:
                 self._init_data(data)
 
-    def _create_new(self, data=None, key=None, pipe=None, type=None):
-        """Shorthand for creating instances of any collections. *type*
+    def _create_new(self, data=None, key=None, pipe=None, cls=None):
+        """Shorthand for creating instances of any collections. *cls*
         specifies the type of collection to be created. If subclass of
         :class:`RedisCollection` given, all settings from current ``self``
         are propagated.
 
         :param data: Initial data in form of a classic, built-in collection.
-        :param key: Redis key of the instance. Ignored if *type* is not a
+        :param key: Redis key of the instance. Ignored if *cls* is not a
                    :class:`RedisCollection` subclass.
         :type key: string
         :param pipe: Redis pipe in case creation is performed as a part
-                     of transaction. Ignored if *type* is not a
+                     of transaction. Ignored if *cls* is not a
                      :class:`RedisCollection` subclass.
         :type pipe: :class:`redis.client.StrictPipeline` or
                     :class:`redis.client.StrictRedis`
-        :param type: Type of the collection. Defaults to the same
-                     type as ``self``.
-        :type type: Class object.
+        :param cls: Type of the collection. Defaults to ``self.__class__``.
+        :type cls: Class object.
         """
         assert not isinstance(data, RedisCollection), \
             "Not atomic. Use '_data()' within a transaction first."
 
-        cls = type or self.__class__
+        cls = cls or self.__class__
         if issubclass(cls, RedisCollection):
             settings = {
                 'key': key,

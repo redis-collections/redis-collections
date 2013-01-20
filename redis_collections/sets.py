@@ -19,7 +19,7 @@ class SetOperation(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, s, update=False, flipped=False, type=None):
+    def __init__(self, s, update=False, flipped=False, return_cls=None):
         """
         :param s: :class:`collections.Set` instance.
         :param update: If :obj:`True`, operation is considered to be *update*.
@@ -30,20 +30,16 @@ class SetOperation(object):
                          :func:`__call__` is the left one. With this option
                          *update* must be :obj:`False` and only one other
                          operand is accepted in :func:`__call__`.
-        :param type: Class object specifying the type to be used for result
-                     of the operation. If *update* or *flipped* are
-                     :obj:`True`, this argument is ignored.
+        :param return_cls: Class object specifying the type to be used for
+                            result of the operation. If *update* or *flipped*
+                            are :obj:`True`, this argument is ignored.
         """
         assert not (update and flipped)
 
         self.s = s
         self.update = update
         self.flipped = flipped
-
-        if update or flipped:
-            self.type = None
-        else:
-            self.type = type
+        self.return_cls = None if (update or flipped) else return_cls
 
     def _are_set_instances(self, *others):
         """Helper method deciding whether given *others* are instances
@@ -62,7 +58,7 @@ class SetOperation(object):
             return set(c._data(pipe=pipe))
         return set(c)
 
-    def _op(self, new_key, new_type, others):
+    def _op(self, new_key, return_cls, others):
         """:func:`op` wrapper. Takes care of proper transaction
         handling and result instantiation.
         """
@@ -84,7 +80,7 @@ class SetOperation(object):
             pipe.multi()
 
             # store within the transaction
-            return self.s._create_new(elements, key=new_key, type=new_type,
+            return self.s._create_new(elements, key=new_key, cls=return_cls,
                                       pipe=pipe)
         return self.s._transaction_with_new(trans, new_key=new_key)
 
@@ -101,7 +97,7 @@ class SetOperation(object):
         """
         pass
 
-    def _redisop(self, new_key, new_type, other_keys):
+    def _redisop(self, new_key, return_cls, other_keys):
         """:func:`redisop` wrapper. Takes care of proper transaction
         handling and result instantiation.
         """
@@ -119,7 +115,7 @@ class SetOperation(object):
             pipe.multi()
 
             # store within the transaction
-            return self.s._create_new(elements, key=new_key, type=new_type,
+            return self.s._create_new(elements, key=new_key, cls=return_cls,
                                       pipe=pipe)
         return self.s._transaction_with_new(trans, new_key=new_key,
                                             extra_keys=other_keys)
@@ -140,7 +136,7 @@ class SetOperation(object):
         """
         pass
 
-    def _redisopstore(self, new_key, new_type, other_keys):
+    def _redisopstore(self, new_key, return_cls, other_keys):
         """:func:`redisopstore` wrapper. Takes care of proper transaction
         handling and result instantiation.
         """
@@ -154,7 +150,7 @@ class SetOperation(object):
 
         def trans(pipe, new_key):
             # operation & possible store (in self.redisopstore)
-            new = self.s._create_new(key=new_key, type=new_type)
+            new = self.s._create_new(key=new_key, cls=return_cls)
             # ! new_key is unprefixed, but new.key is prefixed
             self.redisopstore(pipe, new.key, left, right)
             return new
@@ -189,14 +185,14 @@ class SetOperation(object):
         if self.flipped:
             # should return type of the left operand
             assert len(others) == 1
-            new_type = others[0].__class__
+            return_cls = others[0].__class__
         elif self.update:
             # should return the original set
-            new_type = self.s.__class__
+            return_cls = self.s.__class__
         else:
             # should return type of the left operand or type
-            # specified in self.type
-            new_type = self.type or Set
+            # specified in self.return_cls
+            return_cls = self.return_cls or Set
 
         new_key = self.s.key if self.update else None
 
@@ -204,16 +200,16 @@ class SetOperation(object):
             # all others are of Set type
             other_keys = [other.key for other in others]
 
-            if issubclass(new_type, self.s.__class__):
+            if issubclass(return_cls, self.s.__class__):
                 # operation can be performed in Redis completely
-                return self._redisopstore(new_key, new_type, other_keys)
+                return self._redisopstore(new_key, return_cls, other_keys)
             else:
                 # operation can be performed in Redis and returned to Python
-                return self._redisop(new_key, new_type, other_keys)
+                return self._redisop(new_key, return_cls, other_keys)
 
         # else do it in Python completely,
         # simulating the same operation on standard set
-        return self._op(new_key, new_type, others)
+        return self._op(new_key, return_cls, others)
 
 
 class SetDifference(SetOperation):
@@ -403,13 +399,15 @@ class Set(RedisCollection, collections.MutableSet):
         not in the *others*.
 
         :param others: Iterables, each one as a single positional argument.
-        :param type: Keyword argument, type of result, defaults to the same
-                     type as collection (:class:`Set`, if not inherited).
-        :rtype: :class:`Set` or collection of type specified in *type* argument
+        :param return_cls: Keyword argument, type of result, defaults to
+                            the same type as collection (:class:`Set`,
+                            if not inherited).
+        :rtype: :class:`Set` or collection of type specified in
+                *return_cls* argument
 
         .. note::
             If all *others* are :class:`Set` instances, operation
-            is performed completely in Redis. If *type* is provided,
+            is performed completely in Redis. If *return_cls* is provided,
             operation is still performed in Redis, but results are sent
             back to Python and returned with corresponding type. All other
             combinations are performed in Python and results are sent
@@ -429,15 +427,15 @@ class Set(RedisCollection, collections.MutableSet):
                 s1.difference(s2, s3, s2)  # = Set
 
                 # Redis (operation) → Python (type conversion)
-                s1.difference(s2, type=set)  # = set
+                s1.difference(s2, return_cls=set)  # = set
 
                 # Redis (operation) → Python (type conversion)
-                s1.difference(s2, type=list)  # = list
+                s1.difference(s2, return_cls=list)  # = list
 
                 # Redis (operation) → Python → Redis (new key with List)
-                s1.difference(s2, type=List)  # = List
+                s1.difference(s2, return_cls=List)  # = List
         """
-        op = SetDifference(self, type=kwargs.get('type'))
+        op = SetDifference(self, return_cls=kwargs.get('return_cls'))
         return op(*others)
 
     def __sub__(self, other):
@@ -513,14 +511,16 @@ class Set(RedisCollection, collections.MutableSet):
         """Return a new set with elements common to the set and all *others*.
 
         :param others: Iterables, each one as a single positional argument.
-        :param type: Keyword argument, type of result, defaults to the same
-                     type as collection (:class:`Set`, if not inherited).
-        :rtype: :class:`Set` or collection of type specified in *type* argument
+        :param return_cls: Keyword argument, type of result, defaults to
+                            the same type as collection (:class:`Set`,
+                            if not inherited).
+        :rtype: :class:`Set` or collection of type specified in
+                *return_cls* argument
 
         .. note::
             The same behavior as at :func:`difference` applies.
         """
-        op = SetIntersection(self, type=kwargs.get('type'))
+        op = SetIntersection(self, return_cls=kwargs.get('return_cls'))
         return op(*others)
 
     def __and__(self, other):
@@ -576,14 +576,16 @@ class Set(RedisCollection, collections.MutableSet):
         """Return a new set with elements from the set and all *others*.
 
         :param others: Iterables, each one as a single positional argument.
-        :param type: Keyword argument, type of result, defaults to the same
-                     type as collection (:class:`Set`, if not inherited).
-        :rtype: :class:`Set` or collection of type specified in *type* argument
+        :param return_cls: Keyword argument, type of result, defaults to
+                            the same type as collection (:class:`Set`,
+                            if not inherited).
+        :rtype: :class:`Set` or collection of type specified in
+                *return_cls* argument
 
         .. note::
             The same behavior as at :func:`difference` applies.
         """
-        op = SetUnion(self, type=kwargs.get('type'))
+        op = SetUnion(self, return_cls=kwargs.get('return_cls'))
         return op(*others)
 
     def __or__(self, other):
@@ -604,7 +606,7 @@ class Set(RedisCollection, collections.MutableSet):
     def __ror__(self, other):
         if not isinstance(other, collections.Set):  # collections.Set is ABC
             raise TypeError('Only sets are supported as operand types.')
-        return self.union(other, type=other.__class__)
+        return self.union(other, return_cls=other.__class__)
 
     def _update(self, data, others=None, pipe=None):
         super(Set, self)._update(data, pipe)
@@ -648,14 +650,16 @@ class Set(RedisCollection, collections.MutableSet):
         both.
 
         :param others: Any kind of iterable.
-        :param type: Keyword argument, type of result, defaults to the same
-                     type as collection (:class:`Set`, if not inherited).
-        :rtype: :class:`Set` or collection of type specified in *type* argument
+        :param return_cls: Keyword argument, type of result, defaults to
+                            the same type as collection (:class:`Set`,
+                            if not inherited).
+        :rtype: :class:`Set` or collection of type specified in
+                *return_cls* argument
 
         .. note::
             The same behavior as at :func:`difference` applies.
         """
-        op = SetSymmetricDifference(self, type=kwargs.get('type'))
+        op = SetSymmetricDifference(self, return_cls=kwargs.get('return_cls'))
         return op(other)
 
     def __xor__(self, other):
@@ -677,7 +681,7 @@ class Set(RedisCollection, collections.MutableSet):
     def __rxor__(self, other):
         if not isinstance(other, collections.Set):  # collections.Set is ABC
             raise TypeError('Only sets are supported as operand types.')
-        return self.symmetric_difference(other, type=other.__class__)
+        return self.symmetric_difference(other, return_cls=other.__class__)
 
     def symmetric_difference_update(self, other):
         """Update the set, keeping only elements found in either set, but not
