@@ -37,11 +37,11 @@ class List(RedisCollection, collections.MutableSequence):
         :type data: iterable
         :param redis: Redis client instance. If not provided, default Redis
                       connection is used.
-        :type redis: :class:`redis.StrictRedis` or :obj:`None`
-        :param id: ID of the collection. Collections with the same IDs point
-                   to the same data. If not provided, default random ID string
-                   is generated.
-        :type id: str or :obj:`None`
+        :type redis: :class:`redis.StrictRedis`
+        :param key: Redis key of the collection. Collections with the same key
+                    point to the same data. If not provided, default random
+                    string is generated.
+        :type key: str
         :param pickler: Implementation of data serialization. Object with two
                         methods is expected: :func:`dumps` for conversion
                         of data to string and :func:`loads` for the opposite
@@ -54,16 +54,16 @@ class List(RedisCollection, collections.MutableSequence):
                         Of course, you can construct your own pickling object
                         (it can be class, module, whatever). Default
                         serialization implementation uses :mod:`pickle`.
-        :param prefix: Key prefix to use when working with Redis. Default is
-                       empty string.
-        :type prefix: str or :obj:`None`
+        :param prefix: Key prefix to use when working with Redis. Defaults
+                       to empty string.
+        :type prefix: str
 
         .. note::
-            :func:`uuid.uuid4` is used for default ID generation.
+            :func:`uuid.uuid4` is used for default key generation.
             If you are not satisfied with its `collision
             probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding method
-            :func:`_create_new_id`.
+            make your own implementation by subclassing and overriding
+            internal method :func:`_create_key`.
         """
         super(List, self).__init__(*args, **kwargs)
 
@@ -113,7 +113,7 @@ class List(RedisCollection, collections.MutableSequence):
         """Helper for getting a slice."""
         assert isinstance(index, slice)
 
-        def slice_trans(pipe, new_id, new_key):
+        def slice_trans(pipe, new_key):
             start, stop = self._recalc_slice(index.start, index.stop)
             values = pipe.lrange(self.key, start, stop)
             if index.step:
@@ -122,7 +122,7 @@ class List(RedisCollection, collections.MutableSequence):
             values = map(self._unpickle, values)
 
             pipe.multi()
-            return self._create_new(values, id=new_id, pipe=pipe)
+            return self._create_new(values, key=new_key, pipe=pipe)
 
         return self._transaction_with_new(slice_trans)
 
@@ -322,7 +322,7 @@ class List(RedisCollection, collections.MutableSequence):
         """Returns concatenation of the list and given iterable. New
         :class:`List` instance is returned.
         """
-        def add_trans(pipe, new_id, new_key):
+        def add_trans(pipe, new_key):
             d1 = list(self._data(pipe=pipe))  # retrieve
 
             if isinstance(values, RedisCollection):
@@ -331,7 +331,7 @@ class List(RedisCollection, collections.MutableSequence):
                 d2 = list(values)
 
             pipe.multi()
-            return self._create_new(d1 + d2, id=new_id, pipe=pipe)  # store
+            return self._create_new(d1 + d2, key=new_key, pipe=pipe)  # store
         return self._transaction_with_new(add_trans)
 
     def __radd__(self, values):
@@ -344,11 +344,14 @@ class List(RedisCollection, collections.MutableSequence):
         if not isinstance(n, int):
             raise TypeError('Cannot multiply sequence by non-int.')
 
-        def mul_trans(pipe, new_id, new_key):
+        def mul_trans(pipe, new_key):
             data = list(self._data(pipe=pipe))  # retrieve
             pipe.multi()
-            return self._create_new(data * n, id=new_id, pipe=pipe)  # store
+            return self._create_new(data * n, key=new_key, pipe=pipe)  # store
         return self._transaction_with_new(mul_trans)
 
     def __rmul__(self, n):
         return self.__mul__(n)
+
+    def _repr_data(self, data):
+        return repr(list(data))

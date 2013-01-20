@@ -26,17 +26,17 @@ class RedisCollection:
                     'due to limitations in Redis command set.')
 
     @abstractmethod
-    def __init__(self, data=None, redis=None, id=None, pickler=None,
+    def __init__(self, data=None, redis=None, key=None, pickler=None,
                  prefix=None):
         """
         :param data: Initial data.
         :param redis: Redis client instance. If not provided, default Redis
                       connection is used.
-        :type redis: :class:`redis.StrictRedis` or :obj:`None`
-        :param id: ID of the collection. Collections with the same IDs point
-                   to the same data. If not provided, default random ID string
-                   is generated.
-        :type id: str or :obj:`None`
+        :type redis: :class:`redis.StrictRedis`
+        :param key: Redis key of the collection. Collections with the same key
+                    point to the same data. If not provided, default random
+                    string is generated.
+        :type key: str
         :param pickler: Implementation of data serialization. Object with two
                         methods is expected: :func:`dumps` for conversion
                         of data to string and :func:`loads` for the opposite
@@ -49,16 +49,16 @@ class RedisCollection:
                         Of course, you can construct your own pickling object
                         (it can be class, module, whatever). Default
                         serialization implementation uses :mod:`pickle`.
-        :param prefix: Key prefix to use when working with Redis. Default is
-                       empty string.
-        :type prefix: str or :obj:`None`
+        :param prefix: Key prefix to use when working with Redis. Defaults
+                       to empty string.
+        :type prefix: str
 
         .. note::
-            :func:`uuid.uuid4` is used for default ID generation.
+            :func:`uuid.uuid4` is used for default key generation.
             If you are not satisfied with its `collision
             probability <http://stackoverflow.com/a/786541/325365>`_,
             make your own implementation by subclassing and overriding
-            internal method :func:`_create_id`.
+            internal method :func:`_create_key`.
         """
         #: Redis client instance. :class:`StrictRedis` object with default
         #: connection settings is used if not set by :func:`__init__`.
@@ -71,9 +71,8 @@ class RedisCollection:
         #: Redis key prefix. Defaults to an empty string.
         self.prefix = prefix
 
-        #: ID of the collection.
-        self.id = id or self._create_id()
-        self.key = self._create_key(self.id, prefix=prefix)
+        #: Redis key of the collection.
+        self.key = self._create_key(key, prefix)
 
         # data initialization
         if data is not None:
@@ -87,16 +86,16 @@ class RedisCollection:
             else:
                 self._init_data(data)
 
-    def _create_new(self, data=None, id=None, pipe=None, type=None):
+    def _create_new(self, data=None, key=None, pipe=None, type=None):
         """Shorthand for creating instances of any collections. *type*
         specifies the type of collection to be created. If subclass of
         :class:`RedisCollection` given, all settings from current ``self``
         are propagated.
 
         :param data: Initial data in form of a classic, built-in collection.
-        :param id: ID of instance. Ignored if *type* is not a
+        :param key: Redis key of the instance. Ignored if *type* is not a
                    :class:`RedisCollection` subclass.
-        :type id: string
+        :type key: string
         :param pipe: Redis pipe in case creation is performed as a part
                      of transaction. Ignored if *type* is not a
                      :class:`RedisCollection` subclass.
@@ -112,7 +111,7 @@ class RedisCollection:
         cls = type or self.__class__
         if issubclass(cls, RedisCollection):
             settings = {
-                'id': id,
+                'key': key,
                 'redis': self.redis,
                 'pickler': self.pickler,
                 'prefix': self.prefix,
@@ -127,18 +126,6 @@ class RedisCollection:
             return cls(data, **settings)
 
         return cls(data) if data else cls()
-
-    def _create_new_id(self):
-        """Shorthand for creating new ID with id's key.
-        Used in transactions.
-
-        :rtype: tuple of strings (id, key)
-        """
-        id = self._create_id()
-        return (
-            id,
-            self._create_key(id, prefix=self.prefix)
-        )
 
     def _init_data(self, data, pipe=None):
         """Data initialization helper.
@@ -169,9 +156,13 @@ class RedisCollection:
         """
         return redis.StrictRedis()
 
-    def _create_id(self):
-        """Creates default collection ID.
+    def _create_key(self, key=None, prefix=None):
+        """Creates new Redis key.
 
+        :param prefix: Key. If :obj:`None`, random string is generated.
+        :type prefix: string
+        :param prefix: Key prefix.
+        :type prefix: string
         :rtype: string
 
         .. note::
@@ -181,43 +172,11 @@ class RedisCollection:
             make your own implementation by subclassing and overriding this
             method.
         """
-        return uuid.uuid4().hex
-
-    def _create_key_name(self, namespace, item, prefix=None):
-        """
-        Simple key name factory. Puts all the parts together.
-
-        :param namespace: Key namespace.
-        :type namespace: string
-        :param item: Item in given *namespace*.
-        :type item: string
-        :param prefix: Key prefix to use when working with Redis.
-        :type prefix: string or :obj:`None`
-        :rtype: string
-        """
         components = [
-            prefix,
-            '_redis_collections',
-            '_' + namespace.lower(),
-            item.lower(),
+            prefix or '',
+            key or uuid.uuid4().hex,
         ]
-        return '.'.join(filter(None, components))
-
-    def _create_key(self, id, type=None, prefix=None):
-        """Creates Redis key for collection.
-
-        :param id: Collection ID.
-        :type id: string
-        :param type: Type of the collection. Defaults to the same
-                     type as ``self``. Only subclasses of
-                     :class:`RedisCollection` are expected.
-        :type type: Class object.
-        :param prefix: Key prefix to use when working with Redis.
-        :type prefix: string or :obj:`None`
-        :rtype: string
-        """
-        type_name = (type or self.__class__).__name__
-        return self._create_key_name(type_name, id, prefix=prefix)
+        return ''.join(components)
 
     @abstractmethod
     def _data(self, pipe=None):
@@ -245,7 +204,7 @@ class RedisCollection:
 
         :param string: String to be unserialized.
         :type string: string
-        :rtype: anything serializable or :obj:`None`
+        :rtype: anything serializable
         """
         if string is None or string == '':
             return None
@@ -304,20 +263,20 @@ class RedisCollection:
         self.redis.transaction(trans, self.key, *extra_keys)
         return results[0]
 
-    def _transaction_with_new(self, fn, new_id=None, extra_keys=None):
+    def _transaction_with_new(self, fn, new_key=None, extra_keys=None):
         """Helper simplifying code within transaction which
         creates a new instance of a Redis collection.
 
         Takes *fn*, function treated as a transaction. Returns whatever
         *fn* returns. ``self.key`` and the new key are watched.
-        *fn* takes *pipe* as the first argument and the new ID as the second.
+        *fn* takes *pipe* as the first argument and the new key as the second.
 
-        If *new_id* given, it is used instead of a newly generated one.
+        If *new_key* given, it is used instead of a newly generated one.
 
         :param fn: Closure treated as a transaction.
-        :type fn: function *fn(pipe, new_id, new_key)*
-        :param new_id: ID used for new instance creation.
-        :type new_id: string
+        :type fn: function *fn(pipe, new_key)*
+        :param new_key: Unprefixed key to be used for new instance creation.
+        :type new_key: string
         :param extra_keys: Optional list of additional keys to watch.
         :type extra_keys: list
         :rtype: whatever *fn* returns
@@ -325,29 +284,29 @@ class RedisCollection:
         results = []
         extra_keys = extra_keys or []
 
-        if new_id:
-            new_key = self._create_key(new_id, prefix=self.prefix)
-        else:
-            new_id, new_key = self._create_new_id()
-
         def trans(pipe):
-            results.append(fn(pipe, new_id, new_key))
+            results.append(fn(pipe, new_key))
 
         self.redis.transaction(trans, self.key, new_key, *extra_keys)
         return results[0]
 
-    def copy(self, id=None):
+    def copy(self, key=None):
         """Return a copy of the collection.
 
-        :param id: ID of the new collection. Defaults to auto-generated.
-        :type id: string
+        :param key: Unprefixed key of the new collection.
+                    Defaults to auto-generated.
+        :type key: string
         """
-        def copy_trans(pipe, new_id, new_key):
+        def copy_trans(pipe, new_key):
             data = self._data(pipe=pipe)  # retrieve
             pipe.multi()
-            return self._create_new(data, id=new_id, pipe=pipe)  # store
-        return self._transaction_with_new(copy_trans)
+            return self._create_new(data, key=new_key, pipe=pipe)  # store
+        return self._transaction_with_new(copy_trans, new_key=key)
+
+    def _repr_data(self, data):
+        return repr(data)
 
     def __repr__(self):
         cls_name = self.__class__.__name__
-        return '<redis_collections.%s %s>' % (cls_name, self.id)
+        data = self._repr_data(self._data())
+        return '<redis_collections.%s at %s %s>' % (cls_name, self.key, data)

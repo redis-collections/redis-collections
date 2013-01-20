@@ -62,7 +62,7 @@ class SetOperation(object):
             return set(c._data(pipe=pipe))
         return set(c)
 
-    def _op(self, new_id, new_type, others):
+    def _op(self, new_key, new_type, others):
         """:func:`op` wrapper. Takes care of proper transaction
         handling and result instantiation.
         """
@@ -74,7 +74,7 @@ class SetOperation(object):
             left = self.s
             right = others
 
-        def trans(pipe, new_id, new_key):
+        def trans(pipe, new_key):
             # retrieve
             data = self._to_set(left, pipe=pipe)
             other_sets = [self._to_set(o, pipe=pipe) for o in right]
@@ -84,9 +84,9 @@ class SetOperation(object):
             pipe.multi()
 
             # store within the transaction
-            return self.s._create_new(elements, id=new_id, type=new_type,
+            return self.s._create_new(elements, key=new_key, type=new_type,
                                       pipe=pipe)
-        return self.s._transaction_with_new(trans, new_id=new_id)
+        return self.s._transaction_with_new(trans, new_key=new_key)
 
     @abstractmethod
     def op(self, s, other_sets):
@@ -101,7 +101,7 @@ class SetOperation(object):
         """
         pass
 
-    def _redisop(self, new_id, new_type, other_keys):
+    def _redisop(self, new_key, new_type, other_keys):
         """:func:`redisop` wrapper. Takes care of proper transaction
         handling and result instantiation.
         """
@@ -113,15 +113,15 @@ class SetOperation(object):
             left = self.s.key
             right = other_keys
 
-        def trans(pipe, new_id, new_key):
+        def trans(pipe, new_key):
             # operation
             elements = self.redisop(pipe, left, right)
             pipe.multi()
 
             # store within the transaction
-            return self.s._create_new(elements, id=new_id, type=new_type,
+            return self.s._create_new(elements, key=new_key, type=new_type,
                                       pipe=pipe)
-        return self.s._transaction_with_new(trans, new_id=new_id,
+        return self.s._transaction_with_new(trans, new_key=new_key,
                                             extra_keys=other_keys)
 
     @abstractmethod
@@ -140,7 +140,7 @@ class SetOperation(object):
         """
         pass
 
-    def _redisopstore(self, new_id, new_type, other_keys):
+    def _redisopstore(self, new_key, new_type, other_keys):
         """:func:`redisopstore` wrapper. Takes care of proper transaction
         handling and result instantiation.
         """
@@ -152,12 +152,13 @@ class SetOperation(object):
             left = self.s.key
             right = other_keys
 
-        def trans(pipe, new_id, new_key):
+        def trans(pipe, new_key):
             # operation & possible store (in self.redisopstore)
-            new = self.s._create_new(id=new_id, type=new_type)
-            self.redisopstore(pipe, new_key, left, right)
+            new = self.s._create_new(key=new_key, type=new_type)
+            # ! new_key is unprefixed, but new.key is prefixed
+            self.redisopstore(pipe, new.key, left, right)
             return new
-        return self.s._transaction_with_new(trans, new_id=new_id,
+        return self.s._transaction_with_new(trans, new_key=new_key,
                                             extra_keys=other_keys)
 
     @abstractmethod
@@ -167,9 +168,10 @@ class SetOperation(object):
 
         :param pipe: Redis transaction pipe.
         :type pipe: :class:`redis.client.StrictPipeline`
-        :param new_key: Redis key of the new collection (destination).
+        :param new_key: Prefixed Redis key of the new collection (destination).
         :type new_key: string
-        :param key: Redis key from the original collection (first operand).
+        :param key: Prefixed Redis key from the original collection
+                    (first operand).
         :type key: string
         :param other_keys: Redis keys of all the other collections
                            participating in this operation (other operands).
@@ -196,7 +198,7 @@ class SetOperation(object):
             # specified in self.type
             new_type = self.type or Set
 
-        new_id = self.s.id if self.update else None
+        new_key = self.s.key if self.update else None
 
         if self._are_set_instances(*others):
             # all others are of Set type
@@ -204,14 +206,14 @@ class SetOperation(object):
 
             if issubclass(new_type, self.s.__class__):
                 # operation can be performed in Redis completely
-                return self._redisopstore(new_id, new_type, other_keys)
+                return self._redisopstore(new_key, new_type, other_keys)
             else:
                 # operation can be performed in Redis and returned to Python
-                return self._redisop(new_id, new_type, other_keys)
+                return self._redisop(new_key, new_type, other_keys)
 
         # else do it in Python completely,
         # simulating the same operation on standard set
-        return self._op(new_id, new_type, others)
+        return self._op(new_key, new_type, others)
 
 
 class SetDifference(SetOperation):
@@ -302,11 +304,11 @@ class Set(RedisCollection, collections.MutableSet):
         :type data: iterable
         :param redis: Redis client instance. If not provided, default Redis
                       connection is used.
-        :type redis: :class:`redis.StrictRedis` or :obj:`None`
-        :param id: ID of the collection. Collections with the same IDs point
-                   to the same data. If not provided, default random ID string
-                   is generated.
-        :type id: str or :obj:`None`
+        :type redis: :class:`redis.StrictRedis`
+        :param key: Redis key of the collection. Collections with the same key
+                    point to the same data. If not provided, default random
+                    string is generated.
+        :type key: str
         :param pickler: Implementation of data serialization. Object with two
                         methods is expected: :func:`dumps` for conversion
                         of data to string and :func:`loads` for the opposite
@@ -319,16 +321,16 @@ class Set(RedisCollection, collections.MutableSet):
                         Of course, you can construct your own pickling object
                         (it can be class, module, whatever). Default
                         serialization implementation uses :mod:`pickle`.
-        :param prefix: Key prefix to use when working with Redis. Default is
-                       empty string.
-        :type prefix: str or :obj:`None`
+        :param prefix: Key prefix to use when working with Redis. Defaults
+                       to empty string.
+        :type prefix: str
 
         .. note::
-            :func:`uuid.uuid4` is used for default ID generation.
+            :func:`uuid.uuid4` is used for default key generation.
             If you are not satisfied with its `collision
             probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding method
-            :func:`_create_new_id`.
+            make your own implementation by subclassing and overriding
+            internal method :func:`_create_key`.
         """
         super(Set, self).__init__(*args, **kwargs)
 
@@ -763,3 +765,8 @@ class Set(RedisCollection, collections.MutableSet):
             return other <= self
         else:
             return frozenset(other) <= self
+
+    def _repr_data(self, data):
+        list_repr = repr(list(data))
+        set_repr = '{' + list_repr[1:-1] + '}'
+        return set_repr

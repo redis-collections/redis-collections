@@ -44,11 +44,11 @@ class Dict(RedisCollection, collections.MutableMapping):
         :type data: iterable or mapping
         :param redis: Redis client instance. If not provided, default Redis
                       connection is used.
-        :type redis: :class:`redis.StrictRedis` or :obj:`None`
-        :param id: ID of the collection. Collections with the same IDs point
-                   to the same data. If not provided, default random ID string
-                   is generated.
-        :type id: str or :obj:`None`
+        :type redis: :class:`redis.StrictRedis`
+        :param key: Redis key of the collection. Collections with the same key
+                    point to the same data. If not provided, default random
+                    string is generated.
+        :type key: str
         :param pickler: Implementation of data serialization. Object with two
                         methods is expected: :func:`dumps` for conversion
                         of data to string and :func:`loads` for the opposite
@@ -61,16 +61,16 @@ class Dict(RedisCollection, collections.MutableMapping):
                         Of course, you can construct your own pickling object
                         (it can be class, module, whatever). Default
                         serialization implementation uses :mod:`pickle`.
-        :param prefix: Key prefix to use when working with Redis. Default is
-                       empty string.
-        :type prefix: str or :obj:`None`
+        :param prefix: Key prefix to use when working with Redis. Defaults
+                       to empty string.
+        :type prefix: str
 
         .. note::
-            :func:`uuid.uuid4` is used for default ID generation.
+            :func:`uuid.uuid4` is used for default key generation.
             If you are not satisfied with its `collision
             probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding method
-            :func:`_create_id`.
+            make your own implementation by subclassing and overriding
+            internal method :func:`_create_key`.
 
         .. warning::
             As mentioned, :class:`Dict` does not support following
@@ -306,3 +306,6 @@ class Dict(RedisCollection, collections.MutableMapping):
         """
         values = ((item, value) for item in seq)
         return cls(values, **kwargs)
+
+    def _repr_data(self, data):
+        return repr(dict(data))

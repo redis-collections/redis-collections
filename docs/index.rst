@@ -14,22 +14,22 @@ Aim of this small library is to provide such interface when dealing with collect
     >>> d = Dict()
     >>> d['answer'] = 42
     >>> d
-    <redis_collections.Dict fe267c1dde5d4f648e7bac836a0168fe>
+    <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'answer': 42}>
     >>> d.items()
     [('answer', 42)]
 
-In my Redis I can see a ``hash`` under key ``_redis_collections._dict.fe267c1dde5d4f648e7bac836a0168fe``. Using :class:`dict`-like notation, it's value is following::
+In my Redis I can see a ``hash`` structure under key ``fe267c1dde5d4f648e7bac836a0168fe``. Using :class:`dict`-like notation, it's value is following::
 
     {'answer': 'I42\n.'}
 
 The value is pickled, because Redis can store only strings. On Python side, you can do almost any stuff you are used to do with standard :class:`dict` instances:
 
     >>> d.update({'hasek': 39, 'jagr': 68})
-    >>> dict(d.items())
-    {'answer': 42, 'jagr': 68, 'hasek': 39}
+    >>> d
+    <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'answer': 42, 'jagr': 68, 'hasek': 39}>
     >>> del d['answer']
-    >>> dict(d.items())
-    {'jagr': 68, 'hasek': 39}
+    >>> d
+    <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'jagr': 68, 'hasek': 39}>
 
 Every such operation atomically changes data in Redis.
 
@@ -49,14 +49,12 @@ In case you have an adventurous mind, give a try to the source::
 Persistence
 -----------
 
-When creating the :class:`Dict` object, your collection gets an unique ID. As you maybe noticed in previous examples, it is used in Redis key. If you keep this ID, you can summon your collection any time in the future:
+When creating the :class:`Dict` object, your collection gets a unique Redis key. If you keep this key, you can summon your collection any time in the future:
 
-    >>> d.id
+    >>> d.key
     fe267c1dde5d4f648e7bac836a0168fe
-    >>> d = None
-    >>> d = Dict(id='fe267c1dde5d4f648e7bac836a0168fe')
-    >>> dict(d.items())
-    {'jagr': 68, 'hasek': 39}
+    >>> Dict(key='fe267c1dde5d4f648e7bac836a0168fe')
+    <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'jagr': 68, 'hasek': 39}>
 
 In case you wish to wipe all its data, use :func:`clear` method, which is available to all collections provided by this library::
 
@@ -64,15 +62,15 @@ In case you wish to wipe all its data, use :func:`clear` method, which is availa
     >>> d.items()
     []
 
-If I look to my Redis, key ``_redis_collections._dict.fe267c1dde5d4f648e7bac836a0168fe`` completely disappeared.
+If I look to my Redis, key ``fe267c1dde5d4f648e7bac836a0168fe`` completely disappeared.
 
 .. note::
-    If you provide your own ID string, collection will be successfully created. If there is no key corresponding to such ID in Redis, it will be created and initialized as an empty collection. This means you can set up your own way of assigning unique keys dependent on your other code. For example, by using IDs of records from your relational database you can have exactly one unique collection in Redis for every record from your SQL storage.
+    If you provide your own key string, collection will be successfully created. If there is no key corresponding in Redis, it will be created and initialized as an empty collection. This means you can set up your own way of assigning unique keys dependent on your other code. For example, by using IDs of records from your relational database you can have exactly one unique collection in Redis for every record from your SQL storage.
 
 Redis connection
 ----------------
 
-By default, collection uses a new Redis connection with its default values. If you wish to use your own :class:`Redis` instance, pass it in ``redis`` keyword argument::
+By default, collection uses a new Redis connection with its default values, **which is highly inefficient, but needs no configuration**. If you wish to use your own :class:`Redis` instance, pass it in ``redis`` keyword argument::
 
     >>> from redis import StrictRedis
     >>> r = StrictRedis()
@@ -87,16 +85,21 @@ always use the same Redis connection as the original object::
     >>> r = StrictRedis()
     >>> l = List([1, 2], redis=r)
     >>> l
-    <redis_collections.List 196e407f8fc142728318a999ec821368>
+    <redis_collections.List at 196e407f8fc142728318a999ec821368 [1, 2]>
     >>> l + [4, 5, 6]  # result is using the same connection
-    <redis_collections.List 7790ef98639043c9abeacc80c2de0b93>
+    <redis_collections.List at 7790ef98639043c9abeacc80c2de0b93 [1, 2, 4, 5, 6]>
 
 If you wish to add a prefix to keys used as collection identification in Redis, use ``prefix`` keyword argument::
 
     >>> from redis_collections import List
-    >>> l = List(prefix='antananarivo')
+    >>> l = List(prefix='madagascar.')
     >>> l.key
-    'antananarivo._redis_collections._list.db6081d57d9345ac8f853fc9ab648b2d'
+    'madagascar.db6081d57d9345ac8f853fc9ab648b2d'
+    >>> d = Dict(key='antananarivo', prefix='madagascar.')
+    >>> d.key
+    'madagascar.antananarivo'
+
+New instances of collections coming from operations between them use the same ``prefix``. It is propagated as well as Redis connection.
 
 Pickling
 --------
@@ -110,6 +113,8 @@ If you don't like the standard way of data serialization made by :mod:`pickle`, 
 
     >>> import json
     >>> l = List(pickler=json)
+
+New instances of collections coming from operations between them use the same ``pickler``. It is propagated as well as key prefix or Redis connection.
 
 Philosophy
 ----------
@@ -129,7 +134,7 @@ Philosophy
 
 *   Cases where different than standard approach would lead to better efficiency are mentioned and highlighted in API documentation as notes. Known incompatibilities with the original API are marked as warnings.
 *   Behavior of **nested Redis Collections** containing other Redis Collections is **undefined**.
-    It is not recommended to create such structures. Use IDs instead.
+    It is not recommended to create such structures. Use collection of keys instead.
 
 API Documentation
 -----------------

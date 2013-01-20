@@ -37,12 +37,18 @@ class DictTest(RedisTestCase):
         self.assertEqual(sorted(d.items()),
                          [('one', 1), ('three', 3), ('two', 2)])
 
-    def test_id(self):
+    def test_key(self):
         d1 = self.create_dict()
         d1['a'] = 'b'
-        d2 = self.create_dict(id=d1.id)
+        d2 = self.create_dict(key=d1.key)
         self.assertEqual(d1, d2)
         self.assertEqual(sorted(d1.items()), sorted(d2.items()))
+
+    def test_prefix(self):
+        d1 = self.create_dict(prefix='carrot')
+        self.assertTrue(d1.key.startswith('carrot'))
+        d2 = d1.copy(key='banana')
+        self.assertEqual(d2.key, 'carrotbanana')
 
     def test_len(self):
         d = self.create_dict()
