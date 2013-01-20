@@ -145,6 +145,13 @@ class DictTest(RedisTestCase):
         d['c'] = 'd'
         d.clear()
         self.assertEqual(d.items(), [])
+        self.assertEqual(self.redis.dbsize(), 0)
+
+        d = self.create_dict(prefix='smurf')
+        d['c'] = 'd'
+        d.clear()
+        self.assertEqual(d.items(), [])
+        self.assertEqual(self.redis.dbsize(), 0)
 
     def test_pop(self):
         d = self.create_dict()
