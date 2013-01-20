@@ -12,6 +12,14 @@ try:
 except ImportError:
     from distutils.core import setup, find_packages
 
+# Hack to prevent stupid "TypeError: 'NoneType' object is not callable"
+# error in multiprocessing/util.py _exit_function when running `python
+# setup.py test`
+try:
+    import multiprocessing
+except ImportError:
+    pass
+
 
 base_path = os.path.dirname(__file__)
 
@@ -48,9 +56,11 @@ setup(
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
     install_requires=['redis>=2.7.2'],
+    test_suite='nose.collector',
+    tests_require=['nose==1.2.1'],
     zip_safe=False,
     classifiers=(
-        'Development Status :: 1 - Planning',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: ISC License (ISCL)',
         'Programming Language :: Python',
