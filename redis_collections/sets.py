@@ -347,8 +347,15 @@ class Set(RedisCollection, collections.MutableSet):
         return self.redis.sismember(self.key, self._pickle(elem))
 
     def add(self, elem):
-        """Add element *elem* to the set."""
-        self.redis.sadd(self.key, self._pickle(elem))
+        """Add element *elem* to the set. Returns :obj:`False` if
+        *elem* was already present in the set.
+
+        :rtype: boolean
+
+        .. warning::
+            Original :func:`add` in :class:`set` returns no value.
+        """
+        return bool(self.redis.sadd(self.key, self._pickle(elem)))
 
     def discard(self, elem):
         """Remove element *elem* from the set if it is present."""

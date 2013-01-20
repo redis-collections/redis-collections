@@ -175,6 +175,8 @@ class SetTest(RedisTestCase):
         s = self.create_set('ab')
         s.add('c')
         self.assertEqual(sorted(s), ['a', 'b', 'c'])
+        self.assertFalse(s.add('c'))
+        self.assertTrue(s.add('d'))
 
     def test_remove_discard(self):
         s = self.create_set('cdab')
