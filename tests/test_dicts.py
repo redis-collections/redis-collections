@@ -5,7 +5,7 @@
 import unittest
 
 from .base import RedisTestCase
-from redis_collections import Dict
+from redis_collections import Dict, Counter
 
 
 class DictTest(RedisTestCase):
@@ -191,6 +191,124 @@ class DictTest(RedisTestCase):
         d.update(c=None)
         self.assertEqual(sorted(d.items()),
                          [('a', 'g'), ('c', None), ('x', 38)])
+
+
+class CounterTest(RedisTestCase):
+
+    def create_counter(self, *args, **kwargs):
+        kwargs['redis'] = self.redis
+        return Counter(*args, **kwargs)
+
+    def test_set_get(self):
+        c = self.create_counter()
+        c['a'] = 5
+        self.assertEqual(c['a'], 5)
+
+    def test_init(self):
+        c = self.create_counter('gallahad')
+        self.assertEqual(c['a'], 3)
+        self.assertEqual(c['l'], 2)
+        self.assertEqual(c['g'], 1)
+
+        c = self.create_counter([1, 1, 2, 2, 2, 38])
+        self.assertEqual(c[1], 2)
+        self.assertEqual(c[2], 3)
+        self.assertEqual(c[38], 1)
+
+        c = self.create_counter({'red': 4, 'blue': 2})
+        self.assertEqual(c['red'], 4)
+        self.assertEqual(c['blue'], 2)
+
+    def test_missing(self):
+        c = self.create_counter('gallahad')
+        self.assertEqual(c['x'], 0)
+
+    def test_del(self):
+        c = self.create_counter('gallahad')
+        self.assertFalse('x' in c)
+        self.assertEqual(c['x'], 0)
+        c['x'] = 0
+        self.assertTrue('x' in c)
+        self.assertEqual(c['x'], 0)
+        del c['x']
+        self.assertFalse('x' in c)
+        self.assertEqual(c['x'], 0)
+
+    def test_elements(self):
+        c = self.create_counter({'a': 3, 'b': 0, 'c': 1, 'd': -5})
+        self.assertEqual(sorted(c.elements()), ['a', 'a', 'a', 'c'])
+
+    def test_most_common(self):
+        c = self.create_counter('abbcccddddeeeeeffffff')
+        counts = [('f', 6), ('e', 5), ('d', 4), ('c', 3), ('b', 2), ('a', 1)]
+        self.assertEqual(c.most_common(), counts)
+        self.assertEqual(c.most_common(1), counts[0:1])
+        self.assertEqual(c.most_common(3), counts[:3])
+
+    def test_subtract(self):
+        result = [('a', 0), ('b', 1), ('c', 1), ('d', 2), ('e', 2), ('f', 3)]
+
+        c1 = self.create_counter('abbcccddddeeeeeffffff')
+        c1.subtract('abccddeeefff')
+        self.assertEqual(sorted(c1.items()), sorted(result))
+
+        c1 = self.create_counter('abbcccddddeeeeeffffff')
+        c2 = self.create_counter('abccddeeefff')
+        c1.subtract(c2)
+        self.assertEqual(sorted(c1.items()), sorted(result))
+
+    def test_fromkeys(self):
+        self.assertRaises(NotImplementedError, Counter.fromkeys, [1, 2])
+
+    def test_update(self):
+        result = [('a', 2), ('b', 3), ('c', 5), ('d', 6), ('e', 8), ('f', 9)]
+
+        c1 = self.create_counter('abbcccddddeeeeeffffff')
+        c1.update('abccddeeefff')
+        self.assertEqual(sorted(c1.items()), sorted(result))
+
+        c1 = self.create_counter('abbcccddddeeeeeffffff')
+        c2 = self.create_counter('abccddeeefff')
+        c1.update(c2)
+        self.assertEqual(sorted(c1.items()), sorted(result))
+
+    def test_add(self):
+        c1 = self.create_counter('abbcccddddeeeeeffffff')
+        c2 = self.create_counter('abccddeeefff')
+        result = [('a', 2), ('b', 3), ('c', 5), ('d', 6), ('e', 8), ('f', 9)]
+        self.assertEqual(sorted((c1 + c2).items()), sorted(result))
+
+    def test_diff(self):
+        c1 = self.create_counter('abbcccddddeeeeeffffff')
+        c2 = self.create_counter('abccddeeefff')
+        result = [('b', 1), ('c', 1), ('d', 2), ('e', 2), ('f', 3)]
+        self.assertEqual(sorted((c1 - c2).items()), sorted(result))
+
+    def test_and(self):
+        c1 = self.create_counter('abbcccddddeeeeef')
+        c2 = self.create_counter('abccddeeefff')
+        result = [('a', 1), ('b', 1), ('c', 2), ('d', 2), ('e', 3), ('f', 1)]
+        self.assertEqual(sorted((c1 & c2).items()), sorted(result))
+
+    def test_or(self):
+        c1 = self.create_counter('abbcccddddeeeeef')
+        c2 = self.create_counter('abccddeeefff')
+        result = [('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('f', 3)]
+        self.assertEqual(sorted((c1 | c2).items()), sorted(result))
+
+    def test_inc(self):
+        c = self.create_counter('abbcccc')
+        c.inc('x', 0)
+        self.assertFalse('x' in c)
+        c.inc('b')
+        self.assertEqual(c['b'], 3)
+        c.inc('b', 5)
+        self.assertEqual(c['b'], 8)
+        c.inc('b', -1)
+        self.assertEqual(c['b'], 7)
+        c.inc('b', -9)
+        self.assertEqual(c['b'], -2)
+
 
 if __name__ == '__main__':
     unittest.main()

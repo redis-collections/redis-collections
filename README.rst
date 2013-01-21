@@ -39,7 +39,7 @@ Redis Collections are a simple, pythonic way how to access Redis structures::
     >>> d
     <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'jagr': 68, 'hasek': 39}>
 
-Available collections are ``Dict``, ``List``, ``Set``.
+Available collections are ``Dict``, ``List``, ``Set``, ``Counter``.
 
 Documentation
 -------------

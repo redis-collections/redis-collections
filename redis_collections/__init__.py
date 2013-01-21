@@ -11,4 +11,4 @@ from .base import RedisCollection
 
 from .sets import Set
 from .lists import List
-from .dicts import Dict
+from .dicts import Dict, Counter

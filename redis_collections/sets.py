@@ -11,7 +11,7 @@ import itertools
 import collections
 from abc import ABCMeta, abstractmethod
 
-from .base import RedisCollection
+from .base import RedisCollection, same_types
 
 
 class SetOperation(object):
@@ -294,6 +294,8 @@ class Set(RedisCollection, collections.MutableSet):
     `set <http://redis.io/commands#set>`_ type.
     """
 
+    _same_types = (collections.Set,)
+
     def __init__(self, *args, **kwargs):
         """
         :param data: Initial data.
@@ -445,6 +447,7 @@ class Set(RedisCollection, collections.MutableSet):
         op = SetDifference(self, return_cls=kwargs.get('return_cls'))
         return op(*others)
 
+    @same_types
     def __sub__(self, other):
         """Return a new set with elements in the set that are
         not in the *other*.
@@ -459,13 +462,10 @@ class Set(RedisCollection, collections.MutableSet):
             is performed completely in Redis. Otherwise it's performed
             in Python and results are sent to Redis.
         """
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         return self.difference(other)
 
+    @same_types
     def __rsub__(self, other):
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         op = SetDifference(self, flipped=True)
         return op(other)
 
@@ -496,6 +496,7 @@ class Set(RedisCollection, collections.MutableSet):
         op = SetDifference(self, update=True)
         op(*others)
 
+    @same_types
     def __isub__(self, other):
         """Update the set, removing elements found in *other*.
 
@@ -509,8 +510,6 @@ class Set(RedisCollection, collections.MutableSet):
             is performed completely in Redis. Otherwise it's performed
             in Python and results are sent to Redis.
         """
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         op = SetDifference(self, update=True)
         return op(other)
 
@@ -530,6 +529,7 @@ class Set(RedisCollection, collections.MutableSet):
         op = SetIntersection(self, return_cls=kwargs.get('return_cls'))
         return op(*others)
 
+    @same_types
     def __and__(self, other):
         """Return a new set with elements common to the set and the *other*.
 
@@ -541,13 +541,10 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`__sub__` applies.
         """
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         return self.intersection(other)
 
+    @same_types
     def __rand__(self, other):
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         op = SetIntersection(self, flipped=True)
         return op(other)
 
@@ -563,6 +560,7 @@ class Set(RedisCollection, collections.MutableSet):
         op = SetIntersection(self, update=True)
         op(*others)
 
+    @same_types
     def __iand__(self, other):
         """Update the set, keeping only elements found in it and the *other*.
 
@@ -574,8 +572,6 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`__isub__` applies.
         """
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         op = SetIntersection(self, update=True)
         return op(other)
 
@@ -595,6 +591,7 @@ class Set(RedisCollection, collections.MutableSet):
         op = SetUnion(self, return_cls=kwargs.get('return_cls'))
         return op(*others)
 
+    @same_types
     def __or__(self, other):
         """Return a new set with elements from the set and the *other*.
 
@@ -606,13 +603,10 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`__sub__` applies.
         """
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         return self.union(other)
 
+    @same_types
     def __ror__(self, other):
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         return self.union(other, return_cls=other.__class__)
 
     def _update(self, data, others=None, pipe=None):
@@ -636,6 +630,7 @@ class Set(RedisCollection, collections.MutableSet):
         op = SetUnion(self, update=True)
         op(*others)
 
+    @same_types
     def __ior__(self, other):
         """Update the set, adding elements from the *other*.
 
@@ -647,8 +642,6 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`__isub__` applies.
         """
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         op = SetUnion(self, update=True)
         return op(other)
 
@@ -669,6 +662,7 @@ class Set(RedisCollection, collections.MutableSet):
         op = SetSymmetricDifference(self, return_cls=kwargs.get('return_cls'))
         return op(other)
 
+    @same_types
     def __xor__(self, other):
         """Update the set, keeping only elements found in either set, but not
         in both.
@@ -681,13 +675,10 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`__sub__` applies.
         """
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         return self.symmetric_difference(other)
 
+    @same_types
     def __rxor__(self, other):
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         return self.symmetric_difference(other, return_cls=other.__class__)
 
     def symmetric_difference_update(self, other):
@@ -707,6 +698,7 @@ class Set(RedisCollection, collections.MutableSet):
         op = SetSymmetricDifference(self, update=True)
         op(other)
 
+    @same_types
     def __ixor__(self, other):
         """Update the set, keeping only elements found in either set, but not
         in both.
@@ -719,8 +711,6 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`__isub__` applies.
         """
-        if not isinstance(other, collections.Set):  # collections.Set is ABC
-            raise TypeError('Only sets are supported as operand types.')
         op = SetSymmetricDifference(self, update=True)
         return op(other)
 

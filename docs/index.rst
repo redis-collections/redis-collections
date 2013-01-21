@@ -154,6 +154,10 @@ Redis Collections are composed of only several classes. All items listed below a
     :members:
     :special-members:
 
+.. autoclass:: Counter
+    :members:
+    :special-members:
+
 .. automodule:: redis_collections.lists
 
 .. autoclass:: List

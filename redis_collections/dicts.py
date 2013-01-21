@@ -9,7 +9,7 @@ Collections based on dict interface.
 
 import collections
 
-from .base import RedisCollection
+from .base import RedisCollection, same_types
 
 
 class Dict(RedisCollection, collections.MutableMapping):
@@ -309,3 +309,259 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def _repr_data(self, data):
         return repr(dict(data))
+
+
+class Counter(Dict):
+    """Mutable **mapping** collection aiming to have the same API as
+    :class:`collections.Counter`. See `Counter
+    <http://docs.python.org/2/library/collections.html#collections.Counter>`_
+    for further details. The Redis implementation is based on the
+    `hash <http://redis.io/commands#hash>`_ type.
+
+    .. warning::
+        In comparing with original :class:`collections.Counter` type
+        **supports only integers**. :class:`Counter` also  does not implement
+        methods :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues`.
+
+    .. note::
+        Unlike :class:`Dict`, :class:`Counter` has the same efficiency
+        of ``c[key]`` and :func:`get` operations.
+    """
+
+    _same_types = (collections.Counter,)
+
+    def __init__(self, *args, **kwargs):
+        """Breakes the original :class:`Counter` API, because there is no
+        support for keyword syntax. The only single way to create
+        :class:`Counter` object is to pass iterable or mapping as the first
+        argument. Iterable is expected to be a sequence of elements,
+        not a sequence of ``(key, value)`` pairs.
+
+        There is no support for *pickler* setting, because all values are
+        integers only.
+
+        :param data: Initial data.
+        :type data: iterable or mapping
+        :param redis: Redis client instance. If not provided, default Redis
+                      connection is used.
+        :type redis: :class:`redis.StrictRedis`
+        :param key: Redis key of the collection. Collections with the same key
+                    point to the same data. If not provided, default random
+                    string is generated.
+        :type key: str
+        :param prefix: Key prefix to use when working with Redis. Defaults
+                       to empty string.
+        :type prefix: str
+
+        .. note::
+            :func:`uuid.uuid4` is used for default key generation.
+            If you are not satisfied with its `collision
+            probability <http://stackoverflow.com/a/786541/325365>`_,
+            make your own implementation by subclassing and overriding
+            internal method :func:`_create_key`.
+
+        .. warning::
+            As mentioned, :class:`Counter` does not support following
+            initialization syntax: ``c = Counter(a=1, b=2)``
+        """
+        if 'pickler' in kwargs:
+            del kwargs['pickler']
+        super(Counter, self).__init__(*args, **kwargs)
+
+    def _pickle(self, data):
+        return unicode(int(data))
+
+    def _unpickle(self, string):
+        if string is None:
+            return None
+        return int(string)
+
+    def _obj_to_data(self, obj):
+        is_redis = isinstance(obj, RedisCollection)
+        is_mapping = isinstance(obj, collections.Mapping)
+
+        data = obj._data() if is_redis else obj
+        return dict(data) if is_mapping else iter(data)
+
+    def getmany(self, *keys):
+        values = super(Counter, self).getmany(*keys)
+        return [(v or 0) for v in values]
+
+    def __getitem__(self, key):
+        """Return the item of dictionary with key *key*. Returns zero if key
+        is not in the map.
+
+        .. note::
+            Unlike :class:`Dict`, :class:`Counter` has the same efficiency
+            of ``c[key]`` and :func:`get` operations.
+        """
+        return self.get(key, 0)
+
+    def elements(self):
+        """Return an iterator over elements repeating each as many times as
+        its count. Elements are returned in arbitrary order. If an element's
+        count is less than one, :func:`elements` will ignore it.
+        """
+        for element, count in self._data():
+            if count:
+                for _ in xrange(0, count):
+                    yield element
+
+    def _update(self, data, pipe=None):
+        super(Dict, self)._update(data, pipe)  # Dict intentionally
+        redis = pipe or self.redis
+
+        data = collections.Counter(data)
+        keys = data.keys()
+        values = map(self._pickle, data.values())  # pickling values
+
+        redis.hmset(self.key, dict(zip(keys, values)))
+
+    def inc(self, key, n=1):
+        """Value of *key* will be increased by *n*. *n* defaults to 1.
+        If *n* is negative integer, value of *key* will be decreased.
+        Value after the increment (decrement) operation is returned.
+
+        .. note::
+            Whole operation is ignored if *n* is zero.
+
+        :rtype: integer
+        """
+        if n:
+            return self.redis.hincrby(self.key, key, self._pickle(n))
+        return 0
+
+    def most_common(self, n=None):
+        """Return a list of the *n* most common elements and their counts
+        from the most common to the least. If *n* is not specified,
+        :func:`most_common` returns *all* elements in the counter.
+        Elements with equal counts are ordered arbitrarily.
+        """
+        data = self._obj_to_data(self)
+        counter = collections.Counter(data)
+        return counter.most_common(n)
+
+    def _operation(self, other, fn, update=False):
+        """Update operation helper.
+
+        :param other: Other operand.
+        :type other: iterable or mapping
+        :param fn: Closure, takes counter object as the first argument
+                   and data from *other* as second.
+        :type fn: function *fn(counter, other)*
+        :param update: Whether the operation is update.
+        :type update: boolean
+        """
+        def op_trans(pipe, new_key):
+            d1 = self._obj_to_data(self)
+            d2 = self._obj_to_data(other)
+
+            c1 = collections.Counter(d1)
+            result = fn(c1, d2)
+
+            if update:
+                result = c1
+
+            pipe.multi()
+            return self._create_new(result, key=new_key, pipe=pipe)
+
+        key = self.key if update else None
+        return self._transaction_with_new(op_trans, new_key=key)
+
+    def subtract(self, other):
+        """Elements are subtracted from an *iterable* or from another
+        *mapping* (or counter). Like :func:`dict.update` but subtracts
+        counts instead of replacing them.
+        """
+        def subtract_op(c1, d2):
+            c1.subtract(d2)
+        self._operation(other, subtract_op, update=True)
+
+    def update(self, other):
+        """Elements are counted from an *iterable* or added-in from another
+        *mapping* (or counter). Like :func:`dict.update` but adds counts
+        instead of replacing them. Also, the *iterable* is expected to be
+        a sequence of elements, not a sequence of ``(key, value)`` pairs.
+        """
+        def update_op(c1, d2):
+            c1.update(d2)
+        self._operation(other, update_op, update=True)
+
+    @same_types
+    def __add__(self, other):
+        def add_op(c1, d2):
+            c2 = collections.Counter(d2)
+            return c1 + c2
+        return self._operation(other, add_op)
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    @same_types
+    def __iadd__(self, other):
+        def iadd_op(c1, d2):
+            c2 = collections.Counter(d2)
+            c1 += c2
+        return self._operation(other, iadd_op, update=True)
+
+    @same_types
+    def __and__(self, other):
+        def and_op(c1, d2):
+            c2 = collections.Counter(d2)
+            return c1 & c2
+        return self._operation(other, and_op)
+
+    def __rand__(self, other):
+        return self.__and__(other)
+
+    @same_types
+    def __iand__(self, other):
+        def iand_op(c1, d2):
+            c2 = collections.Counter(d2)
+            c1 &= c2
+        return self._operation(other, iand_op, update=True)
+
+    @same_types
+    def __sub__(self, other):
+        def sub_op(c1, d2):
+            c2 = collections.Counter(d2)
+            return c1 - c2
+        return self._operation(other, sub_op)
+
+    @same_types
+    def __rsub__(self, other):
+        def rsub_op(c1, d2):
+            c2 = collections.Counter(d2)
+            return c2 - c1
+        return self._operation(other, rsub_op)
+
+    @same_types
+    def __isub__(self, other):
+        def isub_op(c1, d2):
+            c2 = collections.Counter(d2)
+            c1 -= c2
+        return self._operation(other, isub_op, update=True)
+
+    @same_types
+    def __or__(self, other):
+        def or_op(c1, d2):
+            c2 = collections.Counter(d2)
+            return c1 | c2
+        return self._operation(other, or_op)
+
+    def __ror__(self, other):
+        return self.__or__(other)
+
+    @same_types
+    def __ior__(self, other):
+        def ior_op(c1, d2):
+            c2 = collections.Counter(d2)
+            c1 |= c2
+        return self._operation(other, ior_op, update=True)
+
+    @classmethod
+    def fromkeys(cls, seq, value=None, **kwargs):
+        """This class method is not implemented for :class:`Counter`
+        objects.
+        """
+        raise NotImplementedError

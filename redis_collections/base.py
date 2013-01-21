@@ -7,6 +7,7 @@ base
 
 import uuid
 import redis
+import functools
 from abc import ABCMeta, abstractmethod
 
 try:
@@ -15,12 +16,41 @@ except ImportError:
     import pickle as pickle
 
 
+def same_types(fn):
+    """Decorator, helps to check whether operands are of
+    the same type as *self*. It is possible to extend
+    allowed types by defining ``_same_types`` class property
+    with tuple of allowed classes.
+    """
+    @functools.wraps(fn)
+    def wrapper(self, *args):
+        types = (self.__class__,) + self._same_types
+
+        # all args must be an instance of any of the types
+        allowed = all([
+            any([isinstance(arg, t) for t in types])
+            for arg in args
+        ])
+
+        if not allowed:
+            types_msg = ', '.join(types[:-1])
+            types_msg = ' or '.join([types_msg, types[-1]])
+            message = ('Only instances of %s are '
+                       'supported as operand types.') % types_msg
+            raise TypeError(message)
+
+        return fn(self, *args)
+    return wrapper
+
+
 class RedisCollection:
     """Abstract class providing backend functionality for all the other
     Redis collections.
     """
 
     __metaclass__ = ABCMeta
+
+    _same_types = ()
 
     not_impl_msg = ('Cannot be implemented efficiently or atomically '
                     'due to limitations in Redis command set.')
@@ -205,7 +235,7 @@ class RedisCollection:
         :type string: string
         :rtype: anything serializable
         """
-        if string is None or string == '':
+        if string is None:
             return None
         if not isinstance(string, basestring):
             msg = 'Only strings can be unpickled (%r given).' % string
