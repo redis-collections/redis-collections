@@ -89,32 +89,20 @@ always use the same Redis connection as the original object::
     >>> l + [4, 5, 6]  # result is using the same connection
     <redis_collections.List at 7790ef98639043c9abeacc80c2de0b93 [1, 2, 4, 5, 6]>
 
-If you wish to add a prefix to keys used as collection identification in Redis, use ``prefix`` keyword argument::
-
-    >>> from redis_collections import List
-    >>> l = List(prefix='madagascar.')
-    >>> l.key
-    'madagascar.db6081d57d9345ac8f853fc9ab648b2d'
-    >>> d = Dict(key='antananarivo', prefix='madagascar.')
-    >>> d.key
-    'madagascar.antananarivo'
-
-New instances of collections coming from operations between them use the same ``prefix``. It is propagated as well as Redis connection.
-
 Pickling
 --------
 
 If you don't like the standard way of data serialization made by :mod:`pickle`, you can set your own. Use ``pickler`` keyword argument:
 
     >>> import pickle
-    >>> l = List(pickler=pickle)  # this has no sense
+    >>> l = List(pickler=pickle)  # this makes no sense
 
 *pickler* can be anything having two methods (or functions): :func:`dumps` for conversion of data to string, and :func:`loads` for the opposite direction. You can write your own module or class with such interface, or you can use one of those which are already available::
 
     >>> import json
     >>> l = List(pickler=json)
 
-New instances of collections coming from operations between them use the same ``pickler``. It is propagated as well as key prefix or Redis connection.
+New instances of collections coming from operations between them use the same ``pickler``. It is propagated as well as Redis connection.
 
 Philosophy
 ----------

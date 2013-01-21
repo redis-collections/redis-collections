@@ -44,12 +44,6 @@ class DictTest(RedisTestCase):
         self.assertEqual(d1, d2)
         self.assertEqual(sorted(d1.items()), sorted(d2.items()))
 
-    def test_prefix(self):
-        d1 = self.create_dict(prefix='carrot')
-        self.assertTrue(d1.key.startswith('carrot'))
-        d2 = d1.copy(key='banana')
-        self.assertEqual(d2.key, 'carrotbanana')
-
     def test_len(self):
         d = self.create_dict()
         self.assertEqual(len(d), 0)
@@ -142,12 +136,6 @@ class DictTest(RedisTestCase):
     def test_clear(self):
         d = self.create_dict()
         d['a'] = 'b'
-        d['c'] = 'd'
-        d.clear()
-        self.assertEqual(d.items(), [])
-        self.assertEqual(self.redis.dbsize(), 0)
-
-        d = self.create_dict(prefix='smurf')
         d['c'] = 'd'
         d.clear()
         self.assertEqual(d.items(), [])

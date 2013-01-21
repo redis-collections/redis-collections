@@ -61,9 +61,6 @@ class Dict(RedisCollection, collections.MutableMapping):
                         Of course, you can construct your own pickling object
                         (it can be class, module, whatever). Default
                         serialization implementation uses :mod:`pickle`.
-        :param prefix: Key prefix to use when working with Redis. Defaults
-                       to empty string.
-        :type prefix: str
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.
@@ -349,9 +346,6 @@ class Counter(Dict):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
-        :param prefix: Key prefix to use when working with Redis. Defaults
-                       to empty string.
-        :type prefix: str
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.
@@ -452,7 +446,9 @@ class Counter(Dict):
         :param update: Whether the operation is update.
         :type update: boolean
         """
-        def op_trans(pipe, new_key):
+        key = self.key if update else None
+
+        def op_trans(pipe):
             d1 = self._obj_to_data(self)
             d2 = self._obj_to_data(other)
 
@@ -463,10 +459,8 @@ class Counter(Dict):
                 result = c1
 
             pipe.multi()
-            return self._create_new(result, key=new_key, pipe=pipe)
-
-        key = self.key if update else None
-        return self._transaction_with_new(op_trans, new_key=key)
+            return self._create_new(result, key=key, pipe=pipe)
+        return self._transaction(op_trans, key)
 
     def subtract(self, other):
         """Elements are subtracted from an *iterable* or from another

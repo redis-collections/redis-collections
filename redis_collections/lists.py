@@ -54,9 +54,6 @@ class List(RedisCollection, collections.MutableSequence):
                         Of course, you can construct your own pickling object
                         (it can be class, module, whatever). Default
                         serialization implementation uses :mod:`pickle`.
-        :param prefix: Key prefix to use when working with Redis. Defaults
-                       to empty string.
-        :type prefix: str
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.
@@ -113,7 +110,7 @@ class List(RedisCollection, collections.MutableSequence):
         """Helper for getting a slice."""
         assert isinstance(index, slice)
 
-        def slice_trans(pipe, new_key):
+        def slice_trans(pipe):
             start, stop = self._recalc_slice(index.start, index.stop)
             values = pipe.lrange(self.key, start, stop)
             if index.step:
@@ -122,9 +119,8 @@ class List(RedisCollection, collections.MutableSequence):
             values = map(self._unpickle, values)
 
             pipe.multi()
-            return self._create_new(values, key=new_key, pipe=pipe)
-
-        return self._transaction_with_new(slice_trans)
+            return self._create_new(values, pipe=pipe)
+        return self._transaction(slice_trans)
 
     def __getitem__(self, index):
         """Returns item of sequence on *index*.
@@ -322,7 +318,7 @@ class List(RedisCollection, collections.MutableSequence):
         """Returns concatenation of the list and given iterable. New
         :class:`List` instance is returned.
         """
-        def add_trans(pipe, new_key):
+        def add_trans(pipe):
             d1 = list(self._data(pipe=pipe))  # retrieve
 
             if isinstance(values, RedisCollection):
@@ -331,8 +327,8 @@ class List(RedisCollection, collections.MutableSequence):
                 d2 = list(values)
 
             pipe.multi()
-            return self._create_new(d1 + d2, key=new_key, pipe=pipe)  # store
-        return self._transaction_with_new(add_trans)
+            return self._create_new(d1 + d2, pipe=pipe)  # store
+        return self._transaction(add_trans)
 
     def __radd__(self, values):
         return self.__add__(values)
@@ -344,11 +340,11 @@ class List(RedisCollection, collections.MutableSequence):
         if not isinstance(n, int):
             raise TypeError('Cannot multiply sequence by non-int.')
 
-        def mul_trans(pipe, new_key):
+        def mul_trans(pipe):
             data = list(self._data(pipe=pipe))  # retrieve
             pipe.multi()
-            return self._create_new(data * n, key=new_key, pipe=pipe)  # store
-        return self._transaction_with_new(mul_trans)
+            return self._create_new(data * n, pipe=pipe)  # store
+        return self._transaction(mul_trans)
 
     def __rmul__(self, n):
         return self.__mul__(n)

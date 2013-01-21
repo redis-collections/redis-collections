@@ -56,8 +56,7 @@ class RedisCollection:
                     'due to limitations in Redis command set.')
 
     @abstractmethod
-    def __init__(self, data=None, redis=None, key=None, pickler=None,
-                 prefix=None):
+    def __init__(self, data=None, redis=None, key=None, pickler=None):
         """
         :param data: Initial data.
         :param redis: Redis client instance. If not provided, default Redis
@@ -79,9 +78,6 @@ class RedisCollection:
                         Of course, you can construct your own pickling object
                         (it can be class, module, whatever). Default
                         serialization implementation uses :mod:`pickle`.
-        :param prefix: Key prefix to use when working with Redis. Defaults
-                       to empty string.
-        :type prefix: str
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.
@@ -98,11 +94,8 @@ class RedisCollection:
         #: module is set as default.
         self.pickler = pickler or pickle
 
-        #: Redis key prefix. Defaults to an empty string.
-        self.prefix = prefix
-
         #: Redis key of the collection.
-        self.key = self._create_key(key, prefix)
+        self.key = key or self._create_key()
 
         # data initialization
         if data is not None:
@@ -143,7 +136,6 @@ class RedisCollection:
                 'key': key,
                 'redis': self.redis,
                 'pickler': self.pickler,
-                'prefix': self.prefix,
             }
 
             if pipe and data:
@@ -185,13 +177,9 @@ class RedisCollection:
         """
         return redis.StrictRedis()
 
-    def _create_key(self, key=None, prefix=None):
+    def _create_key(self):
         """Creates new Redis key.
 
-        :param prefix: Key. If :obj:`None`, random string is generated.
-        :type prefix: string
-        :param prefix: Key prefix.
-        :type prefix: string
         :rtype: string
 
         .. note::
@@ -201,11 +189,7 @@ class RedisCollection:
             make your own implementation by subclassing and overriding this
             method.
         """
-        components = [
-            prefix or '',
-            key or uuid.uuid4().hex,
-        ]
-        return ''.join(components)
+        return uuid.uuid4().hex
 
     @abstractmethod
     def _data(self, pipe=None):
@@ -270,7 +254,7 @@ class RedisCollection:
         """Completely cleares the collection's data."""
         self._clear()
 
-    def _transaction(self, fn, extra_keys=None):
+    def _transaction(self, fn, *extra_keys):
         """Helper simplifying code within watched transaction.
 
         Takes *fn*, function treated as a transaction. Returns whatever
@@ -284,7 +268,6 @@ class RedisCollection:
         :rtype: whatever *fn* returns
         """
         results = []
-        extra_keys = extra_keys or []
 
         def trans(pipe):
             results.append(fn(pipe))
@@ -292,45 +275,17 @@ class RedisCollection:
         self.redis.transaction(trans, self.key, *extra_keys)
         return results[0]
 
-    def _transaction_with_new(self, fn, new_key=None, extra_keys=None):
-        """Helper simplifying code within transaction which
-        creates a new instance of a Redis collection.
-
-        Takes *fn*, function treated as a transaction. Returns whatever
-        *fn* returns. ``self.key`` and the new key are watched.
-        *fn* takes *pipe* as the first argument and the new key as the second.
-
-        If *new_key* given, it is used instead of a newly generated one.
-
-        :param fn: Closure treated as a transaction.
-        :type fn: function *fn(pipe, new_key)*
-        :param new_key: Unprefixed key to be used for new instance creation.
-        :type new_key: string
-        :param extra_keys: Optional list of additional keys to watch.
-        :type extra_keys: list
-        :rtype: whatever *fn* returns
-        """
-        results = []
-        extra_keys = extra_keys or []
-
-        def trans(pipe):
-            results.append(fn(pipe, new_key))
-
-        self.redis.transaction(trans, self.key, new_key, *extra_keys)
-        return results[0]
-
     def copy(self, key=None):
         """Return a copy of the collection.
 
-        :param key: Unprefixed key of the new collection.
-                    Defaults to auto-generated.
+        :param key: Key of the new collection. Defaults to auto-generated.
         :type key: string
         """
-        def copy_trans(pipe, new_key):
+        def copy_trans(pipe):
             data = self._data(pipe=pipe)  # retrieve
             pipe.multi()
-            return self._create_new(data, key=new_key, pipe=pipe)  # store
-        return self._transaction_with_new(copy_trans, new_key=key)
+            return self._create_new(data, key=key, pipe=pipe)  # store
+        return self._transaction(copy_trans, key)
 
     def _repr_data(self, data):
         return repr(data)
