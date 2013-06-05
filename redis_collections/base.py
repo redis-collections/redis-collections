@@ -13,7 +13,7 @@ from abc import ABCMeta, abstractmethod
 try:
     import cPickle as pickle
 except ImportError:
-    import pickle as pickle
+    import pickle as pickle  # NOQA
 
 
 def same_types(fn):
@@ -209,7 +209,7 @@ class RedisCollection:
         :type data: anything serializable
         :rtype: string
         """
-        return unicode(self.pickler.dumps(data))
+        return str(self.pickler.dumps(data))
 
     def _unpickle(self, string):
         """Converts given string serialization back to corresponding data.

@@ -260,6 +260,14 @@ class List(RedisCollection, collections.MutableSequence):
                 return i + start
         raise ValueError(value)
 
+    def count(self, value):
+        """Returns number of occurences of *value*.
+
+        .. note::
+            Implemented only on Python side.
+        """
+        return list(self._data()).count(value)
+
     def insert(self, index, value):
         """Item of *index* is replaced by *value*. If *index* is out of
         range, the *value* is prepended or appended (no error is raised).

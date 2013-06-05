@@ -10,13 +10,13 @@ import subprocess
 try:
     from setuptools import setup, find_packages
 except ImportError:
-    from distutils.core import setup, find_packages
+    from distutils.core import setup, find_packages  # NOQA
 
 # Hack to prevent stupid "TypeError: 'NoneType' object is not callable"
 # error in multiprocessing/util.py _exit_function when running `python
 # setup.py test`
 try:
-    import multiprocessing
+    import multiprocessing  # NOQA
 except ImportError:
     pass
 
@@ -25,31 +25,26 @@ base_path = os.path.dirname(__file__)
 
 
 # version
-ver_file = os.path.join(base_path, 'redis_collections/__init__.py')
-ver_file_head = open(ver_file).read(100)
-
-match = re.search(r'__version__ = \'([^\']*)\'', ver_file_head)
-if match:
-    version = match.group(1)
-else:
-    raise RuntimeError('Missing version number.')
+meta_file = os.path.join(base_path, 'redis_collections/__init__.py')
+meta_file_contents = open(meta_file).read()
+meta = dict(re.findall(r'__([^_]+)__ = \'([^\']*)\'', meta_file_contents))
 
 
 # release a version, publish to GitHub and PyPI
 if sys.argv[-1] == 'publish':
     command = lambda cmd: subprocess.check_call(shlex.split(cmd))
-    command('git tag v' + version)
+    command('git tag v' + meta['version'])
     command('git push --tags origin master:master')
     command('python setup.py sdist upload')
     sys.exit()
 
 
 setup(
-    name='redis-collections',
-    version=version,
+    name=meta['title'],
+    version=meta['version'],
     description='Set of basic Python collections backed by Redis.',
     long_description=open('README.rst').read(),
-    author='Honza Javorek',
+    author=meta['author'],
     author_email='jan.javorek@gmail.com',
     url='https://github.com/honzajavorek/redis-collections',
     license=open('LICENSE').read(),

@@ -204,6 +204,12 @@ class SetTest(RedisTestCase):
             s = self.create_set('ab')
             self.assertEqual(s.random_sample(2), ['a', 'b'])
 
+    def test_add_unicode(self):
+        s = self.create_set()
+        elem = u'ěščřžýáíéůú\U0001F4A9'
+        s.add(elem)
+        self.assertEqual(sorted(s), [elem])
+
     def test_clear(self):
         s = self.create_set('abcdefg')
         s.clear()
