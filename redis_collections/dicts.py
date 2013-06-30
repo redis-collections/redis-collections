@@ -166,7 +166,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         self.redis.hdel(self.key, key)
 
     def _data(self, pipe=None):
-        redis = pipe or self.redis
+        redis = pipe if pipe is not None else self.redis
         result = redis.hgetall(self.key).items()
         return [(k, self._unpickle(v)) for (k, v) in result]
 
@@ -259,7 +259,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def _update(self, data, pipe=None):
         super(Dict, self)._update(data, pipe)
-        redis = pipe or self.redis
+        redis = pipe if pipe is not None else self.redis
 
         data = dict(data)
         keys = data.keys()
@@ -403,7 +403,7 @@ class Counter(Dict):
 
     def _update(self, data, pipe=None):
         super(Dict, self)._update(data, pipe)  # Dict intentionally
-        redis = pipe or self.redis
+        redis = pipe if pipe is not None else self.redis
 
         data = collections.Counter(data)
         keys = data.keys()
