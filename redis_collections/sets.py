@@ -330,7 +330,7 @@ class Set(RedisCollection, collections.MutableSet):
         return self.redis.scard(self.key)
 
     def _data(self, pipe=None):
-        redis = pipe or self.redis
+        redis = pipe if pipe is not None else self.redis
         return (self._unpickle(v) for v in redis.smembers(self.key))
 
     def __iter__(self):
@@ -604,7 +604,7 @@ class Set(RedisCollection, collections.MutableSet):
 
     def _update(self, data, others=None, pipe=None):
         super(Set, self)._update(data, pipe)
-        redis = pipe or self.redis
+        redis = pipe if pipe is not None else self.redis
 
         others = [data] + list(others or [])
         elements = map(self._pickle, frozenset(itertools.chain(*others)))
