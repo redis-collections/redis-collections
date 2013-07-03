@@ -51,8 +51,6 @@ setup(
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
     install_requires=['redis>=2.7.2'],
-    test_suite='nose.collector',
-    tests_require=['nose==1.2.1'],
     zip_safe=False,
     classifiers=(
         'Development Status :: 4 - Beta',
