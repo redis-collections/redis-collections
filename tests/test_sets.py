@@ -202,7 +202,7 @@ class SetTest(RedisTestCase):
 
         if major_ver >= 2 and minor_ver >= 6:
             s = self.create_set('ab')
-            self.assertEqual(s.random_sample(2), ['a', 'b'])
+            self.assertEqual(sorted(s.random_sample(2)), ['a', 'b'])
 
     def test_add_unicode(self):
         s = self.create_set()
