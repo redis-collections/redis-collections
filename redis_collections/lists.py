@@ -69,7 +69,7 @@ class List(RedisCollection, collections.MutableSequence):
         return self.redis.llen(self.key)
 
     def _data(self, pipe=None):
-        redis = pipe or self.redis
+        redis = pipe if pipe is not None else self.redis
         values = redis.lrange(self.key, 0, -1)
         return (self._unpickle(v) for v in values)
 
@@ -288,7 +288,7 @@ class List(RedisCollection, collections.MutableSequence):
 
     def _update(self, data, pipe=None):
         super(List, self)._update(data, pipe)
-        redis = pipe or self.redis
+        redis = pipe if pipe is not None else self.redis
 
         values = map(self._pickle, data)
         redis.rpush(self.key, *values)

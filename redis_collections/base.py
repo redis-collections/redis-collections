@@ -138,7 +138,7 @@ class RedisCollection:
                 'pickler': self.pickler,
             }
 
-            if pipe and data:
+            if pipe is not None and data:
                 # here we cannot use cls(data, **settings), because
                 # that would not be atomic within the transaction
                 new = cls(**settings)
@@ -160,13 +160,14 @@ class RedisCollection:
         assert not isinstance(data, RedisCollection), \
             "Not atomic. Use '_data()' within a transaction first."
 
-        p = pipe or self.redis.pipeline()  # if not in pipe, make your own
+        # if not in pipe, make your own
+        p = pipe if pipe is not None else self.redis.pipeline()
         if data is not None:
             self._clear(pipe=p)
             if data:
                 # non-empty data, populate collection
                 self._update(data, pipe=p)
-        if not pipe:
+        if pipe is None:
             # own pipe, execute it
             p.execute()
 
@@ -247,7 +248,7 @@ class RedisCollection:
         :type pipe: :class:`redis.client.StrictPipeline` or
                     :class:`redis.client.StrictRedis`
         """
-        redis = pipe or self.redis
+        redis = pipe if pipe is not None else self.redis
         redis.delete(self.key)
 
     def clear(self):

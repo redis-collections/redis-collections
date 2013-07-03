@@ -2,6 +2,9 @@
 Redis Collections
 =================
 
+.. image:: https://travis-ci.org/honzajavorek/redis-collections.png
+   :target: https://travis-ci.org/honzajavorek/redis-collections
+
 Set of basic Python collections backed by Redis.
 
 Status: ACTIVE
