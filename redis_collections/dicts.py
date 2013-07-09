@@ -325,7 +325,10 @@ class Counter(Dict):
         of ``c[key]`` and :func:`get` operations.
     """
 
-    _same_types = (collections.Counter,)
+    try:
+        _same_types = (collections.Counter,)
+    except AttributeError:
+        _same_types = ()
 
     def __init__(self, *args, **kwargs):
         """Breakes the original :class:`Counter` API, because there is no
