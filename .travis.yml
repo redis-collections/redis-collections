@@ -1,5 +1,5 @@
 language: python
 python:
-  - "2.7"
-  - "2.6"
-script: python -m unittest discover
+    - "2.7"
+    - "2.6"
+script: nosetests
