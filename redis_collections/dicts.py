@@ -316,6 +316,9 @@ class Counter(Dict):
     `hash <http://redis.io/commands#hash>`_ type.
 
     .. warning::
+        Not available in Python 2.6.
+
+    .. warning::
         In comparing with original :class:`collections.Counter` type
         **supports only integers**. :class:`Counter` also  does not implement
         methods :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues`.
@@ -325,10 +328,7 @@ class Counter(Dict):
         of ``c[key]`` and :func:`get` operations.
     """
 
-    try:
-        _same_types = (collections.Counter,)
-    except AttributeError:
-        _same_types = ()
+    _same_types = (collections.Counter,)
 
     def __init__(self, *args, **kwargs):
         """Breakes the original :class:`Counter` API, because there is no
