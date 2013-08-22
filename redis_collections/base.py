@@ -11,7 +11,7 @@ import six
 from abc import ABCMeta, abstractmethod
 
 try:
-    from six.moves import pickle
+    from six.moves import pickle  # cPikle
 except ImportError:
     import pickle  # NOQA
 
