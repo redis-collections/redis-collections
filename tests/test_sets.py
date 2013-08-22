@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+from __future__ import unicode_literals
 
 import unittest
 
@@ -195,7 +195,7 @@ class SetTest(RedisTestCase):
 
     def test_random_sample(self):
         s = self.create_set('a')
-        self.assertEqual(s.random_sample(), ['a'])
+        self.assertEqual(list(s.random_sample()), ['a'])
 
         version = map(int, self.redis.info()['redis_version'].split('.'))
         major_ver, minor_ver, _ = version
@@ -206,7 +206,7 @@ class SetTest(RedisTestCase):
 
     def test_add_unicode(self):
         s = self.create_set()
-        elem = u'ěščřžýáíéůú\U0001F4A9'
+        elem = 'ěščřžýáíéůú\U0001F4A9'
         s.add(elem)
         self.assertEqual(sorted(s), [elem])
 

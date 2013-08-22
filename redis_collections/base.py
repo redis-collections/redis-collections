@@ -4,16 +4,16 @@ base
 ~~~~
 """
 
-
 import uuid
 import redis
 import functools
+import six
 from abc import ABCMeta, abstractmethod
 
 try:
-    import cPickle as pickle
+    from six.moves import pickle
 except ImportError:
-    import pickle as pickle  # NOQA
+    import pickle  # NOQA
 
 
 def same_types(fn):
@@ -210,7 +210,7 @@ class RedisCollection:
         :type data: anything serializable
         :rtype: string
         """
-        return str(self.pickler.dumps(data))
+        return self.pickler.dumps(data)
 
     def _unpickle(self, string):
         """Converts given string serialization back to corresponding data.
@@ -222,7 +222,7 @@ class RedisCollection:
         """
         if string is None:
             return None
-        if not isinstance(string, basestring):
+        if not isinstance(string, six.binary_type):
             msg = 'Only strings can be unpickled (%r given).' % string
             raise TypeError(msg)
         return self.pickler.loads(string)
