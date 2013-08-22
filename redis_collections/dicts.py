@@ -12,6 +12,9 @@ import six
 
 from .base import RedisCollection, same_types
 
+if six.PY3:
+    xrange = range
+
 
 class Dict(RedisCollection, collections.MutableMapping):
     """Mutable **mapping** collection aiming to have the same API as the
@@ -402,7 +405,7 @@ class Counter(Dict):
         """
         for element, count in self._data():
             if count:
-                for _ in range(0, count):
+                for _ in xrange(0, count):
                     yield element
 
     def _update(self, data, pipe=None):
