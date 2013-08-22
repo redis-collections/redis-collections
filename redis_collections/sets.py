@@ -9,15 +9,14 @@ Collections based on set interface.
 
 import itertools
 import collections
+import six
 from abc import ABCMeta, abstractmethod
 
 from .base import RedisCollection, same_types
 
 
-class SetOperation(object):
+class SetOperation(six.with_metaclass(ABCMeta)):
     """Helper class for implementing standard set operations."""
-
-    __metaclass__ = ABCMeta
 
     def __init__(self, s, update=False, flipped=False, return_cls=None):
         """

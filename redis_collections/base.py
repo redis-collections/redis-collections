@@ -43,12 +43,10 @@ def same_types(fn):
     return wrapper
 
 
-class RedisCollection:
+class RedisCollection(six.with_metaclass(ABCMeta)):
     """Abstract class providing backend functionality for all the other
     Redis collections.
     """
-
-    __metaclass__ = ABCMeta
 
     _same_types = ()
 
