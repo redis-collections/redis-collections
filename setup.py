@@ -50,7 +50,7 @@ setup(
     license=open('LICENSE').read(),
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
-    install_requires=['redis>=2.7.2'],
+    install_requires=['redis>=2.7.2', 'six'],
     zip_safe=False,
     classifiers=(
         'Development Status :: 4 - Beta',
