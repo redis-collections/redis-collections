@@ -370,7 +370,7 @@ class Counter(Dict):
         super(Counter, self).__init__(*args, **kwargs)
 
     def _pickle(self, data):
-        return six.u(str(int(data)))
+        return six.b(str(data))
 
     def _unpickle(self, string):
         if string is None:
