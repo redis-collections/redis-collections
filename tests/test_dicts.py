@@ -4,7 +4,6 @@
 
 import unittest
 import six
-b = six.b
 
 from .base import RedisTestCase
 from redis_collections import Dict, Counter
