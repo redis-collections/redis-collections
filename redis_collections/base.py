@@ -15,6 +15,9 @@ try:
 except ImportError:
     import pickle  # NOQA
 
+if six.PY3:
+    basestring = (str, bytes)
+
 
 def same_types(fn):
     """Decorator, helps to check whether operands are of
@@ -220,7 +223,7 @@ class RedisCollection(six.with_metaclass(ABCMeta)):
         """
         if string is None:
             return None
-        if not isinstance(string, six.binary_type):
+        if not isinstance(string, basestring):
             msg = 'Only strings can be unpickled (%r given).' % string
             raise TypeError(msg)
         return self.pickler.loads(string)
