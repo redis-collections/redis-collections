@@ -119,7 +119,7 @@ class List(RedisCollection, collections.MutableSequence):
             values = map(self._unpickle, values)
 
             pipe.multi()
-            return self._create_new(values, pipe=pipe)
+            return self._create_new(values, pipe=pipe, key=self.key)
         return self._transaction(slice_trans)
 
     def __getitem__(self, index):
