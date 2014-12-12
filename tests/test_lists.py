@@ -135,9 +135,13 @@ class ListTest(RedisTestCase):
         self.assertEqual(list(l), [3, 2, 1])
 
     def test_lset_issue(self):
-        l = self.create_list([1])
-        l.insert(-1, 5)
-        self.assertEqual(list(l), [5, 1])       # failed in 0.1.5
+        for l in ( [1], self.create_list([1]) ):
+            l.insert(0, 5)
+            self.assertEqual(list(l), [5, 1])
+            l.insert(0, 6)
+            self.assertEqual(list(l), [6, 5, 1])
+            l.append(7)
+            self.assertEqual(list(l), [6, 5, 1, 7])
 
 
 if __name__ == '__main__':
