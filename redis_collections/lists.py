@@ -269,9 +269,9 @@ class List(RedisCollection, collections.MutableSequence):
         return list(self._data()).count(value)
 
     def insert(self, index, value):
-        """Insert *value* before *index*. Can only work with index <= 0.
+        """Insert *value* before *index*. Can only work with index == 0.
         """
-        if index > 0:
+        if index != 0:
             # Redis has no commands for *inserting* into a list by index.
             # LINSERT requires assumptions about contents of the list values.
             raise NotImplementedError(self.not_impl_msg)
