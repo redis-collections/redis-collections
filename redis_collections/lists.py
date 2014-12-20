@@ -269,22 +269,19 @@ class List(RedisCollection, collections.MutableSequence):
         return list(self._data()).count(value)
 
     def insert(self, index, value):
-        """Item of *index* is replaced by *value*. If *index* is out of
-        range, the *value* is prepended or appended (no error is raised).
+        """Insert *value* before *index*. Can only work with index == 0.
         """
-        def insert_trans(pipe):
-            size = pipe.llen(self.key)
-            pipe.multi()
+        if index != 0:
+            # Redis has no commands for *inserting* into a list by index.
+            # LINSERT requires assumptions about contents of the list values.
+            raise NotImplementedError(self.not_impl_msg)
+        
+        self.redis.lpush(self.key, self._pickle(value))
 
-            pickled_value = self._pickle(value)
-            if index < 0 and abs(index) > size:
-                pipe.lpush(self.key, pickled_value)
-            elif index >= size:
-                pipe.rpush(self.key, pickled_value)
-            else:
-                pipe.lset(self.key, index, pickled_value)
-
-        self._transaction(insert_trans)
+    def append(self, value):
+        """Insert *value* at end of list.
+        """
+        self.redis.rpush(self.key, self._pickle(value))
 
     def _update(self, data, pipe=None):
         super(List, self)._update(data, pipe)
