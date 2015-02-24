@@ -100,7 +100,8 @@ class Dict(RedisCollection, collections.MutableMapping):
             :func:`__getitem__` protocol.
         """
         value = self.redis.hget(self.key, key)
-        return self._unpickle(value) or default
+        if value is None: return default
+        return self._unpickle(value)
 
     def getmany(self, *keys):
         """Return the value for *keys*. If particular key is not in the
