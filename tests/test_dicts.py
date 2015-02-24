@@ -180,6 +180,12 @@ class DictTest(RedisTestCase):
         self.assertEqual(sorted(d.items()),
                          [('a', 'g'), ('c', None), ('x', 38)])
 
+    def test_get_default(self):
+        d = self.create_dict()
+        for ff in ( '', False, None, 0):
+            d['h'] = ff
+            self.assertEqual(d.get('h', 'wrong'), ff)
+
 
 class CounterTest(RedisTestCase):
 
