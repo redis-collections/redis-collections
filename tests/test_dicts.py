@@ -182,7 +182,7 @@ class DictTest(RedisTestCase):
 
     def test_get_default(self):
         d = self.create_dict()
-        for ff in ( '', False, None, 0):
+        for ff in ('', False, None, 0):
             d['h'] = ff
             self.assertEqual(d.get('h', 'wrong'), ff)
 
