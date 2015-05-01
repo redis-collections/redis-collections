@@ -43,6 +43,9 @@ setup(
     name=meta['title'],
     version=meta['version'],
     description='Set of basic Python collections backed by Redis.',
+    extras_require = {
+        'redislite':  ["redislite"]
+    },
     long_description=open('README.rst').read(),
     author=meta['author'],
     author_email='jan.javorek@gmail.com',
@@ -50,7 +53,7 @@ setup(
     license=open('LICENSE').read(),
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
-    install_requires=['redis>=2.7.2'],
+    install_requires=['redis>=2.7.2', 'future'],
     zip_safe=False,
     classifiers=(
         'Development Status :: 4 - Beta',

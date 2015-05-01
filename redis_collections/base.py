@@ -6,7 +6,11 @@ base
 
 
 import uuid
-import redis
+try:
+    import redislite as redis
+    using_redislite = True
+except ImportError:
+    import redis
 import functools
 from abc import ABCMeta, abstractmethod
 
@@ -14,6 +18,7 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle as pickle  # NOQA
+from past.builtins import basestring
 
 
 def same_types(fn):
@@ -56,7 +61,7 @@ class RedisCollection:
                     'due to limitations in Redis command set.')
 
     @abstractmethod
-    def __init__(self, data=None, redis=None, key=None, pickler=None):
+    def __init__(self, data=None, redis=None, key=None, pickler=None, redis_dbfile=None):
         """
         :param data: Initial data.
         :param redis: Redis client instance. If not provided, default Redis
@@ -78,6 +83,8 @@ class RedisCollection:
                         Of course, you can construct your own pickling object
                         (it can be class, module, whatever). Default
                         serialization implementation uses :mod:`pickle`.
+        :param redis_dbfile: The name for the redis db backing file, if using redislite.
+        "type redis_dbfile: str
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.
@@ -88,7 +95,7 @@ class RedisCollection:
         """
         #: Redis client instance. :class:`StrictRedis` object with default
         #: connection settings is used if not set by :func:`__init__`.
-        self.redis = redis or self._create_redis()
+        self.redis = redis or self._create_redis(redis_dbfile)
 
         #: Class or module implementing pickling. Standard :mod:`pickle`
         #: module is set as default.
@@ -171,11 +178,13 @@ class RedisCollection:
             # own pipe, execute it
             p.execute()
 
-    def _create_redis(self):
+    def _create_redis(self, redis_dbfile=None):
         """Creates default Redis connection.
 
         :rtype: :class:`redis.StrictRedis`
         """
+        if redis_dbfile and using_redislite:
+            return redis.StrictRedis(redis_dbfile)
         return redis.StrictRedis()
 
     def _create_key(self):
