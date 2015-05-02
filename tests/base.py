@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-
-
+use_redislite = False
 try:
-    import redislite as redis
+    import redislite
+    use_redislite = True
 except ImportError:
     import redis
 import unittest
+
 
 
 class RedisTestCase(unittest.TestCase):
@@ -13,9 +14,17 @@ class RedisTestCase(unittest.TestCase):
     db = 15
     dbfilename = None
 
+    @classmethod
+    def setUpClass(cls):
+        # If we're using redislite spin up a redis instance and keep it running while the class exists.
+        # This keeps each test from starting a new redis-server and speeds things up quite a bit.
+        if use_redislite:
+            cls.redis_server = redislite.StrictRedis()
+            cls.dbfilename = cls.redis_server.db
+
     def setUp(self):
-        if self.dbfilename and hasattr(redis, '__redis_executable__'):
-            self.redis = redis.StrictRedis(self.dbfilename, db=self.db)
+        if use_redislite:
+            self.redis = redislite.StrictRedis(self.dbfilename, db=self.db)
         else:
             self.redis = redis.StrictRedis(db=self.db)
         if self.redis.dbsize():

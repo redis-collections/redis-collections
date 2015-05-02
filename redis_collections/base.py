@@ -7,7 +7,7 @@ base
 
 import uuid
 try:
-    import redislite as redis
+    import redislite
     using_redislite = True
 except ImportError:
     import redis
@@ -183,8 +183,8 @@ class RedisCollection:
 
         :rtype: :class:`redis.StrictRedis`
         """
-        if redis_dbfile and using_redislite:
-            return redis.StrictRedis(redis_dbfile)
+        if using_redislite:
+            return redislite.StrictRedis(redis_dbfile)
         return redis.StrictRedis()
 
     def _create_key(self):

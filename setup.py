@@ -44,7 +44,7 @@ setup(
     version=meta['version'],
     description='Set of basic Python collections backed by Redis.',
     extras_require = {
-        'redislite':  ["redislite"]
+        'redislite':  ["redislite==1.0.228"]
     },
     long_description=open('README.rst').read(),
     author=meta['author'],
