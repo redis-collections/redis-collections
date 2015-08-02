@@ -39,6 +39,14 @@ if sys.argv[-1] == 'publish':
     sys.exit()
 
 
+def readme(filename='README.rst'):
+    if sys.version_info.major > 2:
+        with open(filename, encoding='utf-8') as file_handle:
+            return file_handle.read()
+    with open(filename) as file_handle:
+        return file_handle.read()
+
+
 setup(
     name=meta['title'],
     version=meta['version'],
@@ -46,14 +54,14 @@ setup(
     extras_require = {
         'redislite':  ["redislite==1.0.228"]
     },
-    long_description=open('README.rst').read(),
+    long_description=readme(),
     author=meta['author'],
     author_email='jan.javorek@gmail.com',
     url='https://github.com/honzajavorek/redis-collections',
     license=open('LICENSE').read(),
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
-    install_requires=['redis>=2.7.2', 'future'],
+    install_requires=['redis>=2.7.2'],
     zip_safe=False,
     classifiers=(
         'Development Status :: 4 - Beta',

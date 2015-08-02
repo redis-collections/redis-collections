@@ -5,10 +5,8 @@ dicts
 
 Collections based on dict interface.
 """
-
-
 import collections
-
+import sys
 from .base import RedisCollection, same_types
 
 
@@ -168,7 +166,7 @@ class Dict(RedisCollection, collections.MutableMapping):
     def _data(self, pipe=None):
         redis = pipe if pipe is not None else self.redis
         result = redis.hgetall(self.key).items()
-        return [(k, self._unpickle(v)) for (k, v) in result]
+        return [(k.decode('utf-8'), self._unpickle(v)) for (k, v) in result]
 
     def items(self):
         """Return a copy of the dictionary's list of ``(key, value)`` pairs."""
@@ -177,7 +175,7 @@ class Dict(RedisCollection, collections.MutableMapping):
     def iteritems(self):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
         result = self.redis.hgetall(self.key).iteritems()
-        return ((k, self._unpickle(v)) for (k, v) in result)
+        return ((k.decode('utf-8'), self._unpickle(v)) for (k, v) in result)
 
     def keys(self):
         """Return a copy of the dictionary's list of keys."""
@@ -366,7 +364,7 @@ class Counter(Dict):
         super(Counter, self).__init__(*args, **kwargs)
 
     def _pickle(self, data):
-        return unicode(int(data))
+        return str(int(data))
 
     def _unpickle(self, string):
         if string is None:
@@ -399,9 +397,13 @@ class Counter(Dict):
         its count. Elements are returned in arbitrary order. If an element's
         count is less than one, :func:`elements` will ignore it.
         """
+        if sys.version_info.major > 2:
+            generator_range = xrange
+        else:
+            generator_range = range
         for element, count in self._data():
             if count:
-                for _ in xrange(0, count):
+                for _ in generator_range(0, count):
                     yield element
 
     def _update(self, data, pipe=None):

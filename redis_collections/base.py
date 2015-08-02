@@ -6,10 +6,10 @@ base
 
 
 import uuid
-try:
-    import redislite
+try:  # NOQA
+    import redislite as redis
     using_redislite = True
-except ImportError:
+except ImportError:  # NOQA
     import redis
 import functools
 from abc import ABCMeta, abstractmethod
@@ -18,7 +18,10 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle as pickle  # NOQA
-from past.builtins import basestring
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def same_types(fn):
@@ -48,7 +51,7 @@ def same_types(fn):
     return wrapper
 
 
-class RedisCollection:
+class RedisCollection(object):
     """Abstract class providing backend functionality for all the other
     Redis collections.
     """
@@ -219,6 +222,8 @@ class RedisCollection:
         :type data: anything serializable
         :rtype: string
         """
+        if isinstance(data, bytes):
+            print('Pickling a bytestring')
         return str(self.pickler.dumps(data))
 
     def _unpickle(self, string):
@@ -231,10 +236,14 @@ class RedisCollection:
         """
         if string is None:
             return None
-        if not isinstance(string, basestring):
+        if isinstance(string, bytes):
+            string = str(string, 'utf-8')
+        if not isinstance(string, str):
             msg = 'Only strings can be unpickled (%r given).' % string
             raise TypeError(msg)
-        return self.pickler.loads(string)
+        result = self.pickler.loads(bytes(string, 'UTF-8'))
+        logger.info(result)
+        return result
 
     @abstractmethod
     def _update(self, data, pipe=None):
@@ -283,6 +292,7 @@ class RedisCollection:
             results.append(fn(pipe))
 
         self.redis.transaction(trans, self.key, *extra_keys)
+        logger.info(results[0])
         return results[0]
 
     def copy(self, key=None):
