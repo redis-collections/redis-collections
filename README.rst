@@ -7,11 +7,6 @@ Redis Collections
 
 Set of basic Python collections backed by Redis.
 
-Status: ACTIVE
---------------
-
-Under active development and maintenance.
-
 Installation
 ------------
 
