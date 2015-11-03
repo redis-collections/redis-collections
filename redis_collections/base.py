@@ -4,16 +4,19 @@ base
 ~~~~
 """
 
-
 import uuid
 import redis
 import functools
+import six
 from abc import ABCMeta, abstractmethod
 
 try:
-    import cPickle as pickle
+    from six.moves import pickle  # cPickle
 except ImportError:
-    import pickle as pickle  # NOQA
+    import pickle  # NOQA
+
+if six.PY3:
+    basestring = (str, bytes)
 
 
 def same_types(fn):
@@ -43,12 +46,10 @@ def same_types(fn):
     return wrapper
 
 
-class RedisCollection:
+class RedisCollection(six.with_metaclass(ABCMeta)):
     """Abstract class providing backend functionality for all the other
     Redis collections.
     """
-
-    __metaclass__ = ABCMeta
 
     _same_types = ()
 
@@ -210,7 +211,7 @@ class RedisCollection:
         :type data: anything serializable
         :rtype: string
         """
-        return str(self.pickler.dumps(data))
+        return self.pickler.dumps(data)
 
     def _unpickle(self, string):
         """Converts given string serialization back to corresponding data.
