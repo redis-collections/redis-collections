@@ -92,10 +92,12 @@ class DictTest(RedisTestCase):
     def test_get(self):
         d = self.create_dict()
         d['a'] = 'b'
+        d['zero'] = 0
         self.assertEqual(d.get('a'), 'b')
         self.assertEqual(d.get('c'), None)
         self.assertEqual(d.get('a', 'x'), 'b')
         self.assertEqual(d.get('c', 'x'), 'x')
+        self.assertEqual(d.get('zero'), 0)
 
     def test_keys(self):
         d = self.create_dict()
