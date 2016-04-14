@@ -216,5 +216,24 @@ class SetTest(RedisTestCase):
         self.assertEqual(sorted(s), [])
 
 
+class _Set(Set):
+    pass
+
+
+class SubClassTest(SetTest):
+    """Subclasses should be working properly, too"""
+
+    def create_set(self, *args, **kwargs):
+        kwargs['redis'] = self.redis
+        return _Set(*args, **kwargs)
+
+    def test_copy(self):
+        s1 = self.create_set('abc')
+        s2 = s1.copy()
+        self.assertEqual(s2.__class__, _Set)
+        self.assertEqual(sorted(s1),
+                         sorted(s2))
+
+
 if __name__ == '__main__':
     unittest.main()

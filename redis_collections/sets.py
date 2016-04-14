@@ -249,7 +249,7 @@ class SetUnion(SetOperation):
         return s.union(*other_sets)
 
     def redisop(self, pipe, key, other_keys):
-        return pipe.suninon(key, *other_keys)
+        return pipe.sunion(key, *other_keys)
 
     def redisopstore(self, pipe, new_key, key, other_keys):
         pipe.multi()
@@ -437,7 +437,8 @@ class Set(RedisCollection, collections.MutableSet):
                 # Redis (operation) → Python → Redis (new key with List)
                 s1.difference(s2, return_cls=List)  # = List
         """
-        op = SetDifference(self, return_cls=kwargs.get('return_cls'))
+        return_cls = kwargs.get('return_cls') or type(self)
+        op = SetDifference(self, return_cls=return_cls)
         return op(*others)
 
     @same_types
@@ -519,7 +520,8 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`difference` applies.
         """
-        op = SetIntersection(self, return_cls=kwargs.get('return_cls'))
+        return_cls = kwargs.get('return_cls') or type(self)
+        op = SetIntersection(self, return_cls=return_cls)
         return op(*others)
 
     @same_types
@@ -581,7 +583,8 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`difference` applies.
         """
-        op = SetUnion(self, return_cls=kwargs.get('return_cls'))
+        return_cls = kwargs.get('return_cls') or type(self)
+        op = SetUnion(self, return_cls=return_cls)
         return op(*others)
 
     @same_types
@@ -652,7 +655,8 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`difference` applies.
         """
-        op = SetSymmetricDifference(self, return_cls=kwargs.get('return_cls'))
+        return_cls = kwargs.get('return_cls') or type(self)
+        op = SetSymmetricDifference(self, return_cls=return_cls)
         return op(other)
 
     @same_types
