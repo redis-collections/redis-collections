@@ -9,6 +9,8 @@ from __future__ import division, print_function, unicode_literals
 
 import collections
 
+import six
+
 from .base import RedisCollection, same_types
 
 
@@ -109,7 +111,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         dictionary, return :obj:`None`.
         """
         values = self.redis.hmget(self.key, *keys)
-        return map(self._unpickle, values)
+        return [self._unpickle(x) for x in values]
 
     def __getitem__(self, key):
         """Return the item of dictionary with key *key*. Raises a
@@ -178,7 +180,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def iteritems(self):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
-        result = self.redis.hgetall(self.key).iteritems()
+        result = six.iteritems(self.redis.hgetall(self.key))
         return ((k, self._unpickle(v)) for (k, v) in result)
 
     def keys(self):
@@ -262,12 +264,10 @@ class Dict(RedisCollection, collections.MutableMapping):
     def _update(self, data, pipe=None):
         super(Dict, self)._update(data, pipe)
         redis = pipe if pipe is not None else self.redis
-
         data = dict(data)
-        keys = data.keys()
-        values = map(self._pickle, data.values())  # pickling values
-
-        redis.hmset(self.key, dict(zip(keys, values)))
+        redis.hmset(
+            self.key, {k: self._pickle(v) for k, v in six.iteritems(data)}
+        )
 
     def update(self, other=None, **kwargs):
         """Update the dictionary with the key/value pairs from *other*,
@@ -368,7 +368,7 @@ class Counter(Dict):
         super(Counter, self).__init__(*args, **kwargs)
 
     def _pickle(self, data):
-        return unicode(int(data))
+        return six.text_type(int(data))
 
     def _unpickle(self, string):
         if string is None:
@@ -403,7 +403,7 @@ class Counter(Dict):
         """
         for element, count in self._data():
             if count:
-                for _ in xrange(0, count):
+                for _ in six.moves.xrange(0, count):
                     yield element
 
     def _update(self, data, pipe=None):
@@ -411,10 +411,10 @@ class Counter(Dict):
         redis = pipe if pipe is not None else self.redis
 
         data = collections.Counter(data)
-        keys = data.keys()
-        values = map(self._pickle, data.values())  # pickling values
 
-        redis.hmset(self.key, dict(zip(keys, values)))
+        redis.hmset(
+            self.key, {k: self._pickle(v) for k, v in six.iteritems(data)}
+        )
 
     def inc(self, key, n=1):
         """Value of *key* will be increased by *n*. *n* defaults to 1.

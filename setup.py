@@ -3,8 +3,8 @@ from __future__ import division, print_function, unicode_literals
 
 import os
 import re
-import sys
 import subprocess
+import sys
 
 try:
     from setuptools import setup, find_packages
@@ -48,7 +48,7 @@ setup(
     license=open('LICENSE').read(),
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
-    install_requires=['redis>=2.7.2'],
+    install_requires=['redis>=2.7.2', 'six>=1.10.0'],
     zip_safe=False,
     classifiers=(
         'Development Status :: 5 - Production/Stable',

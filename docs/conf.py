@@ -40,8 +40,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Redis Collections'
-copyright = u'2013, Honza Javorek'
+project = 'Redis Collections'
+copyright = '2013, Honza Javorek'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -196,8 +196,8 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'RedisCollections.tex', u'Redis Collections Documentation',
-   u'Honza Javorek', 'manual'),
+  ('index', 'RedisCollections.tex', 'Redis Collections Documentation',
+   'Honza Javorek', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -226,8 +226,8 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'rediscollections', u'Redis Collections Documentation',
-     [u'Honza Javorek'], 1)
+    ('index', 'rediscollections', 'Redis Collections Documentation',
+     ['Honza Javorek'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -240,8 +240,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'RedisCollections', u'Redis Collections Documentation',
-   u'Honza Javorek', 'RedisCollections', 'One line description of project.',
+  ('index', 'RedisCollections', 'Redis Collections Documentation',
+   'Honza Javorek', 'RedisCollections', 'One line description of project.',
    'Miscellaneous'),
 ]
 

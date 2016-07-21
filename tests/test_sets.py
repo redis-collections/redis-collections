@@ -198,8 +198,9 @@ class SetTest(RedisTestCase):
         s = self.create_set('a')
         self.assertEqual(s.random_sample(), ['a'])
 
-        version = map(int, self.redis.info()['redis_version'].split('.'))
-        major_ver, minor_ver, _ = version
+        redis_version = self.redis.info()['redis_version']
+        redis_version = [int(x) for x in redis_version.split('.')]
+        major_ver, minor_ver, _ = redis_version
 
         if major_ver >= 2 and minor_ver >= 6:
             s = self.create_set('ab')
@@ -207,7 +208,7 @@ class SetTest(RedisTestCase):
 
     def test_add_unicode(self):
         s = self.create_set()
-        elem = u'ěščřžýáíéůú\U0001F4A9'
+        elem = 'ěščřžýáíéůú\U0001F4A9'
         s.add(elem)
         self.assertEqual(sorted(s), [elem])
 
