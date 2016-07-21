@@ -83,7 +83,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def __iter__(self):
         """Return an iterator over the keys of the dictionary."""
-        return iter(self.redis.hkeys(self.key))
+        return (k.decode('utf-8') for k in self.redis.hkeys(self.key))
 
     def __contains__(self, key):
         """Return ``True`` if ``Dict`` instance has a key
@@ -172,7 +172,7 @@ class Dict(RedisCollection, collections.MutableMapping):
     def _data(self, pipe=None):
         redis = pipe if pipe is not None else self.redis
         result = redis.hgetall(self.key).items()
-        return [(k, self._unpickle(v)) for (k, v) in result]
+        return [(k.decode('utf-8'), self._unpickle(v)) for (k, v) in result]
 
     def items(self):
         """Return a copy of the dictionary's list of ``(key, value)`` pairs."""
@@ -181,11 +181,11 @@ class Dict(RedisCollection, collections.MutableMapping):
     def iteritems(self):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
         result = six.iteritems(self.redis.hgetall(self.key))
-        return ((k, self._unpickle(v)) for (k, v) in result)
+        return ((k.decode('utf-8'), self._unpickle(v)) for (k, v) in result)
 
     def keys(self):
         """Return a copy of the dictionary's list of keys."""
-        return self.redis.hkeys(self.key)
+        return [k.decode('utf-8') for k in self.redis.hkeys(self.key)]
 
     def iter(self):
         """Return an iterator over the keys of the dictionary.
@@ -248,7 +248,7 @@ class Dict(RedisCollection, collections.MutableMapping):
             return key, value
 
         key, value = self._transaction(popitem_trans)
-        return key, self._unpickle(value)
+        return key.decode('utf-8'), self._unpickle(value)
 
     def setdefault(self, key, default=None):
         """If *key* is in the dictionary, return its value.
@@ -368,7 +368,7 @@ class Counter(Dict):
         super(Counter, self).__init__(*args, **kwargs)
 
     def _pickle(self, data):
-        return six.text_type(int(data))
+        return str(int(data)).encode('ascii')
 
     def _unpickle(self, string):
         if string is None:

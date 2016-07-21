@@ -210,7 +210,7 @@ class RedisCollection(object):
         :type data: anything serializable
         :rtype: string
         """
-        return str(self.pickler.dumps(data))
+        return self.pickler.dumps(data)
 
     def _unpickle(self, string):
         """Converts given string serialization back to corresponding data.
@@ -222,7 +222,7 @@ class RedisCollection(object):
         """
         if string is None:
             return None
-        if not isinstance(string, six.string_types):
+        if not isinstance(string, six.binary_type):
             msg = 'Only strings can be unpickled (%r given).' % string
             raise TypeError(msg)
         return self.pickler.loads(string)

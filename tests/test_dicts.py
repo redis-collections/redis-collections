@@ -29,14 +29,19 @@ class DictTest(RedisTestCase):
 
     def test_init(self):
         d = self.create_dict(zip(['one', 'two', 'three'], [1, 2, 3]))
-        self.assertEqual(sorted(d.items()),
-                         [('one', 1), ('three', 3), ('two', 2)])
+        self.assertEqual(
+            sorted(d.items()), [('one', 1), ('three', 3), ('two', 2)]
+        )
+
         d = self.create_dict([('two', 2), ('one', 1), ('three', 3)])
-        self.assertEqual(sorted(d.items()),
-                         [('one', 1), ('three', 3), ('two', 2)])
+        self.assertEqual(
+            sorted(d.items()), [('one', 1), ('three', 3), ('two', 2)]
+        )
+
         d = self.create_dict({'three': 3, 'one': 1, 'two': 2})
-        self.assertEqual(sorted(d.items()),
-                         [('one', 1), ('three', 3), ('two', 2)])
+        self.assertEqual(
+            sorted(d.items()), [('one', 1), ('three', 3), ('two', 2)]
+        )
 
     def test_key(self):
         d1 = self.create_dict()
@@ -75,11 +80,12 @@ class DictTest(RedisTestCase):
         d = self.create_dict()
         d['a'] = 'b'
         d['c'] = 'd'
-        self.assertEqual(sorted(d.items()),
-                         [('a', 'b'), ('c', 'd')])
-        self.assertEqual(sorted(d.iteritems()),
-                         [('a', 'b'), ('c', 'd')])
-        self.assertTrue(hasattr(d.iteritems(), 'next'))
+        self.assertEqual(sorted(d.items()), [('a', 'b'), ('c', 'd')])
+        self.assertEqual(sorted(d.iteritems()), [('a', 'b'), ('c', 'd')])
+        try:
+            next(d.iteritems())
+        except AttributeError:
+            self.fail()
 
     def test_copy(self):
         d1 = self.create_dict()
@@ -102,37 +108,33 @@ class DictTest(RedisTestCase):
         d = self.create_dict()
         d['a'] = 'b'
         d['c'] = 'd'
-        self.assertEqual(sorted(d.keys()),
-                         ['a', 'c'])
-        self.assertEqual(sorted(d.iterkeys()),
-                         ['a', 'c'])
-        self.assertTrue(hasattr(d.iterkeys(), 'next'))
-        self.assertEqual(sorted(d.iter()),
-                         ['a', 'c'])
-        self.assertTrue(hasattr(d.iter(), 'next'))
+        self.assertEqual(sorted(d.keys()), ['a', 'c'])
+        self.assertEqual(sorted(d.iterkeys()), ['a', 'c'])
+        self.assertEqual(sorted(d.iter()), ['a', 'c'])
+        try:
+            next(d.iter())
+        except AttributeError:
+            self.fail()
 
     def test_values(self):
         d = self.create_dict()
         d['a'] = 'b'
         d['c'] = 'd'
-        self.assertEqual(sorted(d.values()),
-                         ['b', 'd'])
-        self.assertEqual(sorted(d.itervalues()),
-                         ['b', 'd'])
-        self.assertTrue(hasattr(d.itervalues(), 'next'))
+        self.assertEqual(sorted(d.values()), ['b', 'd'])
+        self.assertEqual(sorted(d.itervalues()), ['b', 'd'])
+        try:
+            next(d.itervalues())
+        except AttributeError:
+            self.fail()
 
     def test_fromkeys(self):
         d = Dict.fromkeys(['a', 'b', 'c', 'd'], redis=self.redis)
-        self.assertEqual(sorted(d.keys()),
-                         ['a', 'b', 'c', 'd'])
-        self.assertEqual(d.values(),
-                         [None] * 4)
+        self.assertEqual(sorted(d.keys()), ['a', 'b', 'c', 'd'])
+        self.assertEqual(d.values(), [None] * 4)
 
         d = Dict.fromkeys(['a', 'b', 'c', 'd'], 'be happy', redis=self.redis)
-        self.assertEqual(sorted(d.keys()),
-                         ['a', 'b', 'c', 'd'])
-        self.assertEqual(d.values(),
-                         ['be happy'] * 4)
+        self.assertEqual(sorted(d.keys()), ['a', 'b', 'c', 'd'])
+        self.assertEqual(d.values(), ['be happy'] * 4)
 
     def test_clear(self):
         d = self.create_dict()
@@ -165,21 +167,26 @@ class DictTest(RedisTestCase):
     def test_update(self):
         d = self.create_dict()
         d['a'] = 'b'
+
         d.update({'c': 'd'})
-        self.assertEqual(sorted(d.items()),
-                         [('a', 'b'), ('c', 'd')])
+        self.assertEqual(sorted(d.items()), [('a', 'b'), ('c', 'd')])
+
         d.update({'c': 42})
-        self.assertEqual(sorted(d.items()),
-                         [('a', 'b'), ('c', 42)])
+        self.assertEqual(sorted(d.items()), [('a', 'b'), ('c', 42)])
+
         d.update({'x': 38})
-        self.assertEqual(sorted(d.items()),
-                         [('a', 'b'), ('c', 42), ('x', 38)])
+        self.assertEqual(
+            sorted(d.items()), [('a', 'b'), ('c', 42), ('x', 38)]
+        )
+
         d.update([('a', 'g')])
-        self.assertEqual(sorted(d.items()),
-                         [('a', 'g'), ('c', 42), ('x', 38)])
+        self.assertEqual(
+            sorted(d.items()), [('a', 'g'), ('c', 42), ('x', 38)]
+        )
         d.update(c=None)
-        self.assertEqual(sorted(d.items()),
-                         [('a', 'g'), ('c', None), ('x', 38)])
+        self.assertEqual(
+            sorted(d.items()), [('a', 'g'), ('c', None), ('x', 38)]
+        )
 
     def test_get_default(self):
         d = self.create_dict()
@@ -235,13 +242,17 @@ class CounterTest(RedisTestCase):
 
     def test_most_common(self):
         c = self.create_counter('abbcccddddeeeeeffffff')
-        counts = [('f', 6), ('e', 5), ('d', 4), ('c', 3), ('b', 2), ('a', 1)]
+        counts = [
+            ('f', 6), ('e', 5), ('d', 4), ('c', 3), ('b', 2), ('a', 1)
+        ]
         self.assertEqual(c.most_common(), counts)
         self.assertEqual(c.most_common(1), counts[0:1])
         self.assertEqual(c.most_common(3), counts[:3])
 
     def test_subtract(self):
-        result = [('a', 0), ('b', 1), ('c', 1), ('d', 2), ('e', 2), ('f', 3)]
+        result = [
+            ('a', 0), ('b', 1), ('c', 1), ('d', 2), ('e', 2), ('f', 3)
+        ]
 
         c1 = self.create_counter('abbcccddddeeeeeffffff')
         c1.subtract('abccddeeefff')
@@ -256,7 +267,9 @@ class CounterTest(RedisTestCase):
         self.assertRaises(NotImplementedError, Counter.fromkeys, [1, 2])
 
     def test_update(self):
-        result = [('a', 2), ('b', 3), ('c', 5), ('d', 6), ('e', 8), ('f', 9)]
+        result = [
+            ('a', 2), ('b', 3), ('c', 5), ('d', 6), ('e', 8), ('f', 9)
+        ]
 
         c1 = self.create_counter('abbcccddddeeeeeffffff')
         c1.update('abccddeeefff')
@@ -270,7 +283,9 @@ class CounterTest(RedisTestCase):
     def test_add(self):
         c1 = self.create_counter('abbcccddddeeeeeffffff')
         c2 = self.create_counter('abccddeeefff')
-        result = [('a', 2), ('b', 3), ('c', 5), ('d', 6), ('e', 8), ('f', 9)]
+        result = [
+            ('a', 2), ('b', 3), ('c', 5), ('d', 6), ('e', 8), ('f', 9)
+        ]
         self.assertEqual(sorted((c1 + c2).items()), sorted(result))
 
     def test_diff(self):
@@ -282,13 +297,17 @@ class CounterTest(RedisTestCase):
     def test_and(self):
         c1 = self.create_counter('abbcccddddeeeeef')
         c2 = self.create_counter('abccddeeefff')
-        result = [('a', 1), ('b', 1), ('c', 2), ('d', 2), ('e', 3), ('f', 1)]
+        result = [
+            ('a', 1), ('b', 1), ('c', 2), ('d', 2), ('e', 3), ('f', 1)
+        ]
         self.assertEqual(sorted((c1 & c2).items()), sorted(result))
 
     def test_or(self):
         c1 = self.create_counter('abbcccddddeeeeef')
         c2 = self.create_counter('abccddeeefff')
-        result = [('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('f', 3)]
+        result = [
+            ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('f', 3)
+        ]
         self.assertEqual(sorted((c1 | c2).items()), sorted(result))
 
     def test_inc(self):
