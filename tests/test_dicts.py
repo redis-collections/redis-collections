@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+from __future__ import division, print_function, unicode_literals
 
 import unittest
 
-from .base import RedisTestCase
 from redis_collections import Dict, Counter
+
+from .base import RedisTestCase
 
 
 class DictTest(RedisTestCase):

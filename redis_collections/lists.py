@@ -5,7 +5,7 @@ lists
 
 Collections based on list interface.
 """
-
+from __future__ import division, print_function, unicode_literals
 
 import collections
 

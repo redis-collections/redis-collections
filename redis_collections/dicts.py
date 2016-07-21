@@ -5,7 +5,7 @@ dicts
 
 Collections based on dict interface.
 """
-
+from __future__ import division, print_function, unicode_literals
 
 import collections
 
