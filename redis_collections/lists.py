@@ -275,7 +275,7 @@ class List(RedisCollection, collections.MutableSequence):
             # Redis has no commands for *inserting* into a list by index.
             # LINSERT requires assumptions about contents of the list values.
             raise NotImplementedError(self.not_impl_msg)
-        
+
         self.redis.lpush(self.key, self._pickle(value))
 
     def append(self, value):
