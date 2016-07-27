@@ -38,13 +38,9 @@ Installation
 
 Current version is |release|.
 
-The Cheese Shop::
+.. code:: shell
 
-    pip install redis-collections
-
-In case you have an adventurous mind, give a try to the source::
-
-    pip install git+https://github.com/honzajavorek/redis-collections.git#egg=redis-collections
+   pip install redis-collections
 
 Persistence
 -----------
@@ -67,7 +63,7 @@ If I look to my Redis, key ``fe267c1dde5d4f648e7bac836a0168fe`` completely disap
 .. note::
     If you provide your own key string, collection will be successfully created. If there is no key corresponding in Redis, it will be created and initialized as an empty collection. This means you can set up your own way of assigning unique keys dependent on your other code. For example, by using IDs of records from your relational database you can have exactly one unique collection in Redis for every record from your SQL storage.
 
-Redis connection
+Redis Connection
 ----------------
 
 By default, collection uses a new Redis connection with its default values, **which is highly inefficient, but needs no configuration**. If you wish to use your own :class:`Redis` instance, pass it in ``redis`` keyword argument::
@@ -158,15 +154,16 @@ Redis Collections are composed of only several classes. All items listed below a
     :members:
     :special-members:
 
-Author
-------
+Maintainers
+-----------
 
-My name is Jan (**Honza**) **Javorek**. See my `GitHub <https://github.com/honzajavorek/>`_ profile for further details. I have a `blog <http://honzajavorek.cz>`_ and `Twitter <https://twitter.com/honzajavorek>`_ account, but you wouldn't probably understand a word as it is in `Czech <https://en.wikipedia.org/wiki/Czech_language>`_ only.
+- Bo Bayles (`@bbayles <http://github.com/bbayles>`)
+- Honza Javorek (`@honzajavorek <http://github.com/honzajavorek>`)
 
 License: ISC
 ------------
 
-© 2013 Jan Javorek <jan.javorek@gmail.com>
+© 2013-? Honza Javorek <mail@honzajavorek>
 
 This work is licensed under `ISC license <https://en.wikipedia.org/wiki/ISC_license>`_.
 
@@ -176,4 +173,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
