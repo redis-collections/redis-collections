@@ -4,7 +4,7 @@ __title__ = 'redis-collections'
 __version__ = '0.1.7'
 __author__ = 'Honza Javorek'
 __license__ = 'ISC'
-__copyright__ = 'Copyright 2013 Honza Javorek'
+__copyright__ = 'Copyright 2013-? Honza Javorek'
 
 
 from .base import RedisCollection  # NOQA
