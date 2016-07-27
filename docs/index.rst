@@ -157,8 +157,8 @@ Redis Collections are composed of only several classes. All items listed below a
 Maintainers
 -----------
 
-- Bo Bayles (`@bbayles <http://github.com/bbayles>`)
-- Honza Javorek (`@honzajavorek <http://github.com/honzajavorek>`)
+- Bo Bayles (`@bbayles <http://github.com/bbayles>`_)
+- Honza Javorek (`@honzajavorek <http://github.com/honzajavorek>`_)
 
 License: ISC
 ------------
