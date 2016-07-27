@@ -38,7 +38,7 @@ Available collections are ``Dict``, ``List``, ``Set``, ``Counter``.
 Documentation
 -------------
 
-**→** `redis-collections.readthedocs.org <https://redis-collections.readthedocs.org/>`_
+**→** `redis-collections.readthedocs.io <https://redis-collections.readthedocs.io/>`_
 
 Maintainers
 -----------

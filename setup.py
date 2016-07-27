@@ -4,7 +4,6 @@
 import os
 import re
 import sys
-import shlex
 import subprocess
 
 try:
@@ -32,10 +31,9 @@ meta = dict(re.findall(r'__([^_]+)__ = \'([^\']*)\'', meta_file_contents))
 
 # release a version, publish to GitHub and PyPI
 if sys.argv[-1] == 'publish':
-    command = lambda cmd: subprocess.check_call(shlex.split(cmd))
-    command('git tag v' + meta['version'])
-    command('git push --tags origin master:master')
-    command('python setup.py sdist upload')
+    subprocess.check_call(['git', 'tag', 'v' + meta['version']])
+    subprocess.check_call(['git', 'push', '--tags', 'origin', 'master:master'])
+    # ...the rest happens on Travis CI
     sys.exit()
 
 
@@ -45,7 +43,7 @@ setup(
     description='Set of basic Python collections backed by Redis.',
     long_description=open('README.rst').read(),
     author=meta['author'],
-    author_email='jan.javorek@gmail.com',
+    author_email='mail@honzajavorek.cz',
     url='https://github.com/honzajavorek/redis-collections',
     license=open('LICENSE').read(),
     packages=find_packages(exclude=['tests']),
@@ -53,7 +51,7 @@ setup(
     install_requires=['redis>=2.7.2'],
     zip_safe=False,
     classifiers=(
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: ISC License (ISCL)',
         'Programming Language :: Python',
