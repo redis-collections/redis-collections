@@ -45,8 +45,8 @@ Documentation
 Maintainers
 -----------
 
-- Bo Bayles (`@bbayles <http://github.com/bbayles>`)
-- Honza Javorek (`@honzajavorek <http://github.com/honzajavorek>`)
+- Bo Bayles (`@bbayles <http://github.com/bbayles>`_)
+- Honza Javorek (`@honzajavorek <http://github.com/honzajavorek>`_)
 
 License: ISC
 ------------
