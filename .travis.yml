@@ -8,7 +8,8 @@ services:
 deploy:
   provider: "pypi"
   user: "honzajavorek"
-  password: "..."
+  password:
+    secure: "NLHLE9kVASnibrSDckdt1lmf8CfnKevmpCgAkrg2R+ajxlz3iNRfdKhSxJhExC+VMYryLBGOoeOrV+HwkZv2Lo3LlCstmh7y8k/AKp1v02xZvaOtD4w37eI23JwpNA/yXm/IZqy96cxHd4PdX6pul7xKoFRUj6Mc0PVWe+/izWg="
   on:
     python: "2.7"
     tags: true
