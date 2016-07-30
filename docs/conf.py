@@ -49,9 +49,9 @@ copyright = u'2013, Honza Javorek'
 
 base_path = os.path.dirname(__file__)
 ver_file = os.path.join(base_path, '../redis_collections/__init__.py')
-ver_file_head = open(ver_file).read(100)
+ver_file_data = open(ver_file).read()
 
-match = re.search(r'__version__ = \'([^\']*)\'', ver_file_head)
+match = re.search(r'__version__ = \'([^\']*)\'', ver_file_data)
 if match:
     # The full version, including alpha/beta/rc tags.
     release = match.group(1)
