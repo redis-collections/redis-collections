@@ -51,18 +51,6 @@ class Dict(RedisCollection, collections.MutableMapping):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
-        :param pickler: Implementation of data serialization. Object with two
-                        methods is expected: :func:`dumps` for conversion
-                        of data to string and :func:`loads` for the opposite
-                        direction. Examples::
-
-                            import json, pickle
-                            Dict(pickler=json)
-                            Dict(pickler=pickle)  # default
-
-                        Of course, you can construct your own pickling object
-                        (it can be class, module, whatever). Default
-                        serialization implementation uses :mod:`pickle`.
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.
@@ -339,9 +327,6 @@ class Counter(Dict):
         argument. Iterable is expected to be a sequence of elements,
         not a sequence of ``(key, value)`` pairs.
 
-        There is no support for *pickler* setting, because all values are
-        integers only.
-
         :param data: Initial data.
         :type data: iterable or mapping
         :param redis: Redis client instance. If not provided, default Redis
@@ -363,8 +348,6 @@ class Counter(Dict):
             As mentioned, :class:`Counter` does not support following
             initialization syntax: ``c = Counter(a=1, b=2)``
         """
-        if 'pickler' in kwargs:
-            del kwargs['pickler']
         super(Counter, self).__init__(*args, **kwargs)
 
     def _pickle(self, data):
