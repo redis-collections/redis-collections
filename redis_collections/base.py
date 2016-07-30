@@ -6,7 +6,11 @@ base
 
 
 import uuid
-import redis
+try:  # NOQA
+    import redislite as redis
+    using_redislite = True
+except ImportError:  # NOQA
+    import redis
 import functools
 from abc import ABCMeta, abstractmethod
 
@@ -14,6 +18,10 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle as pickle  # NOQA
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def same_types(fn):
@@ -43,7 +51,7 @@ def same_types(fn):
     return wrapper
 
 
-class RedisCollection:
+class RedisCollection(object):
     """Abstract class providing backend functionality for all the other
     Redis collections.
     """
@@ -56,7 +64,7 @@ class RedisCollection:
                     'due to limitations in Redis command set.')
 
     @abstractmethod
-    def __init__(self, data=None, redis=None, key=None, pickler=None):
+    def __init__(self, data=None, redis=None, key=None, pickler=None, redis_dbfile=None):
         """
         :param data: Initial data.
         :param redis: Redis client instance. If not provided, default Redis
@@ -78,6 +86,8 @@ class RedisCollection:
                         Of course, you can construct your own pickling object
                         (it can be class, module, whatever). Default
                         serialization implementation uses :mod:`pickle`.
+        :param redis_dbfile: The name for the redis db backing file, if using redislite.
+        "type redis_dbfile: str
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.
@@ -88,7 +98,7 @@ class RedisCollection:
         """
         #: Redis client instance. :class:`StrictRedis` object with default
         #: connection settings is used if not set by :func:`__init__`.
-        self.redis = redis or self._create_redis()
+        self.redis = redis or self._create_redis(redis_dbfile)
 
         #: Class or module implementing pickling. Standard :mod:`pickle`
         #: module is set as default.
@@ -171,11 +181,13 @@ class RedisCollection:
             # own pipe, execute it
             p.execute()
 
-    def _create_redis(self):
+    def _create_redis(self, redis_dbfile=None):
         """Creates default Redis connection.
 
         :rtype: :class:`redis.StrictRedis`
         """
+        if using_redislite:
+            return redislite.StrictRedis(redis_dbfile)
         return redis.StrictRedis()
 
     def _create_key(self):
@@ -210,6 +222,8 @@ class RedisCollection:
         :type data: anything serializable
         :rtype: string
         """
+        if isinstance(data, bytes):
+            print('Pickling a bytestring')
         return str(self.pickler.dumps(data))
 
     def _unpickle(self, string):
@@ -222,10 +236,14 @@ class RedisCollection:
         """
         if string is None:
             return None
-        if not isinstance(string, basestring):
+        if isinstance(string, bytes):
+            string = str(string, 'utf-8')
+        if not isinstance(string, str):
             msg = 'Only strings can be unpickled (%r given).' % string
             raise TypeError(msg)
-        return self.pickler.loads(string)
+        result = self.pickler.loads(bytes(string, 'UTF-8'))
+        logger.info(result)
+        return result
 
     @abstractmethod
     def _update(self, data, pipe=None):
@@ -274,6 +292,7 @@ class RedisCollection:
             results.append(fn(pipe))
 
         self.redis.transaction(trans, self.key, *extra_keys)
+        logger.info(results[0])
         return results[0]
 
     def copy(self, key=None):

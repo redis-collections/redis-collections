@@ -37,11 +37,22 @@ if sys.argv[-1] == 'publish':
     sys.exit()
 
 
+def readme(filename='README.rst'):
+    if sys.version_info.major > 2:
+        with open(filename, encoding='utf-8') as file_handle:
+            return file_handle.read()
+    with open(filename) as file_handle:
+        return file_handle.read()
+
+
 setup(
     name=meta['title'],
     version=meta['version'],
     description='Set of basic Python collections backed by Redis.',
-    long_description=open('README.rst').read(),
+    extras_require = {
+        'redislite':  ["redislite==1.0.228"]
+    },
+    long_description=readme(),
     author=meta['author'],
     author_email='mail@honzajavorek.cz',
     url='https://github.com/honzajavorek/redis-collections',
