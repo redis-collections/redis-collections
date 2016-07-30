@@ -437,7 +437,7 @@ class Set(RedisCollection, collections.MutableSet):
                 # Redis (operation) → Python → Redis (new key with List)
                 s1.difference(s2, return_cls=List)  # = List
         """
-        return_cls = kwargs.get('return_cls') or type(self)
+        return_cls = kwargs.get('return_cls', type(self))
         op = SetDifference(self, return_cls=return_cls)
         return op(*others)
 
@@ -520,7 +520,7 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`difference` applies.
         """
-        return_cls = kwargs.get('return_cls') or type(self)
+        return_cls = kwargs.get('return_cls', type(self))
         op = SetIntersection(self, return_cls=return_cls)
         return op(*others)
 
@@ -583,7 +583,7 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`difference` applies.
         """
-        return_cls = kwargs.get('return_cls') or type(self)
+        return_cls = kwargs.get('return_cls', type(self))
         op = SetUnion(self, return_cls=return_cls)
         return op(*others)
 
@@ -655,7 +655,7 @@ class Set(RedisCollection, collections.MutableSet):
         .. note::
             The same behavior as at :func:`difference` applies.
         """
-        return_cls = kwargs.get('return_cls') or type(self)
+        return_cls = kwargs.get('return_cls', type(self))
         op = SetSymmetricDifference(self, return_cls=return_cls)
         return op(other)
 
