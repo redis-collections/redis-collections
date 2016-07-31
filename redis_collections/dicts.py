@@ -63,43 +63,55 @@ class Dict(RedisCollection, collections.MutableMapping):
             As mentioned, :class:`Dict` does not support following
             initialization syntax: ``d = Dict(a=1, b=2)``
         """
+        data = args[0] if args else kwargs.pop('data', None)
         super(Dict, self).__init__(*args, **kwargs)
 
+        if data:
+            self.update(data)
+
+    def _get_hash_dict(self, key, redis):
+        key_hash = hash(key)
+        D = redis.hget(self.key, key_hash)
+        D = {} if D is None else self._unpickle(D)
+
+        return key_hash, D
+
     def __len__(self):
-        """Return the number of items in the dictionary."""
-        return self.redis.hlen(self.key)
+        """Return the number of items in the dictionary.
+
+        .. note::
+            Due to implementation on Redis side, this method is inefficient.
+            The time taken is varies with the number of keys in stored.
+        """
+        ret = 0
+        for D in six.itervalues(self.redis.hgetall(self.key)):
+            ret += len(self._unpickle(D))
+
+        return ret
 
     def __iter__(self):
         """Return an iterator over the keys of the dictionary."""
-        return (k.decode('utf-8') for k in self.redis.hkeys(self.key))
+        return self.iterkeys()
 
     def __contains__(self, key):
-        """Return ``True`` if ``Dict`` instance has a key
-        *key*, else ``False``.
-        """
-        return self.redis.hexists(self.key, key)
+        """Return ``True`` if *key* is present, else ``False``."""
+        key_hash, D = self._get_hash_dict(key, self.redis)
 
-    def get(self, key, default=None):
-        """Return the value for *key* if *key* is in the dictionary, else
-        *default*. If *default* is not given, it defaults to :obj:`None`,
-        so that this method never raises a :exc:`KeyError`.
-
-        .. note::
-            Due to implementation on Redis side, this method of retrieving
-            items is more efficient than classic approach over using the
-            :func:`__getitem__` protocol.
-        """
-        value = self.redis.hget(self.key, key)
-        if value is None:
-            return default
-        return self._unpickle(value)
+        return key in D
 
     def getmany(self, *keys):
         """Return the value for *keys*. If particular key is not in the
         dictionary, return :obj:`None`.
         """
-        values = self.redis.hmget(self.key, *keys)
-        return [self._unpickle(x) for x in values]
+        ret = []
+        for D in self.redis.hmget(self.key, *(hash(k) for k in keys)):
+            if D is None:
+                ret.append(None)
+            else:
+                for v in six.itervalues(self._unpickle(D)):
+                    ret.append(v)
+
+        return ret
 
     def __getitem__(self, key):
         """Return the item of dictionary with key *key*. Raises a
@@ -110,70 +122,61 @@ class Dict(RedisCollection, collections.MutableMapping):
         method with the key *key* as argument. The ``d[key]`` operation
         then returns or raises whatever is returned or raised by
         the ``__missing__(key)`` call if the key is not present.
-
-        .. note::
-            Due to implementation on Redis side, this method of retrieving
-            items is not very efficient. If possible, use :func:`get`.
         """
-        with self.redis.pipeline() as pipe:
-            pipe.hexists(self.key, key)
-            pipe.hget(self.key, key)
-            exists, value = pipe.execute()
+        key_hash, D = self._get_hash_dict(key, self.redis)
 
-        if not exists:
+        try:
+            value = D[key]
+        except KeyError:
             if hasattr(self, '__missing__'):
                 return self.__missing__(key)
-            raise KeyError(key)
-        return self._unpickle(value)
+            else:
+                raise
+
+        return value
 
     def __setitem__(self, key, value):
         """Set ``d[key]`` to *value*."""
-        value = self._pickle(value)
-        self.redis.hset(self.key, key, value)
+        key_hash, D = self._get_hash_dict(key, self.redis)
+        D[key] = value
+
+        self.redis.hset(self.key, key_hash, self._pickle(D))
 
     def __delitem__(self, key):
-        """Remove ``d[key]`` from dictionary. Raises
-        a :func:`KeyError` if *key* is not in the map.
-
-        .. note::
-            Due to implementation on Redis side, this method of deleting
-            items is not very efficient. If possible, use :func:`discard`.
+        """Remove ``d[key]`` from dictionary.
+        Raises a :func:`KeyError` if *key* is not in the map.
         """
-        with self.redis.pipeline() as pipe:
-            pipe.hexists(self.key, key)
-            pipe.hdel(self.key, key)
-            exists, _ = pipe.execute()
+        key_hash, D = self._get_hash_dict(key, self.redis)
+        del D[key]
 
-        if not exists:
-            raise KeyError(key)
-
-    def discard(self, key):
-        """Remove ``d[key]`` from dictionary if it is present.
-
-        .. note::
-            Due to implementation on Redis side, this method of retrieving
-            items is more efficient than classic approach over using the
-            :func:`__delitem__` protocol.
-        """
-        self.redis.hdel(self.key, key)
+        if D:
+            self.redis.hset(self.key, key_hash, self._pickle(D))
+        else:
+            self.redis.hdel(self.key, key_hash)
 
     def _data(self, pipe=None):
-        redis = pipe if pipe is not None else self.redis
-        result = redis.hgetall(self.key).items()
-        return [(k.decode('utf-8'), self._unpickle(v)) for (k, v) in result]
+        redis = self.redis if pipe is None else pipe
+
+        ret = []
+        for D in six.itervalues(redis.hgetall(self.key)):
+            for k, v in six.iteritems(self._unpickle(D)):
+                ret.append((k, v))
+
+        return ret
 
     def items(self):
         """Return a copy of the dictionary's list of ``(key, value)`` pairs."""
-        return self._data()
+        return list(self.iteritems())
 
     def iteritems(self):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
-        result = six.iteritems(self.redis.hgetall(self.key))
-        return ((k.decode('utf-8'), self._unpickle(v)) for (k, v) in result)
+        for D in six.itervalues(self.redis.hgetall(self.key)):
+            for k, v in six.iteritems(self._unpickle(D)):
+                yield k, v
 
     def keys(self):
         """Return a copy of the dictionary's list of keys."""
-        return [k.decode('utf-8') for k in self.redis.hkeys(self.key)]
+        return list(self.iterkeys())
 
     def iter(self):
         """Return an iterator over the keys of the dictionary.
@@ -183,33 +186,42 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def iterkeys(self):
         """Return an iterator over the dictionary's keys."""
-        return self.__iter__()
+        for D in six.itervalues(self.redis.hgetall(self.key)):
+            for k in six.iterkeys(self._unpickle(D)):
+                yield k
 
     def values(self):
         """Return a copy of the dictionary's list of values."""
-        result = self.redis.hvals(self.key)
-        return [self._unpickle(v) for v in result]
+        return list(self.itervalues())
 
     def itervalues(self):
         """Return an iterator over the dictionary's values."""
-        result = iter(self.redis.hvals(self.key))
-        return (self._unpickle(v) for v in result)
+        for D in six.itervalues(self.redis.hgetall(self.key)):
+            for k, v in six.iteritems(self._unpickle(D)):
+                yield v
 
     def pop(self, key, default=__marker):
         """If *key* is in the dictionary, remove it and return its value,
         else return *default*. If *default* is not given and *key* is not
         in the dictionary, a :exc:`KeyError` is raised.
         """
-        with self.redis.pipeline() as pipe:
-            pipe.hget(self.key, key)
-            pipe.hdel(self.key, key)
-            value, existed = pipe.execute()
+        def pop_trans(pipe):
+            key_hash, D = self._get_hash_dict(key, pipe)
+            value = D.pop(key, default)
 
-        if not existed:
-            if default is self.__marker:
-                raise KeyError(key)
-            return default
-        return self._unpickle(value)
+            pipe.multi()
+            if D:
+                pipe.hset(self.key, key_hash, self.pickle(D))
+            else:
+                pipe.hdel(self.key, key_hash)
+
+            return value
+
+        value = self._transaction(pop_trans)
+        if value is self.__marker:
+            raise KeyError(key)
+
+        return value
 
     def popitem(self):
         """Remove and return an arbitrary ``(key, value)`` pair from
@@ -221,41 +233,64 @@ class Dict(RedisCollection, collections.MutableMapping):
         a :exc:`KeyError`.
         """
         def popitem_trans(pipe):
-            # get an 'arbitrary' key
-            try:
-                key = pipe.hkeys(self.key)[0]
-            except IndexError:
+            entries = pipe.hgetall(self.key)
+            if not entries:
                 raise KeyError
 
-            # pop its value
-            pipe.multi()
-            pipe.hget(self.key, key)
-            pipe.hdel(self.key, key)
-            value, _ = pipe.execute()
+            key_hash, D = entries.popitem()
+            D = self._unpickle(D)
+            item = D.popitem()
 
-            return key, value
+            pipe.multi()
+            if D:
+                pipe.hset(self.key, key_hash, self._pickle(D))
+            else:
+                pipe.hdel(self.key, key_hash)
+
+            return item
 
         key, value = self._transaction(popitem_trans)
-        return key.decode('utf-8'), self._unpickle(value)
+        return key, value
 
     def setdefault(self, key, default=None):
         """If *key* is in the dictionary, return its value.
         If not, insert *key* with a value of *default* and
         return *default*. *default* defaults to :obj:`None`.
         """
-        with self.redis.pipeline() as pipe:
-            pipe.hsetnx(self.key, key, self._pickle(default))
-            pipe.hget(self.key, key)
-            _, value = pipe.execute()
-        return self._unpickle(value)
+        def setdefault_trans(pipe):
+            key_hash, D = self._get_hash_dict(key, pipe)
+            value = D.setdefault(key, default)
+            if value == default:
+                pipe.hset(self.key, key_hash, self._pickle(D))
 
-    def _update(self, data, pipe=None):
-        super(Dict, self)._update(data, pipe)
-        redis = pipe if pipe is not None else self.redis
-        data = dict(data)
-        redis.hmset(
-            self.key, {k: self._pickle(v) for k, v in six.iteritems(data)}
-        )
+            return value
+
+        value = self._transaction(setdefault_trans)
+        return value
+
+    def _update_helper(self, other, use_redis=False):
+        def _update_helper_trans(pipe):
+            data = {}
+
+            if use_redis:
+                for D in six.itervalues(pipe.hgetall(other.key)):
+                    data.update(self._unpickle(D))
+            else:
+                data.update(other)
+
+            D_load = {}
+            for key, value in six.iteritems(data):
+                key_hash = hash(key)
+                D_load.setdefault(key_hash, {})
+                D_load[key_hash][key] = value
+
+            for key_hash, D in six.iteritems(D_load):
+                pipe.hset(self.key, key_hash, self._pickle(D))
+
+        if use_redis:
+            self._transaction(_update_helper_trans, other.key)
+        else:
+            self._transaction(_update_helper_trans)
 
     def update(self, other=None, **kwargs):
         """Update the dictionary with the key/value pairs from *other*,
@@ -267,18 +302,22 @@ class Dict(RedisCollection, collections.MutableMapping):
         dictionary is then updated with those key/value pairs:
         ``d.update(red=1, blue=2)``.
         """
-        other = other or {}
-        if isinstance(other, RedisCollection):
-            # wrap into transaction
-            def update_trans(pipe):
-                d = other._data(pipe=pipe)  # retrieve
-                pipe.multi()
-                self._update(d, pipe=pipe)  # store
-            self._transaction(update_trans)
-        else:
-            mapping = {}
-            mapping.update(other, **kwargs)
-            self._update(mapping)
+        if other is not None:
+            if isinstance(other, RedisCollection):
+                self._update_helper(other, use_redis=True)
+            elif hasattr(other, 'keys'):
+                self._update_helper(other)
+            else:
+                self._update_helper({k: v for k, v in other})
+
+        if kwargs:
+            self._update_helper(kwargs)
+
+    def copy(self, key=None):
+        other = self.__class__(redis=self.redis, key=key)
+        other.update(self)
+
+        return other
 
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):

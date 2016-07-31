@@ -93,8 +93,7 @@ class DictTest(RedisTestCase):
         d1['c'] = 'd'
         d2 = d1.copy()
         self.assertEqual(d2.__class__, Dict)
-        self.assertEqual(sorted(d1.items()),
-                         sorted(d2.items()))
+        self.assertEqual(sorted(d1.items()), sorted(d2.items()))
 
     def test_get(self):
         d = self.create_dict()

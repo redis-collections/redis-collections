@@ -113,7 +113,6 @@ class RedisCollection(object):
         """
         assert not isinstance(data, RedisCollection), \
             "Not atomic. Use '_data()' within a transaction first."
-
         cls = cls or self.__class__
         if issubclass(cls, RedisCollection):
             settings = {
@@ -205,7 +204,6 @@ class RedisCollection(object):
         """
         return pickle.loads(string) if string else None
 
-    @abc.abstractmethod
     def _update(self, data, pipe=None):
         """Helper for update operations.
 
