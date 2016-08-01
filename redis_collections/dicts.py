@@ -550,8 +550,14 @@ class Counter(Dict):
     def __or__(self, other):
         return self._op_helper(other, operator.or_)
 
+    def __ror__(self, other):
+        return self._op_helper(other, operator.or_, swap_args=True)
+
     def __and__(self, other):
         return self._op_helper(other, operator.and_)
+
+    def __rand__(self, other):
+        return self._op_helper(other, operator.and_, swap_args=True)
 
     def __iadd__(self, other):
         return self._op_helper(other, operator.add, inplace=True)

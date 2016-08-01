@@ -377,7 +377,7 @@ class CounterTest(RedisTestCase):
             c.update(['a', 'a', 'b', 'b'], c=2)
             self.assertEqual(sorted(c.items()), expected_result)
 
-    def _test_op(self, op, do_reverse=True):
+    def _test_op(self, op):
         redis_counter = self.create_counter('abbccc')
         python_counter = collections.Counter('abbccc')
 
@@ -398,11 +398,9 @@ class CounterTest(RedisTestCase):
         )
 
         # Reversed argument order
-        if do_reverse:
-            self.assertEqual(
-                op(python_other, redis_counter),
-                op(python_other, python_counter)
-            )
+        self.assertEqual(
+            op(python_other, redis_counter), op(python_other, python_counter)
+        )
 
         # Fail for non-counter types
         for c in (redis_counter, python_counter):
@@ -424,14 +422,14 @@ class CounterTest(RedisTestCase):
         self.assertEqual(result, {'c': 1})
 
     def test_or(self):
-        self._test_op(operator.or_, do_reverse=False)
+        self._test_op(operator.or_)
 
         result = self.create_counter('abbccc') | self.create_counter('aabbcc')
         self.assertTrue(isinstance(result, Counter))
         self.assertEqual(result, {'a': 2, 'b': 2, 'c': 3})
 
     def test_and(self):
-        self._test_op(operator.and_, do_reverse=False)
+        self._test_op(operator.and_)
 
         result = self.create_counter('abbccc') & self.create_counter('aabbcc')
         self.assertTrue(isinstance(result, Counter))
