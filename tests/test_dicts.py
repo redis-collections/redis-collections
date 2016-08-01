@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, unicode_literals
 
+import collections
+import operator
 import unittest
 
 from redis_collections import Dict, Counter
@@ -201,127 +203,236 @@ class CounterTest(RedisTestCase):
         return Counter(*args, **kwargs)
 
     def test_set_get(self):
-        c = self.create_counter()
-        c['a'] = 5
-        self.assertEqual(c['a'], 5)
+        for init in (self.create_counter, collections.Counter):
+            c = init()
+            c['a'] = 5
+            self.assertEqual(c['a'], 5)
 
     def test_init(self):
-        c = self.create_counter('gallahad')
-        self.assertEqual(c['a'], 3)
-        self.assertEqual(c['l'], 2)
-        self.assertEqual(c['g'], 1)
+        for init in (self.create_counter, collections.Counter):
+            c = init('gallahad')
+            self.assertEqual(c['a'], 3)
+            self.assertEqual(c['l'], 2)
+            self.assertEqual(c['g'], 1)
 
-        c = self.create_counter([1, 1, 2, 2, 2, 38])
-        self.assertEqual(c[1], 2)
-        self.assertEqual(c[2], 3)
-        self.assertEqual(c[38], 1)
+            c = init([1, 1, 2, 2, 2, 38])
+            self.assertEqual(c[1], 2)
+            self.assertEqual(c[2], 3)
+            self.assertEqual(c[38], 1)
 
-        c = self.create_counter({'red': 4, 'blue': 2})
-        self.assertEqual(c['red'], 4)
-        self.assertEqual(c['blue'], 2)
+            c = init({'red': 4, 'blue': 2})
+            self.assertEqual(c['red'], 4)
+            self.assertEqual(c['blue'], 2)
 
     def test_missing(self):
-        c = self.create_counter('gallahad')
-        self.assertEqual(c['x'], 0)
+        for init in (self.create_counter, collections.Counter):
+            c = init('gallahad')
+            self.assertEqual(c['x'], 0)
 
     def test_del(self):
-        c = self.create_counter('gallahad')
-        self.assertFalse('x' in c)
-        self.assertEqual(c['x'], 0)
-        c['x'] = 0
-        self.assertTrue('x' in c)
-        self.assertEqual(c['x'], 0)
-        del c['x']
-        self.assertFalse('x' in c)
-        self.assertEqual(c['x'], 0)
+        for init in (self.create_counter, collections.Counter):
+            c = init('gallahad')
+            self.assertEqual(c['x'], 0)
+
+            self.assertFalse('x' in c)
+            self.assertEqual(c['x'], 0)
+
+            c['x'] = 0
+            self.assertTrue('x' in c)
+            self.assertEqual(c['x'], 0)
+
+            del c['x']
+            self.assertFalse('x' in c)
+            self.assertEqual(c['x'], 0)
+
+            try:
+                del c['x']
+            except KeyError:
+                self.fail('Counter.__delitem__ should not raise KeyError')
 
     def test_elements(self):
-        c = self.create_counter({'a': 3, 'b': 0, 'c': 1, 'd': -5})
-        self.assertEqual(sorted(c.elements()), ['a', 'a', 'a', 'c'])
+        for init in (self.create_counter, collections.Counter):
+            c = init({'a': 3, 'b': 0, 'c': 1, 'd': -5})
+            self.assertEqual(sorted(c.elements()), ['a', 'a', 'a', 'c'])
 
     def test_most_common(self):
-        c = self.create_counter('abbcccddddeeeeeffffff')
-        counts = [
-            ('f', 6), ('e', 5), ('d', 4), ('c', 3), ('b', 2), ('a', 1)
-        ]
-        self.assertEqual(c.most_common(), counts)
-        self.assertEqual(c.most_common(1), counts[0:1])
-        self.assertEqual(c.most_common(3), counts[:3])
+        for init in (self.create_counter, collections.Counter):
+            c = init('abbcccddddeeeeeffffff')
+            counts = [
+                ('f', 6), ('e', 5), ('d', 4), ('c', 3), ('b', 2), ('a', 1)
+            ]
+            self.assertEqual(c.most_common(), counts)
+            self.assertEqual(c.most_common(1), counts[:1])
+            self.assertEqual(c.most_common(3), counts[:3])
 
     def test_subtract(self):
-        result = [
-            ('a', 0), ('b', 1), ('c', 1), ('d', 2), ('e', 2), ('f', 3)
-        ]
+        expected_result = [('a', -1), ('b', 0), ('c', 1)]
+        for init in (self.create_counter, collections.Counter):
+            # Both Counters
+            c_1 = init('abbccc')
+            c_2 = init('aabbcc')
+            c_1.subtract(c_2)
+            self.assertEqual(sorted(c_1.items()), expected_result)
 
-        c1 = self.create_counter('abbcccddddeeeeeffffff')
-        c1.subtract('abccddeeefff')
-        self.assertEqual(sorted(c1.items()), sorted(result))
+            # One Counter, one dict
+            c = init('abbccc')
+            c.subtract({'a': 2, 'b': 2, 'c': 2})
+            self.assertEqual(sorted(c.items()), expected_result)
 
-        c1 = self.create_counter('abbcccddddeeeeeffffff')
-        c2 = self.create_counter('abccddeeefff')
-        c1.subtract(c2)
-        self.assertEqual(sorted(c1.items()), sorted(result))
+            # One Counter, one sequence and kwargs
+            c = init('abbccc')
+            c.subtract(['a', 'a', 'b', 'b'], c=2)
+            self.assertEqual(sorted(c.items()), expected_result)
 
     def test_fromkeys(self):
         self.assertRaises(NotImplementedError, Counter.fromkeys, [1, 2])
 
     def test_update(self):
-        result = [
-            ('a', 2), ('b', 3), ('c', 5), ('d', 6), ('e', 8), ('f', 9)
-        ]
+        expected_result = [('a', 3), ('b', 4), ('c', 5)]
+        for init in (self.create_counter, collections.Counter):
+            # Both Counters
+            c_1 = init('abbccc')
+            c_2 = init('aabbcc')
+            c_1.update(c_2)
+            self.assertEqual(sorted(c_1.items()), expected_result)
 
-        c1 = self.create_counter('abbcccddddeeeeeffffff')
-        c1.update('abccddeeefff')
-        self.assertEqual(sorted(c1.items()), sorted(result))
+            # One Counter, one dict
+            c = init('abbccc')
+            c.update({'a': 2, 'b': 2, 'c': 2})
+            self.assertEqual(sorted(c.items()), expected_result)
 
-        c1 = self.create_counter('abbcccddddeeeeeffffff')
-        c2 = self.create_counter('abccddeeefff')
-        c1.update(c2)
-        self.assertEqual(sorted(c1.items()), sorted(result))
+            # One Counter, one sequence and kwargs
+            c = init('abbccc')
+            c.update(['a', 'a', 'b', 'b'], c=2)
+            self.assertEqual(sorted(c.items()), expected_result)
+
+    def _test_op(self, op, do_reverse=True):
+        redis_counter = self.create_counter('abbccc')
+        python_counter = collections.Counter('abbccc')
+
+        redis_other = self.create_counter('aabbcc')
+        python_other = collections.Counter('aabbcc')
+
+        # Same types
+        self.assertEqual(
+            op(redis_counter, redis_other), op(python_counter, python_other)
+        )
+        self.assertEqual(
+            op(redis_other, redis_counter), op(python_other, python_counter)
+        )
+
+        # Different types
+        self.assertEqual(
+            op(redis_counter, python_other), op(python_counter, python_other)
+        )
+
+        # Reversed argument order
+        if do_reverse:
+            self.assertEqual(
+                op(python_other, redis_counter),
+                op(python_other, python_counter)
+            )
+
+        # Fail for non-counter types
+        for c in (redis_counter, python_counter):
+            with self.assertRaises(TypeError):
+                op(c, {'a': 2, 'b': 2, 'c': 2})
 
     def test_add(self):
-        c1 = self.create_counter('abbcccddddeeeeeffffff')
-        c2 = self.create_counter('abccddeeefff')
-        result = [
-            ('a', 2), ('b', 3), ('c', 5), ('d', 6), ('e', 8), ('f', 9)
-        ]
-        self.assertEqual(sorted((c1 + c2).items()), sorted(result))
+        self._test_op(operator.add)
 
-    def test_diff(self):
-        c1 = self.create_counter('abbcccddddeeeeeffffff')
-        c2 = self.create_counter('abccddeeefff')
-        result = [('b', 1), ('c', 1), ('d', 2), ('e', 2), ('f', 3)]
-        self.assertEqual(sorted((c1 - c2).items()), sorted(result))
+        result = self.create_counter('abbccc') + self.create_counter('aabbcc')
+        self.assertTrue(isinstance(result, Counter))
+        self.assertEqual(result, {'a': 3, 'b': 4, 'c': 5})
 
-    def test_and(self):
-        c1 = self.create_counter('abbcccddddeeeeef')
-        c2 = self.create_counter('abccddeeefff')
-        result = [
-            ('a', 1), ('b', 1), ('c', 2), ('d', 2), ('e', 3), ('f', 1)
-        ]
-        self.assertEqual(sorted((c1 & c2).items()), sorted(result))
+    def test_sub(self):
+        self._test_op(operator.sub)
+
+        result = self.create_counter('abbccc') - self.create_counter('aabbcc')
+        self.assertTrue(isinstance(result, Counter))
+        self.assertEqual(result, {'c': 1})
 
     def test_or(self):
-        c1 = self.create_counter('abbcccddddeeeeef')
-        c2 = self.create_counter('abccddeeefff')
-        result = [
-            ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('f', 3)
-        ]
-        self.assertEqual(sorted((c1 | c2).items()), sorted(result))
+        self._test_op(operator.or_, do_reverse=False)
 
-    def test_inc(self):
-        c = self.create_counter('abbcccc')
-        c.inc('x', 0)
-        self.assertFalse('x' in c)
-        c.inc('b')
-        self.assertEqual(c['b'], 3)
-        c.inc('b', 5)
-        self.assertEqual(c['b'], 8)
-        c.inc('b', -1)
-        self.assertEqual(c['b'], 7)
-        c.inc('b', -9)
-        self.assertEqual(c['b'], -2)
+        result = self.create_counter('abbccc') | self.create_counter('aabbcc')
+        self.assertTrue(isinstance(result, Counter))
+        self.assertEqual(result, {'a': 2, 'b': 2, 'c': 3})
 
+    def test_and(self):
+        self._test_op(operator.and_, do_reverse=False)
+
+        result = self.create_counter('abbccc') & self.create_counter('aabbcc')
+        self.assertTrue(isinstance(result, Counter))
+        self.assertEqual(result, {'a': 1, 'b': 2, 'c': 2})
+
+    def test_pos(self):
+        redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
+        python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
+
+        self.assertEqual(+redis_counter, +python_counter)
+
+    def test_neg(self):
+        redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
+        python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
+
+        self.assertEqual(-redis_counter, -python_counter)
+
+    def test_iadd(self):
+        redis_counter = self.create_counter('ab')
+        python_counter = collections.Counter('ab')
+
+        # Same types
+        redis_counter += self.create_counter('bcc')
+        python_counter += collections.Counter('bcc')
+        self.assertEqual(redis_counter, python_counter)
+
+        # Different types
+        redis_counter += collections.Counter('cdddd')
+        python_counter += collections.Counter('cdddd')
+        self.assertEqual(redis_counter, python_counter)
+
+    def test_isub(self):
+        redis_counter = self.create_counter('ab')
+        python_counter = collections.Counter('ab')
+
+        # Same types
+        redis_counter -= self.create_counter('bcc')
+        python_counter -= collections.Counter('bcc')
+        self.assertEqual(redis_counter, python_counter)
+
+        # Different types
+        redis_counter -= collections.Counter('cdddd')
+        python_counter -= collections.Counter('cdddd')
+        self.assertEqual(redis_counter, python_counter)
+
+    def test_ior(self):
+        redis_counter = self.create_counter('ab')
+        python_counter = collections.Counter('ab')
+
+        # Same types
+        redis_counter |= self.create_counter('bcc')
+        python_counter |= collections.Counter('bcc')
+        self.assertEqual(redis_counter, python_counter)
+
+        # Different types
+        redis_counter |= collections.Counter('cdddd')
+        python_counter |= collections.Counter('cdddd')
+        self.assertEqual(redis_counter, python_counter)
+
+    def test_iand(self):
+        redis_counter = self.create_counter('ab')
+        python_counter = collections.Counter('ab')
+
+        # Same types
+        redis_counter &= self.create_counter('bcc')
+        python_counter &= collections.Counter('bcc')
+        self.assertEqual(redis_counter, python_counter)
+
+        # Different types
+        redis_counter &= collections.Counter('cdddd')
+        python_counter &= collections.Counter('cdddd')
+        self.assertEqual(redis_counter, python_counter)
 
 if __name__ == '__main__':
     unittest.main()

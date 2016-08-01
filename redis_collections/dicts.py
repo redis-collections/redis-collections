@@ -8,10 +8,11 @@ Collections based on dict interface.
 from __future__ import division, print_function, unicode_literals
 
 import collections
+import operator
 
 import six
 
-from .base import RedisCollection, same_types
+from .base import RedisCollection
 
 
 class Dict(RedisCollection, collections.MutableMapping):
@@ -155,12 +156,12 @@ class Dict(RedisCollection, collections.MutableMapping):
             self.redis.hdel(self.key, key_hash)
 
     def _data(self, pipe=None):
+        """Returns a Python dictionary with the same values as this object"""
         redis = self.redis if pipe is None else pipe
 
-        ret = []
+        ret = {}
         for D in six.itervalues(redis.hgetall(self.key)):
-            for k, v in six.iteritems(self._unpickle(D)):
-                ret.append((k, v))
+            ret.update(self._unpickle(D))
 
         return ret
 
@@ -284,6 +285,7 @@ class Dict(RedisCollection, collections.MutableMapping):
                 D_load.setdefault(key_hash, {})
                 D_load[key_hash][key] = value
 
+            pipe.multi()
             for key_hash, D in six.iteritems(D_load):
                 pipe.hset(self.key, key_hash, self._pickle(D))
 
@@ -319,6 +321,9 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         return other
 
+    def clear(self):
+        self.redis.delete(self.key)
+
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):
         """Create a new dictionary with keys from *seq* and values set to
@@ -348,13 +353,9 @@ class Counter(Dict):
         Not available in Python 2.6.
 
     .. warning::
-        In comparing with original :class:`collections.Counter` type
-        **supports only integers**. :class:`Counter` also  does not implement
-        methods :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues`.
-
-    .. note::
-        Unlike :class:`Dict`, :class:`Counter` has the same efficiency
-        of ``c[key]`` and :func:`get` operations.
+        Note that this :class:`Counter` does not implement
+        methods :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues`,
+        which are available in Python 2.7's version.
     """
 
     _same_types = (collections.Counter,)
@@ -389,200 +390,171 @@ class Counter(Dict):
         """
         super(Counter, self).__init__(*args, **kwargs)
 
-    def _pickle(self, data):
-        return str(int(data)).encode('ascii')
-
-    def _unpickle(self, string):
-        if string is None:
-            return None
-        return int(string)
-
-    def _obj_to_data(self, obj):
-        is_redis = isinstance(obj, RedisCollection)
-        is_mapping = isinstance(obj, collections.Mapping)
-
-        data = obj._data() if is_redis else obj
-        return dict(data) if is_mapping else iter(data)
-
-    def getmany(self, *keys):
-        values = super(Counter, self).getmany(*keys)
-        return [(v or 0) for v in values]
-
-    def __getitem__(self, key):
-        """Return the item of dictionary with key *key*. Returns zero if key
-        is not in the map.
-
-        .. note::
-            Unlike :class:`Dict`, :class:`Counter` has the same efficiency
-            of ``c[key]`` and :func:`get` operations.
-        """
-        return self.get(key, 0)
-
-    def elements(self):
-        """Return an iterator over elements repeating each as many times as
-        its count. Elements are returned in arbitrary order. If an element's
-        count is less than one, :func:`elements` will ignore it.
-        """
-        for element, count in self._data():
-            if count:
-                for _ in six.moves.xrange(0, count):
-                    yield element
-
-    def _update(self, data, pipe=None):
-        super(Dict, self)._update(data, pipe)  # Dict intentionally
-        redis = pipe if pipe is not None else self.redis
-
-        data = collections.Counter(data)
-
-        redis.hmset(
-            self.key, {k: self._pickle(v) for k, v in six.iteritems(data)}
-        )
-
-    def inc(self, key, n=1):
-        """Value of *key* will be increased by *n*. *n* defaults to 1.
-        If *n* is negative integer, value of *key* will be decreased.
-        Value after the increment (decrement) operation is returned.
-
-        .. note::
-            Whole operation is ignored if *n* is zero.
-
-        :rtype: integer
-        """
-        if n:
-            return self.redis.hincrby(self.key, key, self._pickle(n))
+    def __missing__(self, key):
         return 0
 
-    def most_common(self, n=None):
-        """Return a list of the *n* most common elements and their counts
-        from the most common to the least. If *n* is not specified,
-        :func:`most_common` returns *all* elements in the counter.
-        Elements with equal counts are ordered arbitrarily.
-        """
-        data = self._obj_to_data(self)
-        counter = collections.Counter(data)
-        return counter.most_common(n)
+    most_common = collections.Counter.most_common
 
-    def _operation(self, other, fn, update=False):
-        """Update operation helper.
+    elements = collections.Counter.elements
 
-        :param other: Other operand.
-        :type other: iterable or mapping
-        :param fn: Closure, takes counter object as the first argument
-                   and data from *other* as second.
-        :type fn: function *fn(counter, other)*
-        :param update: Whether the operation is update.
-        :type update: boolean
-        """
-        key = self.key if update else None
+    fromkeys = collections.Counter.fromkeys
 
-        def op_trans(pipe):
-            d1 = self._obj_to_data(self)
-            d2 = self._obj_to_data(other)
+    def _update_helper(self, other, op, use_redis=False):
+        def _update_helper_trans(pipe):
+            data = {}
 
-            c1 = collections.Counter(d1)
-            result = fn(c1, d2)
+            if use_redis:
+                for D in six.itervalues(pipe.hgetall(other.key)):
+                    data.update(self._unpickle(D))
+            else:
+                data.update(other)
 
-            if update:
-                result = c1
+            D_load = {}
+            for key, value in six.iteritems(data):
+                key_hash = hash(key)
+                D_load.setdefault(key_hash, {})
+                D_load[key_hash][key] = op(self.get(key, 0), value)
 
             pipe.multi()
-            return self._create_new(result, key=key, pipe=pipe)
-        return self._transaction(op_trans, key)
+            for key_hash, D in six.iteritems(D_load):
+                pipe.hset(self.key, key_hash, self._pickle(D))
 
-    def subtract(self, other):
-        """Elements are subtracted from an *iterable* or from another
-        *mapping* (or counter). Like :func:`dict.update` but subtracts
-        counts instead of replacing them.
-        """
-        def subtract_op(c1, d2):
-            c1.subtract(d2)
-        self._operation(other, subtract_op, update=True)
+        if use_redis:
+            self._transaction(_update_helper_trans, other.key)
+        else:
+            self._transaction(_update_helper_trans)
 
-    def update(self, other):
+    def update(self, other=None, **kwargs):
         """Elements are counted from an *iterable* or added-in from another
         *mapping* (or counter). Like :func:`dict.update` but adds counts
         instead of replacing them. Also, the *iterable* is expected to be
         a sequence of elements, not a sequence of ``(key, value)`` pairs.
         """
-        def update_op(c1, d2):
-            c1.update(d2)
-        self._operation(other, update_op, update=True)
+        if other is not None:
+            if isinstance(other, Dict):
+                self._update_helper(other, operator.add, use_redis=True)
+            elif hasattr(other, 'keys'):
+                self._update_helper(other, operator.add)
+            else:
+                self._update_helper(collections.Counter(other), operator.add)
 
-    @same_types
+        if kwargs:
+            self._update_helper(kwargs, operator.add)
+
+    def subtract(self, other=None, **kwargs):
+        """Elements are subtracted from an *iterable* or from another
+        *mapping* (or counter). Like :func:`dict.update` but subtracts
+        counts instead of replacing them.
+        """
+        if other is not None:
+            if isinstance(other, Dict):
+                self._update_helper(other, operator.sub, use_redis=True)
+            elif hasattr(other, 'keys'):
+                self._update_helper(other, operator.sub)
+            else:
+                self._update_helper(collections.Counter(other), operator.sub)
+
+        if kwargs:
+            self._update_helper(kwargs, operator.sub)
+
+    def __delitem__(self, key):
+        """Like :func:`dict.__delitem__`, but does not raise KeyError for
+        missing values.
+        """
+        try:
+            super(Counter, self).__delitem__(key)
+        except KeyError:
+            pass
+
+    def _op_helper(self, other, op, swap_args=False, inplace=False):
+        def op_trans(pipe):
+            # Get a collections.Counter copy of `self`
+            self_counter = collections.Counter(self._data(pipe))
+
+            # If `other` is also Redis-backed we'll want to pull its values
+            # with the same transaction-provided pipeline as for `self`.
+            if use_redis:
+                other_counter = collections.Counter(other._data(pipe))
+            else:
+                other_counter = other
+
+            # Unary case
+            if other is None:
+                result = op(self_counter)
+            # Reversed case
+            elif swap_args:
+                result = op(other_counter, self_counter)
+            # Normal case
+            else:
+                result = op(self_counter, other_counter)
+
+            # If we're not updating `self`, we're finished
+            if not inplace:
+                return result
+
+            # Otherwise we need to update `self` in this transaction
+            D_load = {}
+            for key, value in six.iteritems(result):
+                key_hash = hash(key)
+                D_load.setdefault(key_hash, {})
+                D_load[key_hash][key] = value
+
+            pipe.multi()
+            pipe.delete(self.key)
+            for key_hash, D in six.iteritems(D_load):
+                pipe.hset(self.key, key_hash, self._pickle(D))
+
+        if other is None:
+            use_redis = False
+            result = self._transaction(op_trans, None)
+        elif isinstance(other, Counter):
+            use_redis = True
+            result = self._transaction(op_trans, other.key)
+        elif isinstance(other, collections.Counter):
+            use_redis = False
+            result = self._transaction(op_trans)
+        else:
+            raise TypeError('Unsupported type {}'.format(type(other)))
+
+        if inplace:
+            return self
+        else:
+            new_instance = self.__class__(redis=self.redis)
+            new_instance.update(result)
+            return new_instance
+
     def __add__(self, other):
-        def add_op(c1, d2):
-            c2 = collections.Counter(d2)
-            return c1 + c2
-        return self._operation(other, add_op)
+        return self._op_helper(other, operator.add)
 
     def __radd__(self, other):
-        return self.__add__(other)
+        return self._op_helper(other, operator.add, swap_args=True)
 
-    @same_types
-    def __iadd__(self, other):
-        def iadd_op(c1, d2):
-            c2 = collections.Counter(d2)
-            c1 += c2
-        return self._operation(other, iadd_op, update=True)
-
-    @same_types
-    def __and__(self, other):
-        def and_op(c1, d2):
-            c2 = collections.Counter(d2)
-            return c1 & c2
-        return self._operation(other, and_op)
-
-    def __rand__(self, other):
-        return self.__and__(other)
-
-    @same_types
-    def __iand__(self, other):
-        def iand_op(c1, d2):
-            c2 = collections.Counter(d2)
-            c1 &= c2
-        return self._operation(other, iand_op, update=True)
-
-    @same_types
     def __sub__(self, other):
-        def sub_op(c1, d2):
-            c2 = collections.Counter(d2)
-            return c1 - c2
-        return self._operation(other, sub_op)
+        return self._op_helper(other, operator.sub)
 
-    @same_types
     def __rsub__(self, other):
-        def rsub_op(c1, d2):
-            c2 = collections.Counter(d2)
-            return c2 - c1
-        return self._operation(other, rsub_op)
+        return self._op_helper(other, operator.sub, swap_args=True)
 
-    @same_types
-    def __isub__(self, other):
-        def isub_op(c1, d2):
-            c2 = collections.Counter(d2)
-            c1 -= c2
-        return self._operation(other, isub_op, update=True)
-
-    @same_types
     def __or__(self, other):
-        def or_op(c1, d2):
-            c2 = collections.Counter(d2)
-            return c1 | c2
-        return self._operation(other, or_op)
+        return self._op_helper(other, operator.or_)
 
-    def __ror__(self, other):
-        return self.__or__(other)
+    def __and__(self, other):
+        return self._op_helper(other, operator.and_)
 
-    @same_types
+    def __pos__(self):
+        return self._op_helper(None, operator.pos)
+
+    def __neg__(self):
+        return self._op_helper(None, operator.neg)
+
+    def __iadd__(self, other):
+        return self._op_helper(other, operator.add, inplace=True)
+
+    def __isub__(self, other):
+        return self._op_helper(other, operator.sub, inplace=True)
+
     def __ior__(self, other):
-        def ior_op(c1, d2):
-            c2 = collections.Counter(d2)
-            c1 |= c2
-        return self._operation(other, ior_op, update=True)
+        return self._op_helper(other, operator.ior, inplace=True)
 
-    @classmethod
-    def fromkeys(cls, seq, value=None, **kwargs):
-        """This class method is not implemented for :class:`Counter`
-        objects.
-        """
-        raise NotImplementedError
+    def __iand__(self, other):
+        return self._op_helper(other, operator.iand, inplace=True)
