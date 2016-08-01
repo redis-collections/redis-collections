@@ -266,6 +266,90 @@ class DictTest(RedisTestCase):
             d['h'] = ff
             self.assertEqual(d.get('h', 'wrong'), ff)
 
+    def test_mutable(self):
+        redis_plain = self.create_dict()
+        redis_cached = self.create_dict(writeback=True)
+        python_dict = {}
+
+        # Create a mutable entry and then modify it
+        for D in (redis_plain, redis_cached, python_dict):
+            D['list'] = [1]
+            D['list'].append(2)
+
+            D['set'] = {1}
+            D['set'].add(2)
+
+            D['dict'] = {1: 'one'}
+            D['dict'][2] = 'two'
+
+        # The Redis Dict with writeback=False won't have made the updates
+        self.assertNotEqual(redis_plain['list'], python_dict['list'])
+        self.assertNotEqual(redis_plain['set'], python_dict['set'])
+        self.assertNotEqual(redis_plain['dict'], python_dict['dict'])
+
+        # The Redis dict with writeback=True will have made the updates
+        self.assertEqual(redis_cached['list'], python_dict['list'])
+        self.assertEqual(redis_cached['set'], python_dict['set'])
+        self.assertEqual(redis_cached['dict'], python_dict['dict'])
+
+    def test_cache(self):
+        redis_cached = self.create_dict(writeback=True)
+
+        # Setting a key should add it to both the cache and to Redis
+        redis_cached['key_1'] = [1]
+        self.assertIn('key_1', redis_cached.cache)
+        self.assertIn('key_1', redis_cached._data())
+
+        # The mutated value should be reflected in items, values
+        redis_cached['key_1'].append(2)
+        self.assertEqual(redis_cached.items(), [('key_1', [1, 2])])
+        self.assertEqual(redis_cached.values(), [([1, 2])])
+
+        # sync-ing should push changes to Redis and clear the cache
+        self.assertEqual(redis_cached._data()['key_1'], [1])
+        redis_cached.sync()
+        self.assertEqual(redis_cached._data()['key_1'], [1, 2])
+        self.assertEqual(redis_cached.cache, {})
+
+        # Deleting a key should delete it from both the cache and Redis
+        redis_cached['key_2'] = [2]
+        del redis_cached['key_2']
+        self.assertNotIn('key_2', redis_cached.cache)
+        self.assertNotIn('key_2', redis_cached._data())
+
+        # Popping a key should delete it from both the cache and Redis
+        redis_cached['key_3'] = [3]
+        redis_cached['key_3'].append(4)
+        self.assertEqual(redis_cached.pop('key_3'), [3, 4])
+        self.assertNotIn('key_3', redis_cached.cache)
+        self.assertNotIn('key_3', redis_cached._data())
+
+        # Doing popitem should delete the item from both the cache and Redis
+        redis_cached.clear()
+        redis_cached['key_4'] = [4]
+        redis_cached['key_4'].append(5)
+        self.assertEqual(redis_cached.popitem(), ('key_4', [4, 5]))
+        self.assertNotIn('key_4', redis_cached.cache)
+        self.assertNotIn('key_4', redis_cached._data())
+
+        # setdefault should reflect changes to mutable objects
+        redis_cached['key_5'] = [5]
+        redis_cached['key_5'].append(6)
+        self.assertEqual(redis_cached.setdefault('key_5'), [5, 6])
+        self.assertIn('key_5', redis_cached.cache)
+        self.assertIn('key_5', redis_cached._data())
+
+        self.assertEqual(redis_cached.setdefault('key_6', [6, 7]), [6, 7])
+        self.assertIn('key_6', redis_cached.cache)
+        self.assertIn('key_6', redis_cached._data())
+
+        # update should update both the cache and Redis
+        redis_cached.clear()
+        redis_cached['key_7'] = [7]
+        redis_cached.update({'key_7': [7, 8, 9], 'key_8': [9]})
+        self.assertEqual(redis_cached._data()['key_7'], [7, 8, 9])
+        self.assertEqual(redis_cached.cache['key_7'], [7, 8, 9])
+
 
 class CounterTest(RedisTestCase):
 
