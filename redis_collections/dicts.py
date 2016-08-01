@@ -104,15 +104,12 @@ class Dict(RedisCollection, collections.MutableMapping):
         """Return the value for *keys*. If particular key is not in the
         dictionary, return :obj:`None`.
         """
-        ret = []
+        D_subset = {}
         for D in self.redis.hmget(self.key, *(hash(k) for k in keys)):
-            if D is None:
-                ret.append(None)
-            else:
-                for v in six.itervalues(self._unpickle(D)):
-                    ret.append(v)
+            if D is not None:
+                D_subset.update(self._unpickle(D))
 
-        return ret
+        return [D_subset.get(key) for key in keys]
 
     def __getitem__(self, key):
         """Return the item of dictionary with key *key*. Raises a

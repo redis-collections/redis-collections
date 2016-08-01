@@ -42,6 +42,9 @@ class DictTest(RedisTestCase):
         d[1] = 'g'
         self.assertEqual(d.getmany('a', 'e', 1.0, 'x'), ['b', 'f', 'g', None])
 
+        if not six.PY2:
+            self.assertEqual(d.getmany(b'a', b'c'), [None, None])
+
     def test_init(self):
         init_seq = [
             ('a', 1),
