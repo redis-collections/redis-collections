@@ -393,11 +393,26 @@ class Counter(Dict):
     def __missing__(self, key):
         return 0
 
-    most_common = collections.Counter.most_common
+    def most_common(self, n=None):
+        """Return a list of the *n* most common elements and their counts
+        from the most common to the least. If *n* is not specified,
+        :func:`most_common` returns *all* elements in the counter.
+        Elements with equal counts are ordered arbitrarily.
+        """
+        return collections.Counter(self).most_common(n)
 
-    elements = collections.Counter.elements
+    def elements(self, n=None):
+        """Return an iterator over elements repeating each as many times as
+        its count. Elements are returned in arbitrary order. If an element's
+        count is less than one, :func:`elements` will ignore it.
+        """
+        return collections.Counter(self).elements()
 
-    fromkeys = collections.Counter.fromkeys
+    @classmethod
+    def fromkeys(cls, iterable, v=None):
+        raise NotImplementedError(
+            'Counter.fromkeys() is undefined.  Use Counter(iterable) instead.'
+        )
 
     def _update_helper(self, other, op, use_redis=False):
         def _update_helper_trans(pipe):
@@ -541,12 +556,6 @@ class Counter(Dict):
     def __and__(self, other):
         return self._op_helper(other, operator.and_)
 
-    def __pos__(self):
-        return self._op_helper(None, operator.pos)
-
-    def __neg__(self):
-        return self._op_helper(None, operator.neg)
-
     def __iadd__(self, other):
         return self._op_helper(other, operator.add, inplace=True)
 
@@ -558,3 +567,10 @@ class Counter(Dict):
 
     def __iand__(self, other):
         return self._op_helper(other, operator.iand, inplace=True)
+
+    if not six.PY2:
+        def __pos__(self):
+            return self._op_helper(None, operator.pos)
+
+        def __neg__(self):
+            return self._op_helper(None, operator.neg)

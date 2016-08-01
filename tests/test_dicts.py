@@ -6,6 +6,8 @@ import collections
 import operator
 import unittest
 
+import six
+
 from redis_collections import Dict, Counter
 
 from .base import RedisTestCase
@@ -366,18 +368,6 @@ class CounterTest(RedisTestCase):
         self.assertTrue(isinstance(result, Counter))
         self.assertEqual(result, {'a': 1, 'b': 2, 'c': 2})
 
-    def test_pos(self):
-        redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
-        python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
-
-        self.assertEqual(+redis_counter, +python_counter)
-
-    def test_neg(self):
-        redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
-        python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
-
-        self.assertEqual(-redis_counter, -python_counter)
-
     def test_iadd(self):
         redis_counter = self.create_counter('ab')
         python_counter = collections.Counter('ab')
@@ -433,6 +423,19 @@ class CounterTest(RedisTestCase):
         redis_counter &= collections.Counter('cdddd')
         python_counter &= collections.Counter('cdddd')
         self.assertEqual(redis_counter, python_counter)
+
+    if not six.PY2:
+        def test_pos(self):
+            redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
+            python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
+
+            self.assertEqual(+redis_counter, +python_counter)
+
+        def test_neg(self):
+            redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
+            python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
+
+            self.assertEqual(-redis_counter, -python_counter)
 
 if __name__ == '__main__':
     unittest.main()
