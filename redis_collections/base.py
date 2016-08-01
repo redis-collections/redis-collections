@@ -3,17 +3,18 @@
 base
 ~~~~
 """
+from __future__ import division, print_function, unicode_literals
 
-
+import abc
 import uuid
-import redis
-import functools
-from abc import ABCMeta, abstractmethod
-
 try:
     import cPickle as pickle
 except ImportError:
     import pickle as pickle  # NOQA
+import functools
+
+import redis
+import six
 
 
 def same_types(fn):
@@ -43,19 +44,18 @@ def same_types(fn):
     return wrapper
 
 
-class RedisCollection:
+@six.add_metaclass(abc.ABCMeta)
+class RedisCollection(object):
     """Abstract class providing backend functionality for all the other
     Redis collections.
     """
-
-    __metaclass__ = ABCMeta
 
     _same_types = ()
 
     not_impl_msg = ('Cannot be implemented efficiently or atomically '
                     'due to limitations in Redis command set.')
 
-    @abstractmethod
+    @abc.abstractmethod
     def __init__(self, data=None, redis=None, key=None, pickler=None):
         """
         :param data: Initial data.
@@ -192,7 +192,7 @@ class RedisCollection:
         """
         return uuid.uuid4().hex
 
-    @abstractmethod
+    @abc.abstractmethod
     def _data(self, pipe=None):
         """Helper for getting collection's data within a transaction.
 
@@ -210,7 +210,7 @@ class RedisCollection:
         :type data: anything serializable
         :rtype: string
         """
-        return str(self.pickler.dumps(data))
+        return self.pickler.dumps(data)
 
     def _unpickle(self, string):
         """Converts given string serialization back to corresponding data.
@@ -222,12 +222,12 @@ class RedisCollection:
         """
         if string is None:
             return None
-        if not isinstance(string, basestring):
+        if not isinstance(string, six.binary_type):
             msg = 'Only strings can be unpickled (%r given).' % string
             raise TypeError(msg)
         return self.pickler.loads(string)
 
-    @abstractmethod
+    @abc.abstractmethod
     def _update(self, data, pipe=None):
         """Helper for update operations.
 

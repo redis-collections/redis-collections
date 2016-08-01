@@ -100,6 +100,17 @@ If you don't like the standard way of data serialization made by :mod:`pickle`, 
 
 New instances of collections coming from operations between them use the same ``pickler``. It is propagated as well as Redis connection.
 
+Known issues
+--------
+
+*   For ``Dict`` and its subclasses, keys are currently coerced to string types when retrieved.
+    This can lead to some incompatibilities with Python's ``dict`` - see `issue 25 <https://github.com/honzajavorek/redis-collections/issues/25>`_.
+
+*   Storing a mutable object (like a ``dict``, ``list``, or ``set``) in a ``Dict`` can lead to surprising behavior.
+    If you retrieve the object and then modify it you must explicitly store it again for changes to persist - see `issue 26 <https://github.com/honzajavorek/redis-collections/issues/25>`_.
+
+*   Support for Python 3 is in progress. Please `report <https://github.com/honzajavorek/redis-collections/issues>`_ any issues you find.
+
 Philosophy
 ----------
 

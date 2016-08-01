@@ -5,19 +5,20 @@ sets
 
 Collections based on set interface.
 """
+from __future__ import division, print_function, unicode_literals
 
-
+import abc
 import itertools
 import collections
-from abc import ABCMeta, abstractmethod
+
+import six
 
 from .base import RedisCollection, same_types
 
 
+@six.add_metaclass(abc.ABCMeta)
 class SetOperation(object):
     """Helper class for implementing standard set operations."""
-
-    __metaclass__ = ABCMeta
 
     def __init__(self, s, update=False, flipped=False, return_cls=None):
         """
@@ -84,7 +85,7 @@ class SetOperation(object):
                                       pipe=pipe)
         return self.s._transaction(trans, key)
 
-    @abstractmethod
+    @abc.abstractmethod
     def op(self, s, other_sets):
         """Implementation of the operation on standard :class:`set`.
 
@@ -119,7 +120,7 @@ class SetOperation(object):
                                       pipe=pipe)
         return self.s._transaction(trans, key, *other_keys)
 
-    @abstractmethod
+    @abc.abstractmethod
     def redisop(self, pipe, key, other_keys):
         """Implementation of the operation in Redis. Results
         are returned to Python.
@@ -154,7 +155,7 @@ class SetOperation(object):
             return new
         return self.s._transaction(trans, key, *other_keys)
 
-    @abstractmethod
+    @abc.abstractmethod
     def redisopstore(self, pipe, new_key, key, other_keys):
         """Implementation of the operation in Redis. Results
         are stored to another key within Redis.
@@ -272,7 +273,7 @@ class SetSymmetricDifference(SetOperation):
     def redisop(self, pipe, key, other_keys):
         other_key = other_keys[0]  # sym. diff. supports only one operand
         elements = self._simulate_redisop(pipe, key, other_key)
-        return map(self.s._unpickle, elements)
+        return [self.s._unpickle(x) for x in elements]
 
     def redisopstore(self, pipe, new_key, key, other_keys):
         other_key = other_keys[0]  # sym. diff. supports only one operand
@@ -394,7 +395,7 @@ class Set(RedisCollection, collections.MutableSet):
             elements = [self.redis.srandmember(self.key)]
         else:
             elements = self.redis.srandmember(self.key, k)
-        return map(self._unpickle, elements)
+        return [self._unpickle(x) for x in elements]
 
     def difference(self, *others, **kwargs):
         """Return a new set with elements in the set that are
@@ -610,7 +611,9 @@ class Set(RedisCollection, collections.MutableSet):
         redis = pipe if pipe is not None else self.redis
 
         others = [data] + list(others or [])
-        elements = map(self._pickle, frozenset(itertools.chain(*others)))
+        elements = [
+            self._pickle(x) for x in frozenset(itertools.chain(*others))
+        ]
 
         redis.sadd(self.key, *elements)
 

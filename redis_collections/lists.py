@@ -5,7 +5,7 @@ lists
 
 Collections based on list interface.
 """
-
+from __future__ import division, print_function, unicode_literals
 
 import collections
 
@@ -116,7 +116,7 @@ class List(RedisCollection, collections.MutableSequence):
             if index.step:
                 # step implemented by pure Python slicing
                 values = values[::index.step]
-            values = map(self._unpickle, values)
+            values = [self._unpickle(x) for x in values]
 
             pipe.multi()
             return self._create_new(values, pipe=pipe)
@@ -275,7 +275,7 @@ class List(RedisCollection, collections.MutableSequence):
             # Redis has no commands for *inserting* into a list by index.
             # LINSERT requires assumptions about contents of the list values.
             raise NotImplementedError(self.not_impl_msg)
-        
+
         self.redis.lpush(self.key, self._pickle(value))
 
     def append(self, value):
@@ -287,7 +287,7 @@ class List(RedisCollection, collections.MutableSequence):
         super(List, self)._update(data, pipe)
         redis = pipe if pipe is not None else self.redis
 
-        values = map(self._pickle, data)
+        values = [self._pickle(x) for x in data]
         redis.rpush(self.key, *values)
 
     def extend(self, values):

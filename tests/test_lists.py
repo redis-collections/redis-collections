@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+from __future__ import division, print_function, unicode_literals
 
 import unittest
 
-from .base import RedisTestCase
 from redis_collections import List
+
+from .base import RedisTestCase
 
 
 class ListTest(RedisTestCase):
@@ -111,8 +112,10 @@ class ListTest(RedisTestCase):
         l = self.create_list([2013])
         l.extend([4, 5, 6, 7])
         self.assertEqual(list(l), [2013, 4, 5, 6, 7])
+
+        # insert does not replace
         l.insert(0, 3)
-        self.assertEqual(list(l), [3, 2013, 4, 5, 6, 7])    # insert does not replace
+        self.assertEqual(list(l), [3, 2013, 4, 5, 6, 7])
 
     def test_pop_remove(self):
         l = self.create_list([3, 4, 5, 6, 7])
@@ -135,7 +138,7 @@ class ListTest(RedisTestCase):
         self.assertEqual(list(l), [3, 2, 1])
 
     def test_lset_issue(self):
-        for l in ( [1], self.create_list([1]) ):
+        for l in ([1], self.create_list([1])):
             l.insert(0, 5)
             self.assertEqual(list(l), [5, 1])
             l.insert(0, 6)

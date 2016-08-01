@@ -5,9 +5,11 @@ dicts
 
 Collections based on dict interface.
 """
-
+from __future__ import division, print_function, unicode_literals
 
 import collections
+
+import six
 
 from .base import RedisCollection, same_types
 
@@ -81,7 +83,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def __iter__(self):
         """Return an iterator over the keys of the dictionary."""
-        return iter(self.redis.hkeys(self.key))
+        return (k.decode('utf-8') for k in self.redis.hkeys(self.key))
 
     def __contains__(self, key):
         """Return ``True`` if ``Dict`` instance has a key
@@ -109,7 +111,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         dictionary, return :obj:`None`.
         """
         values = self.redis.hmget(self.key, *keys)
-        return map(self._unpickle, values)
+        return [self._unpickle(x) for x in values]
 
     def __getitem__(self, key):
         """Return the item of dictionary with key *key*. Raises a
@@ -170,7 +172,7 @@ class Dict(RedisCollection, collections.MutableMapping):
     def _data(self, pipe=None):
         redis = pipe if pipe is not None else self.redis
         result = redis.hgetall(self.key).items()
-        return [(k, self._unpickle(v)) for (k, v) in result]
+        return [(k.decode('utf-8'), self._unpickle(v)) for (k, v) in result]
 
     def items(self):
         """Return a copy of the dictionary's list of ``(key, value)`` pairs."""
@@ -178,12 +180,12 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def iteritems(self):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
-        result = self.redis.hgetall(self.key).iteritems()
-        return ((k, self._unpickle(v)) for (k, v) in result)
+        result = six.iteritems(self.redis.hgetall(self.key))
+        return ((k.decode('utf-8'), self._unpickle(v)) for (k, v) in result)
 
     def keys(self):
         """Return a copy of the dictionary's list of keys."""
-        return self.redis.hkeys(self.key)
+        return [k.decode('utf-8') for k in self.redis.hkeys(self.key)]
 
     def iter(self):
         """Return an iterator over the keys of the dictionary.
@@ -246,7 +248,7 @@ class Dict(RedisCollection, collections.MutableMapping):
             return key, value
 
         key, value = self._transaction(popitem_trans)
-        return key, self._unpickle(value)
+        return key.decode('utf-8'), self._unpickle(value)
 
     def setdefault(self, key, default=None):
         """If *key* is in the dictionary, return its value.
@@ -262,12 +264,10 @@ class Dict(RedisCollection, collections.MutableMapping):
     def _update(self, data, pipe=None):
         super(Dict, self)._update(data, pipe)
         redis = pipe if pipe is not None else self.redis
-
         data = dict(data)
-        keys = data.keys()
-        values = map(self._pickle, data.values())  # pickling values
-
-        redis.hmset(self.key, dict(zip(keys, values)))
+        redis.hmset(
+            self.key, {k: self._pickle(v) for k, v in six.iteritems(data)}
+        )
 
     def update(self, other=None, **kwargs):
         """Update the dictionary with the key/value pairs from *other*,
@@ -368,7 +368,7 @@ class Counter(Dict):
         super(Counter, self).__init__(*args, **kwargs)
 
     def _pickle(self, data):
-        return unicode(int(data))
+        return str(int(data)).encode('ascii')
 
     def _unpickle(self, string):
         if string is None:
@@ -403,7 +403,7 @@ class Counter(Dict):
         """
         for element, count in self._data():
             if count:
-                for _ in xrange(0, count):
+                for _ in six.moves.xrange(0, count):
                     yield element
 
     def _update(self, data, pipe=None):
@@ -411,10 +411,10 @@ class Counter(Dict):
         redis = pipe if pipe is not None else self.redis
 
         data = collections.Counter(data)
-        keys = data.keys()
-        values = map(self._pickle, data.values())  # pickling values
 
-        redis.hmset(self.key, dict(zip(keys, values)))
+        redis.hmset(
+            self.key, {k: self._pickle(v) for k, v in six.iteritems(data)}
+        )
 
     def inc(self, key, n=1):
         """Value of *key* will be increased by *n*. *n* defaults to 1.
