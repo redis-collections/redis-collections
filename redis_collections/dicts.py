@@ -212,7 +212,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
             pipe.multi()
             if D:
-                pipe.hset(self.key, key_hash, self.pickle(D))
+                pipe.hset(self.key, key_hash, self._pickle(D))
             else:
                 pipe.hdel(self.key, key_hash)
 

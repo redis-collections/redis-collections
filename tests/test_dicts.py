@@ -20,32 +20,50 @@ class DictTest(RedisTestCase):
         return Dict(*args, **kwargs)
 
     def test_set_get(self):
-        d = self.create_dict()
-        d['a'] = 'b'
-        self.assertEqual(d['a'], 'b')
+        redis_dict = self.create_dict()
+        python_dict = {}
+
+        for k, v in [
+            ('a', 1),
+            (b'a', 2),
+            (u'a', 3),
+            (1, 'one'),
+            (1.0, 'one point zero'),
+        ]:
+            redis_dict[k] = v
+            python_dict[k] = v
+            self.assertEqual(redis_dict[k], python_dict[k])
 
     def test_getmany(self):
         d = self.create_dict()
         d['a'] = 'b'
         d['c'] = 'd'
         d['e'] = 'f'
-        self.assertEqual(d.getmany('a', 'e', 'x'), ['b', 'f', None])
+        d[1] = 'g'
+        self.assertEqual(d.getmany('a', 'e', 1.0, 'x'), ['b', 'f', 'g', None])
 
     def test_init(self):
-        d = self.create_dict(zip(['one', 'two', 'three'], [1, 2, 3]))
-        self.assertEqual(
-            sorted(d.items()), [('one', 1), ('three', 3), ('two', 2)]
-        )
+        init_seq = [
+            ('a', 1),
+            (b'a', 2),
+            (u'a', 3),
+            (1, 'one'),
+            (1.0, 'one point zero'),
+        ]
+        redis_dict = self.create_dict(init_seq)
+        python_dict = dict(init_seq)
+        six.assertCountEqual(self, redis_dict.items(), python_dict.items())
 
-        d = self.create_dict([('two', 2), ('one', 1), ('three', 3)])
-        self.assertEqual(
-            sorted(d.items()), [('one', 1), ('three', 3), ('two', 2)]
-        )
-
-        d = self.create_dict({'three': 3, 'one': 1, 'two': 2})
-        self.assertEqual(
-            sorted(d.items()), [('one', 1), ('three', 3), ('two', 2)]
-        )
+        init_dict = {
+            'a': 1,
+            b'a': 2,
+            u'a': 3,
+            1: 'one',
+            1.0: 'one point zero',
+        }
+        redis_dict = self.create_dict(init_dict)
+        python_dict = dict(init_dict)
+        six.assertCountEqual(self, redis_dict.items(), python_dict.items())
 
     def test_key(self):
         d1 = self.create_dict()
@@ -55,30 +73,56 @@ class DictTest(RedisTestCase):
         self.assertEqual(sorted(d1.items()), sorted(d2.items()))
 
     def test_len(self):
-        d = self.create_dict()
-        self.assertEqual(len(d), 0)
-        d['a'] = 'b'
-        self.assertEqual(len(d), 1)
-        d['c'] = 'd'
-        self.assertEqual(len(d), 2)
-        self.assertRaises(KeyError, lambda: d['x'])
+        redis_dict = self.create_dict()
+        python_dict = {}
+
+        for k, v in [
+            ('a', 1),
+            (b'a', 2),
+            (u'a', 3),
+            (1, 'one'),
+            (1.0, 'one point zero'),
+        ]:
+            redis_dict[k] = v
+            python_dict[k] = v
+            self.assertEqual(len(redis_dict), len(python_dict))
 
     def test_del(self):
-        d = self.create_dict()
-        self.assertEqual(len(d), 0)
-        d['a'] = 'b'
-        self.assertEqual(len(d), 1)
-        del d['a']
-        self.assertEqual(len(d), 0)
-        self.assertRaises(KeyError, lambda: d['a'])
+        redis_dict = self.create_dict([('a', 1), (b'a', 2), (2, 'b')])
+        python_dict = {'a': 1, b'a': 2, 2: 'b'}
+
+        for key in ('a', 2):
+            del redis_dict[key]
+            del python_dict[key]
+            self.assertEqual(redis_dict, python_dict)
+
+        for D in (redis_dict, python_dict):
+            with self.assertRaises(KeyError):
+                del D[2]
+
+        # b'a' and 'a' hash to the same thing and are equal in Python 2
+        # b'a' and 'a' hash to the same thing but aren't equal in Python 3
+        if not six.PY2:
+            del redis_dict[b'a']
+            del python_dict[b'a']
+            self.assertEqual(redis_dict, python_dict)
 
     def test_in(self):
-        d = self.create_dict()
-        d['a'] = 'b'
-        self.assertTrue('a' in d)
-        self.assertFalse('c' in d)
-        self.assertFalse('a' not in d)
-        self.assertTrue('c' not in d)
+        redis_dict = self.create_dict()
+        python_dict = {}
+        for D in (redis_dict, python_dict):
+            D['a'] = 'b'
+            D[1.0] = 'one point zero'
+
+            self.assertIn('a', D)
+            self.assertIn(1.0, D)
+            self.assertIn(1, D)
+            self.assertNotIn('b', D)
+
+            if six.PY2:
+                self.assertIn(b'a', D)
+            else:
+                self.assertNotIn(b'a', D)
 
     def test_items(self):
         d = self.create_dict()
@@ -148,17 +192,39 @@ class DictTest(RedisTestCase):
         self.assertEqual(self.redis.dbsize(), 0)
 
     def test_pop(self):
-        d = self.create_dict()
-        d['a'] = 'b'
-        self.assertEqual(d.pop('a'), 'b')
-        self.assertEqual(d.pop('a', 'x'), 'x')
-        self.assertRaises(KeyError, d.pop, 'a')
+        redis_dict = self.create_dict()
+        python_dict = {}
+        for D in (redis_dict, python_dict):
+            D = self.create_dict()
+            D['a'] = 1
+            self.assertEqual(D.pop('a'), 1)
+            self.assertNotIn('a', D)
+            self.assertEqual(D.pop('a', b'default'), b'default')
+            self.assertRaises(KeyError, D.pop, 'a')
+
+            if not six.PY2:
+                D['a'] = 1
+                D[b'a'] = 2
+                self.assertEqual(D.pop('a'), 1)
+                self.assertNotIn('a', D)
+                self.assertIn(b'a', D)
 
     def test_popitem(self):
-        d = self.create_dict()
-        d['a'] = 'b'
-        self.assertEqual(d.popitem(), ('a', 'b'))
-        self.assertRaises(KeyError, d.popitem)
+        redis_dict = self.create_dict()
+        python_dict = {}
+        for D in (redis_dict, python_dict):
+            D = self.create_dict()
+            D['a'] = 1
+            self.assertEqual(D.popitem(), ('a', 1))
+            self.assertNotIn('a', D)
+            self.assertRaises(KeyError, D.popitem)
+
+            if not six.PY2:
+                D['a'] = 1
+                D[b'a'] = 2
+                self.assertEqual(D.popitem(), ('a', 1))
+                self.assertNotIn('a', D)
+                self.assertIn(b'a', D)
 
     def test_setdefault(self):
         d = self.create_dict()
