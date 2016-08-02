@@ -350,6 +350,23 @@ class DictTest(RedisTestCase):
         self.assertEqual(redis_cached._data()['key_7'], [7, 8, 9])
         self.assertEqual(redis_cached.cache['key_7'], [7, 8, 9])
 
+    def test_with(self):
+        with self.create_dict() as D:
+            # Writeback set
+            self.assertTrue(D.writeback)
+
+            # Store a mutable value, modify it, and retrieve it - changes
+            # should be reflected
+            D['key'] = [1]
+            D['key'].append(2)
+            self.assertEqual(D['key'], [1, 2])
+
+            # Changes are not in Redis yet
+            self.assertEqual(D._data()['key'], [1])
+
+        # Closing the context manager syncs to Redis
+        self.assertEqual(D._data()['key'], [1, 2])
+
 
 class CounterTest(RedisTestCase):
 
