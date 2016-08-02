@@ -363,6 +363,10 @@ class CounterTest(RedisTestCase):
             c['a'] = 5
             self.assertEqual(c['a'], 5)
 
+            # For whatever reason Python counters accept non-int values
+            c['not integer'] = 'in fact string'
+            self.assertEqual(c['not integer'], 'in fact string')
+
     def test_init(self):
         for init in (self.create_counter, collections.Counter):
             c = init('gallahad')
@@ -460,6 +464,14 @@ class CounterTest(RedisTestCase):
             c = init('abbccc')
             c.update(['a', 'a', 'b', 'b'], c=2)
             self.assertEqual(sorted(c.items()), expected_result)
+
+        # Writeback enabled
+        c = self.create_counter(writeback=True)
+        c[('tuple', 'key')] = 1
+        self.assertIn(('tuple', 'key'), c._data())
+        self.assertIn(('tuple', 'key'), c.cache)
+        c.update({('tuple', 'key'): 2})
+        self.assertEqual(c[('tuple', 'key')], 2)
 
     def _test_op(self, op):
         redis_counter = self.create_counter('abbccc')
