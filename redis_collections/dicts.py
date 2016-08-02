@@ -647,3 +647,29 @@ class Counter(Dict):
 
         def __neg__(self):
             return self._op_helper(None, operator.neg)
+
+
+class DefaultDict(Dict):
+    def __init__(self, default_factory=None, **kwargs):
+        kwargs.setdefault('writeback', True)
+        super(DefaultDict, self).__init__(**kwargs)
+
+        if default_factory is None:
+            pass
+        elif not callable(default_factory):
+            raise TypeError('first argument must be callable or None')
+        self.default_factory = default_factory
+
+    def __missing__(self, key):
+        if self.default_factory is None:
+            raise KeyError(key)
+
+        value = self.default_factory()
+        self[key] = value
+        return value
+
+    def copy(self, **kwargs):
+        other = self.__class__(self.default_factory, **kwargs)
+        other.update(self)
+
+        return other

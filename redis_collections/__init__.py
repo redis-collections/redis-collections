@@ -9,7 +9,8 @@ __copyright__ = 'Copyright 2013-? Honza Javorek'
 
 
 from .base import RedisCollection  # NOQA
-
-from .sets import Set  # NOQA
+from .dicts import DefaultDict, Dict, Counter  # NOQA
 from .lists import List  # NOQA
-from .dicts import Dict, Counter  # NOQA
+from .sets import Set  # NOQA
+
+__all__ = ['RedisCollection', 'Set', 'List', 'DefaultDict', 'Dict', 'Counter']
