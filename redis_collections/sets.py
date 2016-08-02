@@ -304,18 +304,6 @@ class Set(RedisCollection, collections.MutableSet):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
-        :param pickler: Implementation of data serialization. Object with two
-                        methods is expected: :func:`dumps` for conversion
-                        of data to string and :func:`loads` for the opposite
-                        direction. Examples::
-
-                            import json, pickle
-                            Dict(pickler=json)
-                            Dict(pickler=pickle)  # default
-
-                        Of course, you can construct your own pickling object
-                        (it can be class, module, whatever). Default
-                        serialization implementation uses :mod:`pickle`.
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.

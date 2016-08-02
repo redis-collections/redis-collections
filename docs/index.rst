@@ -88,17 +88,8 @@ always use the same Redis connection as the original object::
 Pickling
 --------
 
-If you don't like the standard way of data serialization made by :mod:`pickle`, you can set your own. Use ``pickler`` keyword argument:
-
-    >>> import pickle
-    >>> l = List(pickler=pickle)  # this makes no sense
-
-*pickler* can be anything having two methods (or functions): :func:`dumps` for conversion of data to string, and :func:`loads` for the opposite direction. You can write your own module or class with such interface, or you can use one of those which are already available::
-
-    >>> import json
-    >>> l = List(pickler=json)
-
-New instances of collections coming from operations between them use the same ``pickler``. It is propagated as well as Redis connection.
+If you don't like the standard way of data serialization made by :mod:`pickle`, you may override the ``_pickle`` and ``_unpickle`` methods of the collection classes.
+Using other serializers may limit the objects you can store or retrieve.
 
 Known issues
 --------

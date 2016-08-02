@@ -56,7 +56,7 @@ class RedisCollection(object):
                     'due to limitations in Redis command set.')
 
     @abc.abstractmethod
-    def __init__(self, data=None, redis=None, key=None, pickler=None):
+    def __init__(self, data=None, redis=None, key=None):
         """
         :param data: Initial data.
         :param redis: Redis client instance. If not provided, default Redis
@@ -66,18 +66,6 @@ class RedisCollection(object):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
-        :param pickler: Implementation of data serialization. Object with two
-                        methods is expected: :func:`dumps` for conversion
-                        of data to string and :func:`loads` for the opposite
-                        direction. Examples::
-
-                            import json, pickle
-                            Dict(pickler=json)
-                            Dict(pickler=pickle)  # default
-
-                        Of course, you can construct your own pickling object
-                        (it can be class, module, whatever). Default
-                        serialization implementation uses :mod:`pickle`.
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.
@@ -89,10 +77,6 @@ class RedisCollection(object):
         #: Redis client instance. :class:`StrictRedis` object with default
         #: connection settings is used if not set by :func:`__init__`.
         self.redis = redis or self._create_redis()
-
-        #: Class or module implementing pickling. Standard :mod:`pickle`
-        #: module is set as default.
-        self.pickler = pickler or pickle
 
         #: Redis key of the collection.
         self.key = key or self._create_key()
@@ -129,13 +113,11 @@ class RedisCollection(object):
         """
         assert not isinstance(data, RedisCollection), \
             "Not atomic. Use '_data()' within a transaction first."
-
         cls = cls or self.__class__
         if issubclass(cls, RedisCollection):
             settings = {
                 'key': key,
                 'redis': self.redis,
-                'pickler': self.pickler,
             }
 
             if pipe is not None and data:
@@ -210,7 +192,7 @@ class RedisCollection(object):
         :type data: anything serializable
         :rtype: string
         """
-        return self.pickler.dumps(data)
+        return pickle.dumps(data)
 
     def _unpickle(self, string):
         """Converts given string serialization back to corresponding data.
@@ -220,14 +202,8 @@ class RedisCollection(object):
         :type string: string
         :rtype: anything serializable
         """
-        if string is None:
-            return None
-        if not isinstance(string, six.binary_type):
-            msg = 'Only strings can be unpickled (%r given).' % string
-            raise TypeError(msg)
-        return self.pickler.loads(string)
+        return pickle.loads(string) if string else None
 
-    @abc.abstractmethod
     def _update(self, data, pipe=None):
         """Helper for update operations.
 
