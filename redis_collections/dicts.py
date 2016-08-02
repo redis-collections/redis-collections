@@ -650,9 +650,56 @@ class Counter(Dict):
 
 
 class DefaultDict(Dict):
-    def __init__(self, default_factory=None, **kwargs):
+    """Mutable **mapping** collection aiming to have the same API as
+    :class:`collections.defaultdict`. See
+    `defaultdict  <https://docs.python.org/2/library/collections.html`_ for
+    further details. The Redis implementation is based on the
+    `hash <http://redis.io/commands#hash>`_ type.
+
+    .. warning::
+        Note that this :class:`DefaultDict` does not implement
+        methods :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues`,
+        which are available in Python 2.7's version.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Breakes the original :class:`defaultdict` API, because there is no
+        support for keyword syntax. The only single way to create
+        :class:`defaultdict` object is to pass an iterable or mapping as the
+        second argument.
+
+        :param default_factory: Used to provide default values for missing
+                                keys.
+        :type default_factory: callable or None
+        :param data: Initial data.
+        :type data: iterable or mapping
+        :param redis: Redis client instance. If not provided, default Redis
+                      connection is used.
+        :type redis: :class:`redis.StrictRedis`
+        :param key: Redis key of the collection. Collections with the same key
+                    point to the same data. If not provided, default random
+                    string is generated.
+        :type key: str
+
+        .. note::
+            :func:`uuid.uuid4` is used for default key generation.
+            If you are not satisfied with its `collision
+            probability <http://stackoverflow.com/a/786541/325365>`_,
+            make your own implementation by subclassing and overriding
+            internal method :func:`_create_key`.
+
+        .. warning::
+            As mentioned, :class:`DefaultDict` does not support following
+            initialization syntax: ``d = DefaultDict(None, a=1, b=2)``
+        """
         kwargs.setdefault('writeback', True)
-        super(DefaultDict, self).__init__(**kwargs)
+        if args:
+            default_factory = args[0]
+            args = args[1:]
+        else:
+            default_factory = None
+
+        super(DefaultDict, self).__init__(*args, **kwargs)
 
         if default_factory is None:
             pass

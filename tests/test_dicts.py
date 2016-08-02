@@ -635,12 +635,18 @@ class DefaultDictTest(RedisTestCase):
                 D = init('not callable')
 
             # Callables are OK
-            D = init(int)
+            D = init(int, {1: 2, 3: 4})
             self.assertEqual(D.default_factory, int)
+            self.assertEqual(D[1], 2)
+            self.assertEqual(D[3], 4)
 
         # Writeback is on for defaultdict
-        D = self.create_ddict()
-        self.assertTrue(D.writeback)
+        D_1 = self.create_ddict()
+        self.assertTrue(D_1.writeback)
+
+        # Keywords are passed through
+        D_2 = self.create_ddict(key=D_1.key)
+        self.assertEqual(D_1.key, D_2.key)
 
     def test_None(self):
         # None is a special case - any misses get a KeyError
