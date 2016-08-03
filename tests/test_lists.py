@@ -81,20 +81,43 @@ class ListTest(RedisTestCase):
             self.assertEqual(L.count(2), 2)
 
     def test_slice(self):
-        for init in (self.create_list, list):
-            L = init([1, 2, 3])
-            self.assertEqual(list(L[:]), [1, 2, 3])
+        redis_list = self.create_list([0, 1, 2, 3])
+        python_list = [0, 1, 2, 3]
 
-            self.assertEqual(list(L[0:]), [1, 2, 3])
-            self.assertEqual(list(L[1:]), [2, 3])
-            self.assertEqual(list(L[2:]), [3])
-            self.assertEqual(list(L[3:]), [])
-
-            self.assertEqual(list(L[:0]), [])
-            self.assertEqual(list(L[:1]), [1])
-            self.assertEqual(list(L[:2]), [1, 2])
-            self.assertEqual(list(L[:3]), [1, 2, 3])
-            self.assertEqual(list(L[:4]), [1, 2, 3])
+        for index in [
+            slice(None, None),  # L[:]
+            slice(0, None, None),  # L[0:]
+            slice(1, None, None),  # L[1:]
+            slice(3, None, None),  # L[3:]
+            slice(4, None, None),  # L[4:]
+            slice(None, 0, None),  # L[:0]
+            slice(None, 1, None),  # L[:1]
+            slice(None, 3, None),  # L[:3]
+            slice(None, 4, None),  # L[:3]
+            slice(0, 0, None),  # L[0:0]
+            slice(1, 1, None),  # L[1:1]
+            slice(3, 3, None),  # L[3:3]
+            slice(3, 3, None),  # L[3:3]
+            slice(-1, None, None),  # L[-1:]
+            slice(-2, None, None),  # L[-2:]
+            slice(-4, None, None),  # L[-4:]
+            slice(None, -1, None),  # L[-1:]
+            slice(None, -2, None),  # L[-2:]
+            slice(None, -4, None),  # L[-4:]
+            slice(0, -1, None),  # L[0:-1]
+            slice(1, -1, None),  # L[1:-1]
+            slice(1, -2, None),  # L[1:-2]
+            slice(-3, -1, None),  # L[-3:-1]
+            slice(None, None, 1),  # L[::1]
+            slice(None, None, 2),  # L[::2]
+            slice(None, None, 3),  # L[::3]
+            slice(None, None, 4),  # L[::4]
+            slice(None, None, -1),  # L[::-1]
+            slice(None, None, -2),  # L[::-2]
+            slice(1, -1, 2),  # L[1:-1:1]
+            slice(1, -1, -2),  # L[1:-1:-2]
+        ]:
+            self.assertEqual(list(redis_list[index]), python_list[index])
 
     def test_len_min_max(self):
         for init in (self.create_list, list):

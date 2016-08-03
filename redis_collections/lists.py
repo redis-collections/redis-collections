@@ -98,21 +98,26 @@ class List(RedisCollection, collections.MutableSequence):
         """Helper for getting a slice."""
         assert isinstance(index, slice)
 
+        # For slices without a step we can use the Redis range function
         def slice_trans(pipe):
-            start = index.start or 0
-            if start == index.stop:
+            calc_start, calc_stop = self._recalc_slice(index.start, index.stop)
+            if calc_start == index.stop:
                 return []
-            stop = -1 if (index.stop is None) else max(index.stop - 1, 0)
 
-            values = pipe.lrange(self.key, start, stop)
-            if index.step:
-                # step implemented by pure Python slicing
-                values = values[::index.step]
+            values = pipe.lrange(self.key, calc_start, calc_stop)
             values = [self._unpickle(x) for x in values]
-
             pipe.multi()
             return self._create_new(values, pipe=pipe)
 
+        # Otherwise we'll need to pull the whole list and slice in Python
+        def step_trans(pipe):
+            values = [self._unpickle(x) for x in pipe.lrange(self.key, 0, -1)]
+            values = values[index.start:index.stop:index.step]
+            pipe.multi()
+            return self._create_new(values, pipe=pipe)
+
+        if index.step:
+            return self._transaction(step_trans)
         return self._transaction(slice_trans)
 
     def __getitem__(self, index):
