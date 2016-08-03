@@ -16,183 +16,213 @@ class SetTest(RedisTestCase):
         return Set(*args, **kwargs)
 
     def test_init(self):
-        s = self.create_set([1, 2, 3])
-        self.assertEqual(sorted(s), [1, 2, 3])
-        s = self.create_set('abc')
-        self.assertEqual(sorted(s), ['a', 'b', 'c'])
-        s = self.create_set('antananarivo')
-        self.assertEqual(sorted(s), ['a', 'i', 'n', 'o', 'r', 't', 'v'])
-        s = self.create_set()
-        self.assertEqual(sorted(s), [])
+        for init in (self.create_set, set):
+            s = init([1, 2, 3])
+            self.assertEqual(sorted(s), [1, 2, 3])
+
+            s = init('abc')
+            self.assertEqual(sorted(s), ['a', 'b', 'c'])
+
+            s = init('antananarivo')
+            self.assertEqual(sorted(s), ['a', 'i', 'n', 'o', 'r', 't', 'v'])
+
+            s = init()
+            self.assertEqual(sorted(s), [])
 
     def test_len(self):
-        s = self.create_set([1, 2, 3, 3])
-        self.assertEqual(len(s), 3)
+        for init in (self.create_set, set):
+            s = init([1, 2, 3, 3])
+            self.assertEqual(len(s), 3)
 
     def test_in(self):
-        s = self.create_set([1, 2, 3, 3])
-        self.assertEqual(1 in s, True)
-        self.assertEqual(42 in s, False)
-        self.assertEqual(1 not in s, False)
-        self.assertEqual(42 not in s, True)
+        for init in (self.create_set, set):
+            s = init([1, 2, 3, 3])
+            self.assertEqual(1 in s, True)
+            self.assertEqual(42 in s, False)
+            self.assertEqual(1 not in s, False)
+            self.assertEqual(42 not in s, True)
 
     def test_equal(self):
-        s1 = self.create_set([1, 2, 3, 3])
-        s2 = self.create_set([4, 5])
-        s3 = self.create_set([4, 5])
-        self.assertFalse(s1 == s2)
-        self.assertTrue(s1 != s3)
-        self.assertTrue(s2 == s3)
-        self.assertTrue(s3 == s3)
+        for init in (self.create_set, set):
+            s_1 = init([1, 2, 3, 3])
+            s_2 = init([4, 5])
+            s_3 = init([4, 5])
+            self.assertNotEqual(s_1, s_3)
+            self.assertNotEqual(s_1, s_3)
+            self.assertEqual(s_2, s_3)
+            self.assertEqual(s_3, s_3)
 
     def test_disjoint(self):
-        s1 = self.create_set([1, 2, 3, 3])
-        s2 = self.create_set([4, 5])
-        self.assertTrue(s1.isdisjoint(s2))
+        for init in (self.create_set, set):
+            s_1 = init([1, 2, 3, 3])
+            s_2 = init([4, 5])
+            self.assertTrue(s_1.isdisjoint(s_2))
 
     def test_subset(self):
-        s1 = self.create_set([1, 2, 3, 3])
-        s2 = self.create_set([4, 5])
-        self.assertFalse(s2.issubset(s1))
-        s2 = self.create_set([3, 2])
-        self.assertTrue(s2.issubset(s1))
-        self.assertTrue(s2 <= s1)
-        self.assertTrue(s2 < s1)
-        s2 = self.create_set([1, 2, 3, 3])
-        self.assertFalse(s2 < s1)
+        for init in (self.create_set, set):
+            s_1 = init([1, 2, 3, 3])
+            s_2 = init([4, 5])
+            self.assertFalse(s_2.issubset(s_1))
+
+            s_2 = init([3, 2])
+            self.assertTrue(s_2.issubset(s_1))
+            self.assertTrue(s_2 <= s_1)
+            self.assertTrue(s_2 < s_1)
+
+            s_2 = init([1, 2, 3, 3])
+            self.assertFalse(s_2 < s_1)
 
     def test_superset(self):
-        s1 = self.create_set([1, 2, 3, 3])
-        s2 = self.create_set([4, 5])
-        self.assertFalse(s2.issuperset(s1))
-        s2 = self.create_set([3, 2])
-        self.assertTrue(s1.issuperset(s2))
-        self.assertTrue(s1 >= s2)
-        self.assertTrue(s1 > s2)
-        s2 = self.create_set([1, 2, 3, 3])
-        self.assertFalse(s1 > s2)
+        for init in (self.create_set, set):
+            s_1 = init([1, 2, 3, 3])
+            s_2 = init([4, 5])
+            self.assertFalse(s_2.issuperset(s_1))
+
+            s_2 = init([3, 2])
+            self.assertTrue(s_1.issuperset(s_2))
+            self.assertTrue(s_1 >= s_2)
+            self.assertTrue(s_1 > s_2)
+
+            s_2 = init([1, 2, 3, 3])
+            self.assertFalse(s_1 > s_2)
 
     def test_union(self):
-        s1 = self.create_set([1, 2, 3, 3])
-        s2 = self.create_set([4, 5])
-        s3 = set([6])
-        l = [6]
-        self.assertEqual(sorted(s1 | s2), [1, 2, 3, 4, 5])
-        self.assertEqual(sorted(s1.union(s2)), [1, 2, 3, 4, 5])
-        self.assertEqual(sorted(s1 | s2 | s3), [1, 2, 3, 4, 5, 6])
-        self.assertEqual(sorted(s1.union(s2, s3)), [1, 2, 3, 4, 5, 6])
-        self.assertRaises(TypeError, lambda: s1 | s2 | l)
-        self.assertEqual(sorted(s1.union(s2, l)), [1, 2, 3, 4, 5, 6])
+        for init in (self.create_set, set):
+            s_1 = init([1, 2, 3, 3])
+            s_2 = init([4, 5])
+            s_3 = set([6])
+            l = [6]
+            self.assertEqual(sorted(s_1 | s_2), [1, 2, 3, 4, 5])
+            self.assertEqual(sorted(s_1.union(s_2)), [1, 2, 3, 4, 5])
+            self.assertEqual(sorted(s_1 | s_2 | s_3), [1, 2, 3, 4, 5, 6])
+            self.assertEqual(sorted(s_1.union(s_2, s_3)), [1, 2, 3, 4, 5, 6])
+            self.assertRaises(TypeError, lambda: s_1 | s_2 | l)
+            self.assertEqual(sorted(s_1.union(s_2, l)), [1, 2, 3, 4, 5, 6])
 
     def test_intersection(self):
-        s1 = self.create_set([1, 2, 3, 3])
-        s2 = self.create_set([3, 4, 5])
-        s3 = set([6])
-        l = [6]
-        self.assertEqual(sorted(s1 & s2), [3])
-        self.assertEqual(sorted(s1.intersection(s2)), [3])
-        self.assertEqual(sorted(s1 & s2 & s3), [])
-        self.assertEqual(sorted(s1.intersection(s2, s3)), [])
-        self.assertRaises(TypeError, lambda: s1 & s2 & l)
-        self.assertEqual(sorted(s1.intersection(s2, l)), [])
-        self.assertEqual(sorted(s3 & s2), [])
+        for init in (self.create_set, set):
+            s_1 = init([1, 2, 3, 3])
+            s_2 = init([3, 4, 5])
+            s_3 = set([6])
+            l = [6]
+            self.assertEqual(sorted(s_1 & s_2), [3])
+            self.assertEqual(sorted(s_1.intersection(s_2)), [3])
+            self.assertEqual(sorted(s_1 & s_2 & s_3), [])
+            self.assertEqual(sorted(s_1.intersection(s_2, s_3)), [])
+            self.assertRaises(TypeError, lambda: s_1 & s_2 & l)
+            self.assertEqual(sorted(s_1.intersection(s_2, l)), [])
+            self.assertEqual(sorted(s_3 & s_2), [])
 
     def test_difference(self):
-        s1 = self.create_set([1, 2, 3, 3])
-        s2 = self.create_set([3, 4, 5])
-        s3 = set([6])
-        l = [6]
-        self.assertEqual(sorted(s1 - s2), [1, 2])
-        self.assertEqual(sorted(s1.difference(s2)), [1, 2])
-        self.assertEqual(sorted(s1 - s2 - s3), [1, 2])
-        self.assertEqual(sorted(s1.difference(s2, s3)), [1, 2])
-        self.assertRaises(TypeError, lambda: s1 - s2 - l)
-        self.assertEqual(sorted(s1.difference(s2, l)), [1, 2])
-        self.assertEqual(sorted(s3 - s1), [6])
+        for init in (self.create_set, set):
+            s_1 = init([1, 2, 3, 3])
+            s_2 = init([3, 4, 5])
+            s_3 = set([6])
+            l = [6]
+            self.assertEqual(sorted(s_1 - s_2), [1, 2])
+            self.assertEqual(sorted(s_1.difference(s_2)), [1, 2])
+            self.assertEqual(sorted(s_1 - s_2 - s_3), [1, 2])
+            self.assertEqual(sorted(s_1.difference(s_2, s_3)), [1, 2])
+            self.assertRaises(TypeError, lambda: s_1 - s_2 - l)
+            self.assertEqual(sorted(s_1.difference(s_2, l)), [1, 2])
+            self.assertEqual(sorted(s_3 - s_1), [6])
 
     def test_symmetric_difference(self):
-        s1 = self.create_set([1, 2, 3, 3])
-        s2 = self.create_set([3, 4, 5])
-        s3 = set([6])
-        l = [6]
-        self.assertEqual(sorted(s1 ^ s2), [1, 2, 4, 5])
-        self.assertEqual(sorted(s1.symmetric_difference(s2)), [1, 2, 4, 5])
-        self.assertEqual(sorted(s1 ^ s2 ^ s3), [1, 2, 4, 5, 6])
-        self.assertRaises(TypeError, lambda: s1 ^ s2 ^ l)
-        self.assertEqual(sorted(s3 ^ s1 ^ s2), [1, 2, 4, 5, 6])
+        for init in (self.create_set, set):
+            s_1 = init([1, 2, 3, 3])
+            s_2 = init([3, 4, 5])
+            s_3 = set([6])
+            l = [6]
+            self.assertEqual(sorted(s_1 ^ s_2), [1, 2, 4, 5])
+            self.assertEqual(
+                sorted(s_1.symmetric_difference(s_2)), [1, 2, 4, 5]
+            )
+            self.assertEqual(sorted(s_1 ^ s_2 ^ s_3), [1, 2, 4, 5, 6])
+            self.assertRaises(TypeError, lambda: s_1 ^ s_2 ^ l)
+            self.assertEqual(sorted(s_3 ^ s_1 ^ s_2), [1, 2, 4, 5, 6])
 
     def test_copy(self):
-        s1 = self.create_set('abc')
-        s2 = s1.copy()
-        self.assertEqual(s2.__class__, Set)
-        self.assertEqual(sorted(s1),
-                         sorted(s2))
+        for init in (self.create_set, set):
+            s_1 = init('abc')
+            s_2 = s_1.copy()
+            self.assertEqual(s_1.__class__, s_2.__class__)
+            self.assertEqual(sorted(s_1), sorted(s_2))
 
     def test_result_type(self):
-        s1 = self.create_set('ab')
-        s2 = set('bc')
-        s3 = s1 | s2
-        s4 = s2 | s1
-        self.assertEqual(s3.__class__, s1.__class__)
-        self.assertEqual(s4.__class__, s2.__class__)
+        for init in (self.create_set, set):
+            s_1 = init('ab')
+            s_2 = set('bc')
+            s_3 = s_1 | s_2
+            s4 = s_2 | s_1
+            self.assertEqual(s_3.__class__, s_1.__class__)
+            self.assertEqual(s4.__class__, s_2.__class__)
 
     def test_update(self):
-        s1 = self.create_set('ab')
-        s2 = frozenset('bc')
-        st = 'cd'
-        s1 |= s2
-        self.assertEqual(sorted(s1), ['a', 'b', 'c'])
-        s1.update(s2, st)
-        self.assertEqual(sorted(s1), ['a', 'b', 'c', 'd'])
+        for init in (self.create_set, set):
+            s_1 = init('ab')
+            s_2 = frozenset('bc')
+            st = 'cd'
+            s_1 |= s_2
+            self.assertEqual(sorted(s_1), ['a', 'b', 'c'])
+            s_1.update(s_2, st)
+            self.assertEqual(sorted(s_1), ['a', 'b', 'c', 'd'])
 
     def test_intersection_update(self):
-        s1 = self.create_set('ab')
-        s2 = frozenset('bc')
-        st = 'cd'
-        s1 &= s2
-        self.assertEqual(sorted(s1), ['b'])
-        s1.intersection_update(s2, st)
-        self.assertEqual(sorted(s1), [])
+        for init in (self.create_set, set):
+            s_1 = init('ab')
+            s_2 = frozenset('bc')
+            st = 'cd'
+            s_1 &= s_2
+            self.assertEqual(sorted(s_1), ['b'])
+            s_1.intersection_update(s_2, st)
+            self.assertEqual(sorted(s_1), [])
 
     def test_difference_update(self):
-        s1 = self.create_set('ab')
-        s2 = frozenset('bc')
-        st = 'cd'
-        s1 -= s2
-        self.assertEqual(sorted(s1), ['a'])
-        s1.difference_update(s2, st)
-        self.assertEqual(sorted(s1), ['a'])
+        for init in (self.create_set, set):
+            s_1 = init('ab')
+            s_2 = frozenset('bc')
+            s_3 = 'cd'
+            s_1 -= s_2
+            self.assertEqual(sorted(s_1), ['a'])
+            s_1.difference_update(s_2, s_3)
+            self.assertEqual(sorted(s_1), ['a'])
 
     def test_symmetric_difference_update(self):
-        s1 = self.create_set('ab')
-        s2 = frozenset('bc')
-        st = 'cd'
-        s1 ^= s2
-        self.assertEqual(sorted(s1), ['a', 'c'])
-        s1.symmetric_difference_update(st)
-        self.assertEqual(sorted(s1), ['a', 'd'])
+        for init in (self.create_set, set):
+            s_1 = init('ab')
+            s_2 = frozenset('bc')
+            s_3 = 'cd'
+            s_1 ^= s_2
+            self.assertEqual(sorted(s_1), ['a', 'c'])
+            s_1.symmetric_difference_update(s_3)
+            self.assertEqual(sorted(s_1), ['a', 'd'])
 
     def test_add(self):
         s = self.create_set('ab')
         s.add('c')
         self.assertEqual(sorted(s), ['a', 'b', 'c'])
+
+        # Returning True or False after addition isn't something the native
+        # Python `set` does
         self.assertFalse(s.add('c'))
         self.assertTrue(s.add('d'))
 
     def test_remove_discard(self):
-        s = self.create_set('cdab')
-        self.assertRaises(KeyError, s.remove, 'x')
-        s.remove('b')
-        self.assertEqual(sorted(s), ['a', 'c', 'd'])
-        s.discard('x')
-        s.discard('a')
-        self.assertEqual(sorted(s), ['c', 'd'])
+        for init in (self.create_set, set):
+            s = init('cdab')
+            self.assertRaises(KeyError, s.remove, 'x')
+            s.remove('b')
+            self.assertEqual(sorted(s), ['a', 'c', 'd'])
+            s.discard('x')
+            s.discard('a')
+            self.assertEqual(sorted(s), ['c', 'd'])
 
     def test_pop(self):
-        s = self.create_set('a')
-        self.assertEqual(s.pop(), 'a')
-        self.assertEqual(sorted(s), [])
-        self.assertRaises(KeyError, s.pop)
+        for init in (self.create_set, set):
+            s = init('a')
+            self.assertEqual(s.pop(), 'a')
+            self.assertEqual(sorted(s), [])
+            self.assertRaises(KeyError, s.pop)
 
     def test_random_sample(self):
         s = self.create_set('a')
@@ -207,15 +237,17 @@ class SetTest(RedisTestCase):
             self.assertEqual(sorted(s.random_sample(2)), ['a', 'b'])
 
     def test_add_unicode(self):
-        s = self.create_set()
-        elem = 'ěščřžýáíéůú\U0001F4A9'
-        s.add(elem)
-        self.assertEqual(sorted(s), [elem])
+        for init in (self.create_set, set):
+            s = init()
+            elem = 'ěščřžýáíéůú\U0001F4A9'
+            s.add(elem)
+            self.assertEqual(sorted(s), [elem])
 
     def test_clear(self):
-        s = self.create_set('abcdefg')
-        s.clear()
-        self.assertEqual(sorted(s), [])
+        for init in (self.create_set, set):
+            s = self.create_set('abcdefg')
+            s.clear()
+            self.assertEqual(sorted(s), [])
 
 
 class _Set(Set):
