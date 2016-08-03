@@ -99,7 +99,11 @@ class List(RedisCollection, collections.MutableSequence):
         assert isinstance(index, slice)
 
         def slice_trans(pipe):
-            start, stop = self._recalc_slice(index.start, index.stop)
+            start = index.start or 0
+            if start == index.stop:
+                return []
+            stop = -1 if (index.stop is None) else max(index.stop - 1, 0)
+
             values = pipe.lrange(self.key, start, stop)
             if index.step:
                 # step implemented by pure Python slicing
@@ -108,6 +112,7 @@ class List(RedisCollection, collections.MutableSequence):
 
             pipe.multi()
             return self._create_new(values, pipe=pipe)
+
         return self._transaction(slice_trans)
 
     def __getitem__(self, index):

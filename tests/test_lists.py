@@ -90,8 +90,7 @@ class ListTest(RedisTestCase):
             self.assertEqual(list(L[2:]), [3])
             self.assertEqual(list(L[3:]), [])
 
-            # TODO - make this test pass
-            # self.assertEqual(list(L[:0]), [])
+            self.assertEqual(list(L[:0]), [])
             self.assertEqual(list(L[:1]), [1])
             self.assertEqual(list(L[:2]), [1, 2])
             self.assertEqual(list(L[:3]), [1, 2, 3])
