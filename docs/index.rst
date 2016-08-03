@@ -90,7 +90,7 @@ If you don't like the standard way of data serialization made by :mod:`pickle`, 
 Using other serializers may limit the objects you can store or retrieve.
 
 Known issues
---------
+------------
 
 *   For ``Dict`` and its subclasses, keys are currently coerced to string types when retrieved.
     This can lead to some incompatibilities with Python's ``dict`` - see `issue 25 <https://github.com/honzajavorek/redis-collections/issues/25>`_.
