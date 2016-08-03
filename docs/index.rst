@@ -8,7 +8,7 @@ Redis Collections are a set of basic Python collections backed by Redis.
 
 `Redis <http://redis.io/>`_ is a great key-value storage. There is well-designed `client for Python <https://github.com/andymccurdy/redis-py>`_, but sometimes working with it seems to be too *low-level*. You just call methods with names of corresponding Redis commands. Such approach is great when dealing with cutting edge software tasks, but if you write just a simple app or command line script for your own, you might appreciate a bit different interface.
 
-Aim of this small library is to provide such interface when dealing with collections. Redis has support for several types: strings, hashes, lists, sets, sorted sets. Why not to bring them to Python in a *pythonic* way? ::
+The aim of this library is to provide such interface when dealing with collections. Redis has support for several types: strings, hashes, lists, sets, sorted sets. Why not to bring them to Python in a *pythonic* way? ::
 
     >>> from redis_collections import Dict
     >>> d = Dict()
@@ -18,11 +18,9 @@ Aim of this small library is to provide such interface when dealing with collect
     >>> d.items()
     [('answer', 42)]
 
-In my Redis I can see a ``hash`` structure under key ``fe267c1dde5d4f648e7bac836a0168fe``. Using :class:`dict`-like notation, it's value is following::
+In Redis you will see can see a ``hash`` structure under key ``fe267c1dde5d4f648e7bac836a0168fe``. That structure stores a field and value that corresponds to ``{'answer': 42}``.  The value is pickled, because Redis can store only strings.
 
-    {'answer': 'I42\n.'}
-
-The value is pickled, because Redis can store only strings. On Python side, you can do almost any stuff you are used to do with standard :class:`dict` instances:
+On the Python side, you can do most anything you can do with standard :class:`dict` instances:
 
     >>> d.update({'hasek': 39, 'jagr': 68})
     >>> d
@@ -31,7 +29,7 @@ The value is pickled, because Redis can store only strings. On Python side, you 
     >>> d
     <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'jagr': 68, 'hasek': 39}>
 
-Every such operation atomically changes data in Redis.
+"Write" operations atomically change data in Redis.
 
 Installation
 ------------
@@ -61,12 +59,12 @@ In case you wish to wipe all its data, use :func:`clear` method, which is availa
 If I look to my Redis, key ``fe267c1dde5d4f648e7bac836a0168fe`` completely disappeared.
 
 .. note::
-    If you provide your own key string, collection will be successfully created. If there is no key corresponding in Redis, it will be created and initialized as an empty collection. This means you can set up your own way of assigning unique keys dependent on your other code. For example, by using IDs of records from your relational database you can have exactly one unique collection in Redis for every record from your SQL storage.
+    If you provide your own key string, a collection will be successfully created. If there is no key corresponding in Redis, it will be created and initialized as an empty collection. This means you can set up your own way of assigning unique keys dependent on your other code. For example, by using IDs of records from your relational database you can have exactly one unique collection in Redis for every record from your SQL storage.
 
 Redis Connection
 ----------------
 
-By default, collection uses a new Redis connection with its default values, **which is highly inefficient, but needs no configuration**. If you wish to use your own :class:`Redis` instance, pass it in ``redis`` keyword argument::
+By default, collections use a new Redis connection with its default values, **which is highly inefficient, but needs no configuration**. If you wish to use your own :class:`Redis` instance, pass it in ``redis`` keyword argument::
 
     >>> from redis import StrictRedis
     >>> r = StrictRedis()
@@ -98,7 +96,7 @@ Known issues
     This can lead to some incompatibilities with Python's ``dict`` - see `issue 25 <https://github.com/honzajavorek/redis-collections/issues/25>`_.
 
 *   Storing a mutable object (like a ``dict``, ``list``, or ``set``) in a ``Dict`` can lead to surprising behavior.
-    If you retrieve the object and then modify it you must explicitly store it again for changes to persist - see `issue 26 <https://github.com/honzajavorek/redis-collections/issues/25>`_.
+    If you retrieve the object and then modify it you must either explicitly store it again for changes to persist, or use the `sync` method.
 
 *   Support for Python 3 is in progress. Please `report <https://github.com/honzajavorek/redis-collections/issues>`_ any issues you find.
 
@@ -141,6 +139,10 @@ Redis Collections are composed of only several classes. All items listed below a
     :special-members:
 
 .. autoclass:: Counter
+    :members:
+    :special-members:
+
+.. autoclass:: DefaultDict
     :members:
     :special-members:
 
