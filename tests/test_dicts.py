@@ -8,7 +8,7 @@ import unittest
 
 import six
 
-from redis_collections import Dict, Counter
+from redis_collections import DefaultDict, Dict, Counter
 
 from .base import RedisTestCase
 
@@ -266,6 +266,107 @@ class DictTest(RedisTestCase):
             d['h'] = ff
             self.assertEqual(d.get('h', 'wrong'), ff)
 
+    def test_mutable(self):
+        redis_plain = self.create_dict()
+        redis_cached = self.create_dict(writeback=True)
+        python_dict = {}
+
+        # Create a mutable entry and then modify it
+        for D in (redis_plain, redis_cached, python_dict):
+            D['list'] = [1]
+            D['list'].append(2)
+
+            D['set'] = {1}
+            D['set'].add(2)
+
+            D['dict'] = {1: 'one'}
+            D['dict'][2] = 'two'
+
+        # The Redis Dict with writeback=False won't have made the updates
+        self.assertNotEqual(redis_plain['list'], python_dict['list'])
+        self.assertNotEqual(redis_plain['set'], python_dict['set'])
+        self.assertNotEqual(redis_plain['dict'], python_dict['dict'])
+
+        # The Redis dict with writeback=True will have made the updates
+        self.assertEqual(redis_cached['list'], python_dict['list'])
+        self.assertEqual(redis_cached['set'], python_dict['set'])
+        self.assertEqual(redis_cached['dict'], python_dict['dict'])
+
+    def test_cache(self):
+        redis_cached = self.create_dict(writeback=True)
+
+        # Setting a key should add it to both the cache and to Redis
+        redis_cached['key_1'] = [1]
+        self.assertIn('key_1', redis_cached.cache)
+        self.assertIn('key_1', redis_cached._data())
+
+        # The mutated value should be reflected in items, values
+        redis_cached['key_1'].append(2)
+        self.assertEqual(redis_cached.items(), [('key_1', [1, 2])])
+        self.assertEqual(redis_cached.values(), [([1, 2])])
+
+        # sync-ing should push changes to Redis and clear the cache
+        self.assertEqual(redis_cached._data()['key_1'], [1])
+        redis_cached.sync()
+        self.assertEqual(redis_cached._data()['key_1'], [1, 2])
+        self.assertEqual(redis_cached.cache, {})
+
+        # Deleting a key should delete it from both the cache and Redis
+        redis_cached['key_2'] = [2]
+        del redis_cached['key_2']
+        self.assertNotIn('key_2', redis_cached.cache)
+        self.assertNotIn('key_2', redis_cached._data())
+
+        # Popping a key should delete it from both the cache and Redis
+        redis_cached['key_3'] = [3]
+        redis_cached['key_3'].append(4)
+        self.assertEqual(redis_cached.pop('key_3'), [3, 4])
+        self.assertNotIn('key_3', redis_cached.cache)
+        self.assertNotIn('key_3', redis_cached._data())
+
+        # Doing popitem should delete the item from both the cache and Redis
+        redis_cached.clear()
+        redis_cached['key_4'] = [4]
+        redis_cached['key_4'].append(5)
+        self.assertEqual(redis_cached.popitem(), ('key_4', [4, 5]))
+        self.assertNotIn('key_4', redis_cached.cache)
+        self.assertNotIn('key_4', redis_cached._data())
+
+        # setdefault should reflect changes to mutable objects
+        redis_cached['key_5'] = [5]
+        redis_cached['key_5'].append(6)
+        self.assertEqual(redis_cached.setdefault('key_5'), [5, 6])
+        self.assertIn('key_5', redis_cached.cache)
+        self.assertIn('key_5', redis_cached._data())
+
+        self.assertEqual(redis_cached.setdefault('key_6', [6, 7]), [6, 7])
+        self.assertIn('key_6', redis_cached.cache)
+        self.assertIn('key_6', redis_cached._data())
+
+        # update should update both the cache and Redis
+        redis_cached.clear()
+        redis_cached['key_7'] = [7]
+        redis_cached.update({'key_7': [7, 8, 9], 'key_8': [9]})
+        self.assertEqual(redis_cached._data()['key_7'], [7, 8, 9])
+        self.assertEqual(redis_cached.cache['key_7'], [7, 8, 9])
+
+    def test_with(self):
+        with self.create_dict() as D:
+            # Writeback set
+            self.assertTrue(D.writeback)
+
+            # Store a mutable value, modify it, and retrieve it - changes
+            # should be reflected
+            D['key'] = [1]
+            D['key'].append(2)
+            self.assertEqual(D['key'], [1, 2])
+
+            # Changes are not in Redis yet
+            self.assertEqual(D._data()['key'], [1])
+
+        # Closing the context manager syncs to Redis
+        self.assertEqual(D._data()['key'], [1, 2])
+
 
 class CounterTest(RedisTestCase):
 
@@ -278,6 +379,10 @@ class CounterTest(RedisTestCase):
             c = init()
             c['a'] = 5
             self.assertEqual(c['a'], 5)
+
+            # For whatever reason Python counters accept non-int values
+            c['not integer'] = 'in fact string'
+            self.assertEqual(c['not integer'], 'in fact string')
 
     def test_init(self):
         for init in (self.create_counter, collections.Counter):
@@ -376,6 +481,14 @@ class CounterTest(RedisTestCase):
             c = init('abbccc')
             c.update(['a', 'a', 'b', 'b'], c=2)
             self.assertEqual(sorted(c.items()), expected_result)
+
+        # Writeback enabled
+        c = self.create_counter(writeback=True)
+        c[('tuple', 'key')] = 1
+        self.assertIn(('tuple', 'key'), c._data())
+        self.assertIn(('tuple', 'key'), c.cache)
+        c.update({('tuple', 'key'): 2})
+        self.assertEqual(c[('tuple', 'key')], 2)
 
     def _test_op(self, op):
         redis_counter = self.create_counter('abbccc')
@@ -503,6 +616,81 @@ class CounterTest(RedisTestCase):
             python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
 
             self.assertEqual(-redis_counter, -python_counter)
+
+
+class DefaultDictTest(RedisTestCase):
+
+    def create_ddict(self, *args, **kwargs):
+        kwargs['redis'] = self.redis
+        return DefaultDict(*args, **kwargs)
+
+    def test_init(self):
+        for init in (self.create_ddict, collections.defaultdict):
+            # None is an OK default_factory
+            D = init()
+            self.assertIsNone(D.default_factory)
+
+            # A non-callable is not
+            with self.assertRaises(TypeError):
+                D = init('not callable')
+
+            # Callables are OK
+            D = init(int, {1: 2, 3: 4})
+            self.assertEqual(D.default_factory, int)
+            self.assertEqual(D[1], 2)
+            self.assertEqual(D[3], 4)
+
+        # Writeback is on for defaultdict
+        D_1 = self.create_ddict()
+        self.assertTrue(D_1.writeback)
+
+        # Keywords are passed through
+        D_2 = self.create_ddict(key=D_1.key)
+        self.assertEqual(D_1.key, D_2.key)
+
+    def test_None(self):
+        # None is a special case - any misses get a KeyError
+        for init in (self.create_ddict, collections.defaultdict):
+            D = init()
+            with self.assertRaises(KeyError):
+                D['key']
+            D['key'] = 1
+            self.assertEqual(D['key'], 1)
+
+    def test_set_get(self):
+        redis_ddict = self.create_ddict(int)
+        python_ddict = collections.defaultdict(int)
+
+        self.assertEqual(redis_ddict['key_1'], python_ddict['key_1'])
+        redis_ddict['key_1'] += 1
+        python_ddict['key_1'] += 1
+        self.assertEqual(redis_ddict['key_1'], python_ddict['key_1'])
+
+        # Normal setting and getting should work too
+        redis_ddict['key_1'] = 2
+        python_ddict['key_1'] = 2
+        self.assertEqual(redis_ddict['key_1'], python_ddict['key_1'])
+
+    def test_with(self):
+        with self.create_ddict(lambda: set()) as D:
+            # Store a mutable value, modify it, and retrieve it - changes
+            # should be reflected
+            D['key'].add(1)
+            D['key'].add(2)
+            self.assertEqual(D['key'], {1, 2})
+
+            # Changes are not in Redis yet
+            self.assertEqual(D._data()['key'], set())
+
+        # Closing the context manager syncs to Redis
+        self.assertEqual(D._data()['key'], {1, 2})
+
+    def test_copy(self):
+        redis_ddict = self.create_ddict(lambda: 1)
+        redis_copy = redis_ddict.copy()
+        self.assertEqual(
+            redis_ddict.default_factory, redis_copy.default_factory
+        )
 
 if __name__ == '__main__':
     unittest.main()

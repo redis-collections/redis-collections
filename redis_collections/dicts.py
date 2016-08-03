@@ -65,7 +65,11 @@ class Dict(RedisCollection, collections.MutableMapping):
             initialization syntax: ``d = Dict(a=1, b=2)``
         """
         data = args[0] if args else kwargs.pop('data', None)
+        writeback = kwargs.pop('writeback', False)
         super(Dict, self).__init__(*args, **kwargs)
+
+        self.writeback = writeback
+        self.cache = {}
 
         if data:
             self.update(data)
@@ -121,16 +125,20 @@ class Dict(RedisCollection, collections.MutableMapping):
         then returns or raises whatever is returned or raised by
         the ``__missing__(key)`` call if the key is not present.
         """
-        key_hash, D = self._get_hash_dict(key, self.redis)
-
         try:
-            value = D[key]
+            value = self.cache[key]
         except KeyError:
-            if hasattr(self, '__missing__'):
-                return self.__missing__(key)
-            else:
-                raise
+            key_hash, D = self._get_hash_dict(key, self.redis)
+            try:
+                value = D[key]
+            except KeyError:
+                if hasattr(self, '__missing__'):
+                    return self.__missing__(key)
+                else:
+                    raise
 
+        if self.writeback:
+            self.cache[key] = value
         return value
 
     def __setitem__(self, key, value):
@@ -139,6 +147,8 @@ class Dict(RedisCollection, collections.MutableMapping):
         D[key] = value
 
         self.redis.hset(self.key, key_hash, self._pickle(D))
+        if self.writeback:
+            self.cache[key] = value
 
     def __delitem__(self, key):
         """Remove ``d[key]`` from dictionary.
@@ -151,6 +161,11 @@ class Dict(RedisCollection, collections.MutableMapping):
             self.redis.hset(self.key, key_hash, self._pickle(D))
         else:
             self.redis.hdel(self.key, key_hash)
+
+        try:
+            del self.cache[key]
+        except KeyError:
+            pass
 
     def _data(self, pipe=None):
         """Returns a Python dictionary with the same values as this object"""
@@ -170,7 +185,10 @@ class Dict(RedisCollection, collections.MutableMapping):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
         for D in six.itervalues(self.redis.hgetall(self.key)):
             for k, v in six.iteritems(self._unpickle(D)):
-                yield k, v
+                try:
+                    yield k, self.cache[k]
+                except KeyError:
+                    yield k, v
 
     def keys(self):
         """Return a copy of the dictionary's list of keys."""
@@ -196,7 +214,10 @@ class Dict(RedisCollection, collections.MutableMapping):
         """Return an iterator over the dictionary's values."""
         for D in six.itervalues(self.redis.hgetall(self.key)):
             for k, v in six.iteritems(self._unpickle(D)):
-                yield v
+                try:
+                    yield self.cache[k]
+                except KeyError:
+                    yield v
 
     def pop(self, key, default=__marker):
         """If *key* is in the dictionary, remove it and return its value,
@@ -216,6 +237,13 @@ class Dict(RedisCollection, collections.MutableMapping):
             return value
 
         value = self._transaction(pop_trans)
+        try:
+            value = self.cache[key]
+        except KeyError:
+            pass
+        else:
+            del self.cache[key]
+
         if value is self.__marker:
             raise KeyError(key)
 
@@ -248,7 +276,14 @@ class Dict(RedisCollection, collections.MutableMapping):
             return item
 
         key, value = self._transaction(popitem_trans)
-        return key, value
+        try:
+            item = key, self.cache[key]
+        except KeyError:
+            item = key, value
+        else:
+            del self.cache[key]
+
+        return item
 
     def setdefault(self, key, default=None):
         """If *key* is in the dictionary, return its value.
@@ -263,7 +298,13 @@ class Dict(RedisCollection, collections.MutableMapping):
 
             return value
 
-        value = self._transaction(setdefault_trans)
+        try:
+            value = self.cache[key]
+        except KeyError:
+            value = self._transaction(setdefault_trans)
+
+        if self.writeback:
+            self.cache[key] = value
         return value
 
     def _update_helper(self, other, use_redis=False):
@@ -285,6 +326,9 @@ class Dict(RedisCollection, collections.MutableMapping):
             pipe.multi()
             for key_hash, D in six.iteritems(D_load):
                 pipe.hset(self.key, key_hash, self._pickle(D))
+
+            if self.writeback:
+                self.cache.update(data)
 
         if use_redis:
             self._transaction(_update_helper_trans, other.key)
@@ -320,6 +364,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def clear(self):
         self.redis.delete(self.key)
+        self.cache.clear()
 
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):
@@ -337,6 +382,28 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def _repr_data(self, data):
         return repr(dict(data))
+
+    def __enter__(self):
+        self.writeback = True
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.sync()
+
+    def sync(self):
+        def sync_trans(pipe):
+            D_load = {}
+            for key, value in six.iteritems(self.cache):
+                key_hash = hash(key)
+                D_load.setdefault(key_hash, {})
+                D_load[key_hash][key] = value
+
+            pipe.multi()
+            for key_hash, D in six.iteritems(D_load):
+                pipe.hset(self.key, key_hash, self._pickle(D))
+
+        self._transaction(sync_trans)
+        self.cache = {}
 
 
 class Counter(Dict):
@@ -430,6 +497,9 @@ class Counter(Dict):
             pipe.multi()
             for key_hash, D in six.iteritems(D_load):
                 pipe.hset(self.key, key_hash, self._pickle(D))
+
+            if self.writeback:
+                self.cache.update(data)
 
         if use_redis:
             self._transaction(_update_helper_trans, other.key)
@@ -577,3 +647,76 @@ class Counter(Dict):
 
         def __neg__(self):
             return self._op_helper(None, operator.neg)
+
+
+class DefaultDict(Dict):
+    """Mutable **mapping** collection aiming to have the same API as
+    :class:`collections.defaultdict`. See
+    `defaultdict  <https://docs.python.org/2/library/collections.html`_ for
+    further details. The Redis implementation is based on the
+    `hash <http://redis.io/commands#hash>`_ type.
+
+    .. warning::
+        Note that this :class:`DefaultDict` does not implement
+        methods :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues`,
+        which are available in Python 2.7's version.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Breakes the original :class:`defaultdict` API, because there is no
+        support for keyword syntax. The only single way to create
+        :class:`defaultdict` object is to pass an iterable or mapping as the
+        second argument.
+
+        :param default_factory: Used to provide default values for missing
+                                keys.
+        :type default_factory: callable or None
+        :param data: Initial data.
+        :type data: iterable or mapping
+        :param redis: Redis client instance. If not provided, default Redis
+                      connection is used.
+        :type redis: :class:`redis.StrictRedis`
+        :param key: Redis key of the collection. Collections with the same key
+                    point to the same data. If not provided, default random
+                    string is generated.
+        :type key: str
+
+        .. note::
+            :func:`uuid.uuid4` is used for default key generation.
+            If you are not satisfied with its `collision
+            probability <http://stackoverflow.com/a/786541/325365>`_,
+            make your own implementation by subclassing and overriding
+            internal method :func:`_create_key`.
+
+        .. warning::
+            As mentioned, :class:`DefaultDict` does not support following
+            initialization syntax: ``d = DefaultDict(None, a=1, b=2)``
+        """
+        kwargs.setdefault('writeback', True)
+        if args:
+            default_factory = args[0]
+            args = args[1:]
+        else:
+            default_factory = None
+
+        super(DefaultDict, self).__init__(*args, **kwargs)
+
+        if default_factory is None:
+            pass
+        elif not callable(default_factory):
+            raise TypeError('first argument must be callable or None')
+        self.default_factory = default_factory
+
+    def __missing__(self, key):
+        if self.default_factory is None:
+            raise KeyError(key)
+
+        value = self.default_factory()
+        self[key] = value
+        return value
+
+    def copy(self, **kwargs):
+        other = self.__class__(self.default_factory, **kwargs)
+        other.update(self)
+
+        return other
