@@ -4,6 +4,8 @@ from __future__ import division, print_function, unicode_literals
 
 import unittest
 
+import six
+
 from redis_collections import List
 
 from .base import RedisTestCase
@@ -27,7 +29,10 @@ class ListTest(RedisTestCase):
 
             # List from bytes
             L = init(b'abc')
-            self.assertEqual(list(L), [ord('a'), ord('b'), ord('c')])
+            if six.PY2:
+                self.assertEqual(list(L), [b'a', b'b', b'c'])
+            else:
+                self.assertEqual(list(L), [ord('a'), ord('b'), ord('c')])
 
             # Empty list
             L = init()
