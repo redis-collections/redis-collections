@@ -83,6 +83,33 @@ always use the same Redis connection as the original object::
     >>> l + [4, 5, 6]  # result is using the same connection
     <redis_collections.List at 7790ef98639043c9abeacc80c2de0b93 [1, 2, 4, 5, 6]>
 
+Synchronization
+---------------
+Storing a mutable object like a ``list`` in a ``Dict`` can lead to surprising behavior.
+Because of Python semantics, it's impossible to automatically write to Redis when such an object is retrieved and modified.
+
+    >>> d = Dict({'key': [1, 2]})  # Store a mutable object
+    >>> d['key'].append(3)  # Retrieve and modify the object
+    >>> d['key']  # Retrieve the object from Redis again
+    [1, 2]
+
+To work with such objects you may use a ``Dict`` with ``writeback`` enabled. This will keep a local cache that is flushed to Redis when the ``sync`` method is called.
+
+    >>> d = Dict({'key': [1, 2]}, writeback=True)
+    >>> d['key'].append(3)
+    >>> d['key']  # Modifications are retrieved from the cache
+    [1, 2, 3]  
+    >>> d.sync()  # Flush cache to Redis
+
+You may also use a ``with`` block to automatically call the ``sync`` method.
+
+    >>> with Dict({'key': [1, 2]}) as d:
+    ...     d['key'].append(3)
+    >>> d['key']  # Changes were automatically synced
+    [1, 2, 3]
+
+The ``writeback`` option is automatically enabled for ``DefaultDict`` objects.
+
 Pickling
 --------
 
@@ -92,11 +119,7 @@ Using other serializers may limit the objects you can store or retrieve.
 Known issues
 ------------
 
-*   For ``Dict`` and its subclasses, keys are currently coerced to string types when retrieved.
-    This can lead to some incompatibilities with Python's ``dict`` - see `issue 25 <https://github.com/honzajavorek/redis-collections/issues/25>`_.
-
-*   Storing a mutable object (like a ``dict``, ``list``, or ``set``) in a ``Dict`` can lead to surprising behavior.
-    If you retrieve the object and then modify it you must either explicitly store it again for changes to persist, or use the `sync` method.
+*   Storing objects that have the same hash (such as the float ``1.0`` and the int ``1``) in a ``Set`` can lead to surprising behavior. They can both be retrieved, unlike with a native Python ``set``. See `issue 49 <https://github.com/honzajavorek/redis-collections/issues/49>`_.
 
 *   Support for Python 3 is in progress. Please `report <https://github.com/honzajavorek/redis-collections/issues>`_ any issues you find.
 
