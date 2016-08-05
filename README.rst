@@ -5,6 +5,10 @@ Redis Collections
 .. image:: https://travis-ci.org/honzajavorek/redis-collections.svg
    :target: https://travis-ci.org/honzajavorek/redis-collections
 
+.. image:: https://coveralls.io/repos/github/honzajavorek/redis-collections/badge.svg?branch=master
+   :target: https://coveralls.io/github/honzajavorek/redis-collections?branch=master
+
+
 Set of basic Python collections backed by Redis.
 
 Installation
