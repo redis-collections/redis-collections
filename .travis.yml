@@ -25,5 +25,8 @@ deploy:
     tags: true
     repo: "honzajavorek/redis-collections"
 
+notifications:
+  email: false
+
 after_success:
     - "coveralls"
