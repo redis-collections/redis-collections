@@ -9,6 +9,8 @@ from __future__ import division, print_function, unicode_literals
 
 import collections
 
+import six
+
 from .base import RedisCollection
 
 
@@ -42,6 +44,10 @@ class List(RedisCollection, collections.MutableSequence):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
+        :param writeback: If ``True`` keep a local cache of changes for storing
+                          modifications to mutable values. Changes will be
+                          written to Redis after calling the ``sync`` method.
+        :type key: bool
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.
@@ -50,7 +56,14 @@ class List(RedisCollection, collections.MutableSequence):
             make your own implementation by subclassing and overriding
             internal method :func:`_create_key`.
         """
+        writeback = kwargs.pop('writeback', False)
         super(List, self).__init__(*args, **kwargs)
+
+        self.writeback = writeback
+        self.cache = {}
+
+    def _get_cache_index(self, index):
+        return index if index >= 0 else self.__len__() + index
 
     def __len__(self):
         """Length of the sequence."""
@@ -63,12 +76,11 @@ class List(RedisCollection, collections.MutableSequence):
 
     def __iter__(self):
         """Return an iterator over the sequence."""
-        return self._data()
+        return (self.cache.get(i, x) for i, x in enumerate(self._data()))
 
     def __reversed__(self):
         """Returns iterator for the sequence in reversed order."""
-        values = self.redis.lrange(self.key, 0, -1)
-        return (self._unpickle(v) for v in reversed(values))
+        return reversed(list(self._data()))
 
     def _recalc_slice(self, start, stop):
         """Slicing in Redis takes also the item at 'stop' index, so there is
@@ -104,14 +116,21 @@ class List(RedisCollection, collections.MutableSequence):
             if calc_start == index.stop:
                 return []
 
-            values = pipe.lrange(self.key, calc_start, calc_stop)
-            values = [self._unpickle(x) for x in values]
+            values = []
+            redis_values = pipe.lrange(self.key, calc_start, calc_stop)
+            for i, v in enumerate(redis_values, index.start or 0):
+                values.append(self.cache.get(i, self._unpickle(v)))
+
             pipe.multi()
             return self._create_new(values, pipe=pipe)
 
         # Otherwise we'll need to pull the whole list and slice in Python
         def step_trans(pipe):
-            values = [self._unpickle(x) for x in pipe.lrange(self.key, 0, -1)]
+            values = []
+            redis_values = pipe.lrange(self.key, 0, -1)
+            for i, v in enumerate(redis_values):
+                values.append(self.cache.get(i, self._unpickle(v)))
+
             values = values[index.start:index.stop:index.step]
             pipe.multi()
             return self._create_new(values, pipe=pipe)
@@ -132,14 +151,23 @@ class List(RedisCollection, collections.MutableSequence):
         if isinstance(index, slice):
             return self._get_slice(index)
 
+        if self.writeback:
+            cache_index = self._get_cache_index(index)
+            if cache_index in self.cache:
+                return self.cache[cache_index]
+
         with self.redis.pipeline() as pipe:
             pipe.llen(self.key)
             pipe.lindex(self.key, index)
-            size, value = pipe.execute()
+            size, pickled_value = pipe.execute()
 
         if self._calc_overflow(size, index):
             raise IndexError(index)
-        return self._unpickle(value)
+
+        value = self._unpickle(pickled_value)
+        if self.writeback:
+            self.cache[cache_index] = value
+        return value
 
     def get(self, index, default=None):
         """Return the value for *index* if *index* is not out of range, else
@@ -151,8 +179,17 @@ class List(RedisCollection, collections.MutableSequence):
             items is more efficient than classic approach over using the
             :func:`__getitem__` protocol.
         """
-        value = self.redis.lindex(self.key, index)
-        return self._unpickle(value) or default
+        if self.writeback:
+            cache_index = self._get_cache_index(index)
+            if cache_index in self.cache:
+                return self.cache[cache_index]
+
+        pickled_value = self.redis.lindex(self.key, index)
+
+        value = self._unpickle(pickled_value)
+        if self.writeback:
+            self.cache[cache_index] = value
+        return value
 
     def _set_slice(self, index, value):
         """Helper for setting a slice."""
@@ -161,6 +198,7 @@ class List(RedisCollection, collections.MutableSequence):
         if value:
             # assigning anything else than empty lists not supported
             raise NotImplementedError(self.not_impl_msg)
+
         self.__delitem__(index)
 
     def __setitem__(self, index, value):
@@ -175,16 +213,20 @@ class List(RedisCollection, collections.MutableSequence):
                 l[:] = []
         """
         if isinstance(index, slice):
-            self._set_slice(index, value)
-        else:
-            def set_trans(pipe):
-                size = pipe.llen(self.key)
-                if self._calc_overflow(size, index):
-                    raise IndexError(index)
-                pipe.multi()
-                pipe.lset(self.key, index, self._pickle(value))
+            return self._set_slice(index, value)
 
-            self._transaction(set_trans)
+        def set_trans(pipe):
+            size = pipe.llen(self.key)
+            if self._calc_overflow(size, index):
+                raise IndexError(index)
+            pipe.multi()
+            pipe.lset(self.key, index, self._pickle(value))
+
+        self._transaction(set_trans)
+
+        if self.writeback:
+            cache_index = self._get_cache_index(index)
+            self.cache[cache_index] = value
 
     def _del_slice(self, index):
         """Helper for deleting a slice."""
@@ -202,9 +244,12 @@ class List(RedisCollection, collections.MutableSequence):
         if start == begin and stop == end:
             # trim from beginning to end
             self.clear()
+            self.cache.clear()
             return
 
         with self.redis.pipeline() as pipe:
+            if self.writeback:
+                self._sync_helper(pipe)
             if start != begin and stop == end:
                 # right trim
                 pipe.ltrim(self.key, begin, start - 1)
@@ -230,19 +275,42 @@ class List(RedisCollection, collections.MutableSequence):
         begin = 0
         end = -1
 
+        # Calculate the cache index before the length changes
+        if self.writeback:
+            cache_index = self._get_cache_index(index)
+
         if isinstance(index, slice):
-            self._del_slice(index)
+            return self._del_slice(index)
+
+        if index == begin:
+            self.redis.lpop(self.key)
+        elif index == end:
+            self.redis.rpop(self.key)
         else:
-            if index == begin:
-                self.redis.lpop(self.key)
-            elif index == end:
-                self.redis.rpop(self.key)
-            else:
-                raise NotImplementedError(self.not_impl_msg)
+            raise NotImplementedError(self.not_impl_msg)
+
+        # Removing an item from the list means all the other items after it
+        # have to shift back one - reflect that in the cache
+        if self.writeback:
+            new_cache = {}
+            for k, v in six.iteritems(self.cache):
+                if k < cache_index:
+                    new_cache[k] = v
+                elif k == cache_index:
+                    pass
+                elif k > cache_index:
+                    new_cache[k - 1] = v
+
+            self.cache = new_cache
 
     def remove(self, value):
         """Remove the first occurence of *value*."""
-        self.redis.lrem(self.key, 1, self._pickle(value))
+        # If we're caching, we'll need to synchronize before removing.
+        with self.redis.pipeline() as pipe:
+            if self.writeback:
+                self._sync_helper(pipe)
+            pipe.lrem(self.key, 1, self._pickle(value))
+            pipe.execute()
 
     def index(self, value, start=None, stop=None):
         """Returns index of the first occurence of *value*.
@@ -250,6 +318,14 @@ class List(RedisCollection, collections.MutableSequence):
         If *start* or *stop* are provided, returns the smallest
         index such that ``s[index] == value`` and ``start <= index < stop``.
         """
+        for k, v in six.iteritems(self.cache):
+            if v == value:
+                if start is not None and k < start:
+                    continue
+                if stop is not None and k >= stop:
+                    break
+                return k
+
         start, stop = self._recalc_slice(start, stop)
         values = self.redis.lrange(self.key, start, stop)
 
@@ -264,7 +340,13 @@ class List(RedisCollection, collections.MutableSequence):
         .. note::
             Implemented only on Python side.
         """
-        return list(self._data()).count(value)
+        ret = 0
+        for k, v in enumerate(self._data()):
+            v = self.cache.get(k, v)
+            if v == value:
+                ret += 1
+
+        return ret
 
     def insert(self, index, value):
         """Insert *value* before *index*. Can only work with index == 0.
@@ -276,17 +358,25 @@ class List(RedisCollection, collections.MutableSequence):
 
         self.redis.lpush(self.key, self._pickle(value))
 
+        if self.writeback:
+            new_cache = {k + 1: v for k, v in six.iteritems(self.cache)}
+            new_cache[0] = value
+            self.cache = new_cache
+
     def append(self, value):
         """Insert *value* at end of list.
         """
-        self.redis.rpush(self.key, self._pickle(value))
+        i = self.redis.rpush(self.key, self._pickle(value))
+
+        if self.writeback:
+            self.cache[i - 1] = value
 
     def _update(self, data, pipe=None):
         super(List, self)._update(data, pipe)
         redis = pipe if pipe is not None else self.redis
 
         values = [self._pickle(x) for x in data]
-        redis.rpush(self.key, *values)
+        return redis.rpush(self.key, *values)
 
     def extend(self, values):
         """*values* are appended at the end of the list. Any iterable
@@ -297,10 +387,14 @@ class List(RedisCollection, collections.MutableSequence):
             def extend_trans(pipe):
                 d = values._data(pipe=pipe)  # retrieve
                 pipe.multi()
-                self._update(d, pipe=pipe)  # store
-            self._transaction(extend_trans)
+                return self._update(d, pipe=pipe)  # store
+            new_len = self._transaction(extend_trans)
         else:
-            self._update(values)
+            new_len = self._update(values)
+
+        if self.writeback:
+            for k, v in enumerate(values, new_len - len(values)):
+                self.cache[k] = v
 
     def pop(self, index=-1):
         """Item on *index* is removed and returned.
@@ -309,19 +403,41 @@ class List(RedisCollection, collections.MutableSequence):
             Only indexes ``0`` and ``-1`` (default) are supported, otherwise
             :exc:`NotImplementedError` is raised.
         """
+        # Calculate the cache index before the length changes
+        if self.writeback:
+            cache_index = self._get_cache_index(index)
+
         if index == 0:
-            value = self.redis.lpop(self.key)
+            value = self._unpickle(self.redis.lpop(self.key))
         elif index == -1:
-            value = self.redis.rpop(self.key)
+            value = self._unpickle(self.redis.rpop(self.key))
         else:
             raise NotImplementedError(self.not_impl_msg)
-        return self._unpickle(value)
+
+        # Removing an item from the list means all the other items after it
+        # have to shift back one - reflect that in the cache
+        if self.writeback:
+            new_cache = {}
+            for k, v in six.iteritems(self.cache):
+                if k < cache_index:
+                    new_cache[k] = v
+                elif k == cache_index:
+                    value = v
+                elif k > cache_index:
+                    new_cache[k - 1] = v
+
+            self.cache = new_cache
+
+        return value
 
     def __add__(self, values):
         """Returns concatenation of the list and given iterable. New
         :class:`List` instance is returned.
         """
         def add_trans(pipe):
+            if self.writeback:
+                self._sync_helper(pipe)
+
             d1 = list(self._data(pipe=pipe))  # retrieve
 
             if isinstance(values, RedisCollection):
@@ -344,6 +460,9 @@ class List(RedisCollection, collections.MutableSequence):
             raise TypeError('Cannot multiply sequence by non-int.')
 
         def mul_trans(pipe):
+            if self.writeback:
+                self._sync_helper(pipe)
+
             data = list(self._data(pipe=pipe))  # retrieve
             pipe.multi()
             return self._create_new(data * n, pipe=pipe)  # store
@@ -354,3 +473,23 @@ class List(RedisCollection, collections.MutableSequence):
 
     def _repr_data(self, data):
         return repr(list(data))
+
+    def __enter__(self):
+        self.writeback = True
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.sync()
+
+    def _sync_helper(self, pipe):
+        for k, v in six.iteritems(self.cache):
+            pipe.lset(self.key, k, self._pickle(v))
+
+        self.cache = {}
+
+    def sync(self):
+        def sync_trans(pipe):
+            pipe.multi()
+            self._sync_helper(pipe)
+
+        self._transaction(sync_trans)

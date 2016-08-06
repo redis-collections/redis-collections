@@ -52,6 +52,10 @@ class Dict(RedisCollection, collections.MutableMapping):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
+        :param writeback: If ``True`` keep a local cache of changes for storing
+                          modifications to mutable values. Changes will be
+                          written to Redis after calling the ``sync`` method.
+        :type key: bool
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.
