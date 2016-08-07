@@ -226,6 +226,12 @@ class ListTest(RedisTestCase):
         python_list[0]['one'] = 2
 
         self.assertEqual(redis_cached[0], python_list[0])
+        self.assertEqual(
+            list(redis_cached), list(python_list)
+        )
+        self.assertEqual(
+            list(reversed(redis_cached)), list(reversed(python_list))
+        )
 
         # Changes are not reflected in Redis until after sync
         self.assertNotEqual(list(redis_cached._data())[0], python_list[0])

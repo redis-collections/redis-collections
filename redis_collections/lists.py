@@ -80,7 +80,7 @@ class List(RedisCollection, collections.MutableSequence):
 
     def __reversed__(self):
         """Returns iterator for the sequence in reversed order."""
-        return reversed(list(self._data()))
+        return reversed(list(self.__iter__()))
 
     def _recalc_slice(self, start, stop):
         """Slicing in Redis takes also the item at 'stop' index, so there is
