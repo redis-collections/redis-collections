@@ -185,8 +185,11 @@ class List(RedisCollection, collections.MutableSequence):
                 return self.cache[cache_index]
 
         pickled_value = self.redis.lindex(self.key, index)
+        if pickled_value is None:
+            value = default
+        else:
+            value = self._unpickle(pickled_value)
 
-        value = self._unpickle(pickled_value)
         if self.writeback:
             self.cache[cache_index] = value
         return value

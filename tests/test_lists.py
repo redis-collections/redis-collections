@@ -64,7 +64,8 @@ class ListTest(RedisTestCase):
         with self.assertRaises(IndexError):
             L[42] = 4
 
-        self.assertEqual(L.get(42), None)
+        self.assertIsNone(L.get(42))
+        self.assertEqual(L.get(42, 'MISSING'), 'MISSING')
         self.assertEqual(L.get(1), 2)
 
     def test_index_count(self):

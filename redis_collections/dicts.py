@@ -98,9 +98,12 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         return ret
 
-    def __iter__(self):
+    def __iter__(self, pipe=None):
         """Return an iterator over the keys of the dictionary."""
-        return self.iterkeys()
+        pipe = pipe or self.redis
+        for D in six.itervalues(pipe.hgetall(self.key)):
+            for k in six.iterkeys(self._unpickle(D)):
+                yield k
 
     def __contains__(self, key):
         """Return ``True`` if *key* is present, else ``False``."""
