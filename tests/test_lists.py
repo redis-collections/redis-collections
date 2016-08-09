@@ -64,7 +64,8 @@ class ListTest(RedisTestCase):
         with self.assertRaises(IndexError):
             L[42] = 4
 
-        self.assertEqual(L.get(42), None)
+        self.assertIsNone(L.get(42))
+        self.assertEqual(L.get(42, 'MISSING'), 'MISSING')
         self.assertEqual(L.get(1), 2)
 
     def test_index_count(self):
@@ -133,7 +134,7 @@ class ListTest(RedisTestCase):
 
             self.assertEqual(len(init([])), 0)
 
-    def test_mutable(self):
+    def test_modify(self):
         for init in (self.create_list, list):
             L = init([1, 2, 3])
             L[2] = 42
@@ -163,6 +164,9 @@ class ListTest(RedisTestCase):
 
             del L[1:]
             self.assertEqual(list(L), [2013])
+
+            del L[:]
+            self.assertEqual(list(L), [])
 
     def test_extend_insert(self):
         for init in (self.create_list, list):
@@ -207,6 +211,133 @@ class ListTest(RedisTestCase):
             L.append(7)
             self.assertEqual(list(L), [6, 5, 1, 7])
 
+    def test_reversed(self):
+        for init in (self.create_list, list):
+            L = init([0, 1, 2, 3])
+            self.assertEqual(list(reversed(L)), [3, 2, 1, 0])
+
+    def test_mutable(self):
+        redis_cached = self.create_list(writeback=True)
+        python_list = []
+
+        redis_cached.append({'one': 1})
+        python_list.append({'one': 1})
+
+        redis_cached[0]['one'] = 2
+        python_list[0]['one'] = 2
+
+        self.assertEqual(redis_cached[0], python_list[0])
+        self.assertEqual(
+            list(redis_cached), list(python_list)
+        )
+        self.assertEqual(
+            list(reversed(redis_cached)), list(reversed(python_list))
+        )
+
+        # Changes are not reflected in Redis until after sync
+        self.assertNotEqual(list(redis_cached._data())[0], python_list[0])
+        redis_cached.sync()
+        self.assertEqual(list(redis_cached._data())[0], python_list[0])
+        self.assertEqual(redis_cached.cache, {})
+
+    def test_cache(self):
+        redis_cached = self.create_list(writeback=True)
+
+        # append
+        redis_cached.append([])
+        redis_cached[0].append('whartnell')
+
+        redis_cached.append([])
+        redis_cached[1].append('ptroughton')
+
+        redis_cached.append([])
+        redis_cached[2].append('jpertwee')
+
+        self.assertEqual(
+            redis_cached.cache,
+            {0: ['whartnell'], 1: ['ptroughton'], 2: ['jpertwee']}
+        )
+
+        # __iter__
+        self.assertEqual(
+            list(redis_cached),
+            [['whartnell'], ['ptroughton'], ['jpertwee']]
+        )
+
+        # __getitem__
+        self.assertEqual(redis_cached[0], ['whartnell'])
+        self.assertEqual(redis_cached[1], ['ptroughton'])
+        self.assertEqual(redis_cached[2], ['jpertwee'])
+
+        self.assertEqual(redis_cached[-3], ['whartnell'])
+        self.assertEqual(redis_cached[-2], ['ptroughton'])
+        self.assertEqual(redis_cached[-1], ['jpertwee'])
+
+        # get
+        self.assertEqual(redis_cached.get(0), ['whartnell'])
+
+        # __setitem__
+        redis_cached.append(None)
+        redis_cached[3] = ['tbaker']
+        self.assertEqual(redis_cached[3], ['tbaker'])
+
+        # __delitem__
+        del redis_cached[-1]
+        self.assertEqual(len(redis_cached), 3)
+
+        del redis_cached[0]
+        self.assertEqual(len(redis_cached), 2)
+        self.assertEqual(redis_cached.cache[0], ['ptroughton'])
+
+        # insert
+        redis_cached.insert(0, ['whartnell'])
+        self.assertEqual(len(redis_cached), 3)
+        self.assertEqual(redis_cached.cache[0], ['whartnell'])
+        self.assertEqual(redis_cached.cache[1], ['ptroughton'])
+
+        # index
+        redis_cached.append([None])
+        redis_cached.append([None])
+        redis_cached.append([None])
+        redis_cached[3][0] = 'tbaker'
+        redis_cached[4][0] = 'tbaker'
+        redis_cached[5][0] = 'pdavison'
+
+        self.assertEqual(redis_cached.index(['tbaker']), 3)
+        self.assertEqual(redis_cached.index(['tbaker'], 4), 4)
+        with self.assertRaises(ValueError):
+                redis_cached.index(['tbaker'], 0, 2)
+
+        # remove (forces sync)
+        redis_cached.remove(['tbaker'])
+        self.assertEqual(len(redis_cached), 5)
+        self.assertEqual(list(redis_cached)[3:], [['tbaker'], ['pdavison']])
+
+        # extend
+        redis_cached.extend([['cbaker'], ['smccoy'], ['pmcgann', 'jhurt']])
+        self.assertEqual(len(redis_cached), 8)
+        self.assertEqual(redis_cached[4], ['pdavison'])
+        self.assertEqual(redis_cached[5], ['cbaker'])
+        self.assertEqual(redis_cached[6], ['smccoy'])
+        self.assertEqual(redis_cached[7], ['pmcgann', 'jhurt'])
+
+        # pop
+        redis_cached.insert(0, ['morbius'])
+        self.assertEqual(redis_cached.pop(0), ['morbius'])
+        self.assertEqual(redis_cached[0], ['whartnell'])
+        self.assertEqual(len(redis_cached), 8)
+
+        redis_cached.append(['ceccleston'])
+        self.assertEqual(redis_cached.pop(), ['ceccleston'])
+        self.assertEqual(len(redis_cached), 8)
+
+    def test_with(self):
+        with self.create_list(writeback=True) as redis_cached:
+            redis_cached.append({'one': 1})
+            redis_cached[0]['one'] = 2
+            self.assertEqual(list(redis_cached._data())[0], {'one': 1})
+
+        self.assertEqual(list(redis_cached._data())[0], {'one': 2})
 
 if __name__ == '__main__':
     unittest.main()

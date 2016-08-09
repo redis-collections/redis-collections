@@ -52,6 +52,10 @@ class Dict(RedisCollection, collections.MutableMapping):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
+        :param writeback: If ``True`` keep a local cache of changes for storing
+                          modifications to mutable values. Changes will be
+                          written to Redis after calling the ``sync`` method.
+        :type key: bool
 
         .. note::
             :func:`uuid.uuid4` is used for default key generation.
@@ -94,9 +98,12 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         return ret
 
-    def __iter__(self):
+    def __iter__(self, pipe=None):
         """Return an iterator over the keys of the dictionary."""
-        return self.iterkeys()
+        pipe = pipe or self.redis
+        for D in six.itervalues(pipe.hgetall(self.key)):
+            for k in six.iterkeys(self._unpickle(D)):
+                yield k
 
     def __contains__(self, key):
         """Return ``True`` if *key* is present, else ``False``."""
