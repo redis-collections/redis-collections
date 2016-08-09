@@ -8,10 +8,11 @@ Collections based on list interface.
 from __future__ import division, print_function, unicode_literals
 
 import collections
+import itertools
+import uuid
 
 import six
 from redis import ResponseError
-import uuid
 
 from .base import RedisCollection
 
@@ -75,6 +76,32 @@ class List(RedisCollection, collections.MutableSequence):
         positive_index = index if index >= 0 else len_self + index
 
         return len_self, positive_index
+
+    def _normalize_slice(self, index, pipe=None):
+        if index.step == 0:
+            raise ValueError
+        pipe = pipe or self.redis
+
+        len_self = pipe.llen(self.key)
+
+        step = index.step or 1
+        forward = step > 0
+        step = abs(step)
+
+        if index.start is None:
+            start = 0 if forward else len_self - 1
+        else:
+            start = len_self + index.start if index.start < 0 else index.start
+
+        if index.stop is None:
+            stop = len_self if forward else -1
+        else:
+            stop = len_self + index.stop if index.stop < 0 else index.stop
+
+        if not forward:
+            start, stop = min(stop + 1, len_self), min(start + 1, len_self)
+
+        return start, stop, step, forward
 
     def _pop_left(self):
         pickled_value = self.redis.lpop(self.key)
@@ -141,15 +168,36 @@ class List(RedisCollection, collections.MutableSequence):
         else:
             self._pop_middle(index)
 
+    def _get_slice(self, index):
+        def get_slice_trans(pipe):
+            start, stop, step, forward = self._normalize_slice(index, pipe)
+            if start == stop:
+                return []
+
+            ret = []
+            redis_values = pipe.lrange(self.key, start, max(stop - 1, 0))
+            for i, v in enumerate(redis_values, start):
+                ret.append(self.cache.get(i, self._unpickle(v)))
+
+            if not forward:
+                ret = reversed(ret)
+
+            if step != 1:
+                ret = itertools.islice(ret, None, None, step)
+
+            return list(ret)
+
+        return self._transaction(get_slice_trans)
+
     def __getitem__(self, index):
         if isinstance(index, slice):
-            raise NotImplementedError
+            return self._get_slice(index)
 
         def getitem_trans(pipe):
             len_self, cache_index = self._normalize_index(index, pipe)
 
             if (cache_index < 0) or (cache_index >= len_self):
-                raise IndexError('list index out of range')
+                raise IndexError
 
             if cache_index in self.cache:
                 return cache_index, self.cache[cache_index]
@@ -189,7 +237,7 @@ class List(RedisCollection, collections.MutableSequence):
             try:
                 pipe.execute()
             except ResponseError:
-                raise IndexError('list assignment index out of range')
+                raise IndexError
 
             if self.writeback:
                 self.cache[cache_index] = value
@@ -270,7 +318,7 @@ class List(RedisCollection, collections.MutableSequence):
                     if i >= normal_stop:
                         break
                     return i
-            raise ValueError('{} is not in list'.format(value))
+            raise ValueError
 
         return self._transaction(index_trans)
 
@@ -323,7 +371,7 @@ class List(RedisCollection, collections.MutableSequence):
 
     def sync(self):
         def sync_trans(pipe):
-            # pipe.multi()
+            pipe.multi()
             self._sync_helper(pipe)
 
         self._transaction(sync_trans)
