@@ -90,18 +90,22 @@ class List(RedisCollection, collections.MutableSequence):
 
         if index.start is None:
             start = 0 if forward else len_self - 1
+        elif index.start < 0:
+            start = max(len_self + index.start, 0)
         else:
-            start = len_self + index.start if index.start < 0 else index.start
+            start = min(index.start, len_self)
 
         if index.stop is None:
             stop = len_self if forward else -1
+        elif index.stop < 0:
+            stop = max(len_self + index.stop, 0)
         else:
-            stop = len_self + index.stop if index.stop < 0 else index.stop
+            stop = min(index.stop, len_self)
 
         if not forward:
             start, stop = min(stop + 1, len_self), min(start + 1, len_self)
 
-        return start, stop, step, forward
+        return start, stop, step, forward, len_self
 
     def _pop_left(self):
         pickled_value = self.redis.lpop(self.key)
@@ -157,9 +161,37 @@ class List(RedisCollection, collections.MutableSequence):
 
         return self._transaction(pop_middle_trans)
 
+    def _del_slice(self, index):
+        def del_slice_trans(pipe):
+            start, stop, step, forward, len_self = self._normalize_slice(
+                index, pipe
+            )
+            # Empty slice: nothing to do
+            if start == stop:
+                return
+
+            # Write back the cache before making changes
+            if self.writeback:
+                self._sync_helper(pipe)
+
+            # Slice covers entire range: delete the whole list
+            if start == 0 and stop == len_self:
+                self.clear(pipe)
+            elif start == 0 and stop != len_self:
+                pipe.ltrim(self.key, stop + 1, -1)
+            elif start != 0 and stop == len_self:
+                pipe.ltrim(self.key, 0, start - 1)
+            else:
+                left_values = pipe.lrange(self.key, 0, max(start - 2, 0))
+                right_values = pipe.lrange(self.key, stop + 1, -1)
+                pipe.delete(self.key)
+                pipe.rpush(self.key, *left_values, *right_values)
+
+        return self._transaction(del_slice_trans)
+
     def __delitem__(self, index):
         if isinstance(index, slice):
-            raise NotImplementedError
+            return self._del_slice(index)
 
         if index == 0:
             self._pop_left()
@@ -170,10 +202,11 @@ class List(RedisCollection, collections.MutableSequence):
 
     def _get_slice(self, index):
         def get_slice_trans(pipe):
-            start, stop, step, forward = self._normalize_slice(index, pipe)
+            start, stop, step, forward, len_self = self._normalize_slice(
+                index, pipe
+            )
             if start == stop:
                 return []
-
             ret = []
             redis_values = pipe.lrange(self.key, start, max(stop - 1, 0))
             for i, v in enumerate(redis_values, start):
@@ -248,8 +281,9 @@ class List(RedisCollection, collections.MutableSequence):
         if self.writeback:
             self.cache[len_self - 1] = value
 
-    def clear(self, value):
-        self.redis.delete(self.key)
+    def clear(self, pipe=None):
+        pipe = pipe or self.redis
+        pipe.delete(self.key)
 
         if self.writeback:
             self.cache.clear()
