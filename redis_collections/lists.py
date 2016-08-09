@@ -76,49 +76,70 @@ class List(RedisCollection, collections.MutableSequence):
 
         return len_self, positive_index
 
+    def _pop_left(self):
+        pickled_value = self.redis.lpop(self.key)
+        if pickled_value is None:
+            raise IndexError
+        value = self.cache.get(0, self._unpickle(pickled_value))
+
+        if self.writeback:
+            items = six.iteritems(self.cache)
+            self.cache = {i - 1: v for i, v in items if i != 0}
+
+        return value
+
+    def _pop_right(self):
+        def pop_right_trans(pipe):
+            len_self, cache_index = self._normalize_index(-1, pipe)
+            if len_self == 0:
+                raise IndexError
+            pickled_value = pipe.rpop(self.key)
+            value = self._unpickle(pickled_value)
+
+            if self.writeback:
+                value = self.cache.get(cache_index, value)
+                items = six.iteritems(self.cache)
+                self.cache = {i: v for i, v in items if i != cache_index}
+
+            return value
+
+        return self._transaction(pop_right_trans)
+
+    def _pop_middle(self, index):
+        def pop_middle_trans(pipe):
+            len_self, cache_index = self._normalize_index(index, pipe)
+            if (cache_index < 0) or (cache_index >= len_self):
+                raise IndexError
+
+            value = self._unpickle(pipe.lindex(self.key, index))
+            pipe.multi()
+            pipe.lset(self.key, index, self.__marker)
+            pipe.lrem(self.key, 1, self.__marker)
+
+            if self.writeback:
+                value = self.cache.get(cache_index, value)
+                new_cache = {}
+                for i, v in six.iteritems(self.cache):
+                    if i < cache_index:
+                        new_cache[i] = v
+                    elif i > cache_index:
+                        new_cache[i - 1] = v
+                self.cache = new_cache
+
+            return value
+
+        return self._transaction(pop_middle_trans)
+
     def __delitem__(self, index):
         if isinstance(index, slice):
             raise NotImplementedError
 
-        # Easy case: remove from the left
         if index == 0:
-            self.redis.lpop(self.key)
-            if self.writeback:
-                items = six.iteritems(self.cache)
-                self.cache = {i - 1: v for i, v in items if i != 0}
-        # Slightly harder case: remove from the right
+            self._pop_left()
         elif index == -1:
-            if self.writeback:
-                def delitem_right_trans(pipe):
-                    __, cache_index = self._normalize_index(index, pipe)
-                    pipe.multi()
-                    pipe.rpop(self.key)
-                    items = six.iteritems(self.cache)
-                    self.cache = {i: v for i, v in items if i != cache_index}
-                self._transaction(delitem_right_trans)
-            else:
-                self.redis.rpop(self.key)
-        # Sort of hard case: remove from the middle.
-        # Set index to marker value, then remove the item with that value
+            self._pop_right()
         else:
-            def delitem_middle_trans(pipe):
-                if self.writeback:
-                    __, cache_index = self._normalize_index(index, pipe)
-                try:
-                    pipe.lset(self.key, index, self.__marker)
-                except ResponseError:
-                    raise IndexError('list assignment index out of range')
-                pipe.lrem(self.key, 1, self.__marker)
-
-                if self.writeback:
-                    new_cache = {}
-                    for i, v in six.iteritems(self.cache):
-                        if i < cache_index:
-                            new_cache[i] = v
-                        elif i > cache_index:
-                            new_cache[i - 1] = v
-                    self.cache = new_cache
-            self._transaction(delitem_middle_trans)
+            self._pop_middle(index)
 
     def __getitem__(self, index):
         if isinstance(index, slice):
@@ -254,13 +275,32 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(index_trans)
 
     def pop(self, index=-1):
-        pass
+        if index == 0:
+            return self._pop_left()
+        elif index == -1:
+            return self._pop_right()
+        else:
+            return self._pop_middle(index)
 
     def remove(self, value):
-        pass
+        """Remove the first occurence of *value*."""
+        # If we're caching, we'll need to synchronize before removing.
+        with self.redis.pipeline() as pipe:
+            if self.writeback:
+                self._sync_helper(pipe)
+            pipe.lrem(self.key, 1, self._pickle(value))
+            pipe.execute()
 
     def reverse(self):
-        pass
+        def reverse_trans(pipe):
+            n = pipe.llen(self.key)
+            for i in six.moves.xrange(n // 2):
+                left = pipe.lindex(self.key, i)
+                right = pipe.lindex(self.key, n - i - 1)
+                pipe.lset(self.key, i, right)
+                pipe.lset(self.key, n - i - 1, left)
+
+        self._transaction(reverse_trans)
 
     def __iadd__(self):
         pass
