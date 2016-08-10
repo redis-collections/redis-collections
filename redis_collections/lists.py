@@ -162,10 +162,6 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(pop_middle_trans)
 
     def _del_slice(self, index):
-        # Steps are not supported
-        if index.step is not None:
-            raise NotImplementedError
-
         def del_slice_trans(pipe):
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
@@ -179,13 +175,22 @@ class List(RedisCollection, collections.MutableSequence):
             if self.writeback:
                 self._sync_helper(pipe)
 
+            # Steps must be done index by index
+            if index.step is not None:
+                pipe.multi()
+                for i in six.moves.xrange(start, stop, step):
+                    pipe.lset(self.key, i, self.__marker)
+                pipe.lrem(self.key, 0, self.__marker)
             # Slice covers entire range: delete the whole list
-            if start == 0 and stop == len_self:
+            elif start == 0 and stop == len_self:
                 self.clear(pipe)
+            # Slice starts on the left: keep  the right
             elif start == 0 and stop != len_self:
                 pipe.ltrim(self.key, stop + 1, -1)
+            # Slice stops on the right: kep the left
             elif start != 0 and stop == len_self:
                 pipe.ltrim(self.key, 0, start - 1)
+            # Slice starts and ends in the middle
             else:
                 left_values = pipe.lrange(self.key, 0, max(start - 2, 0))
                 right_values = pipe.lrange(self.key, stop + 1, -1)
