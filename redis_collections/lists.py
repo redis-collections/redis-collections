@@ -450,8 +450,48 @@ class List(RedisCollection, collections.MutableSequence):
 
         return self._transaction(sort_trans)
 
-    def __iadd__(self):
-        pass
+    def __add__(self, other):
+        return list(self.__iter__()) + list(other)
+
+    def __iadd__(self, other):
+        return self.extend(other)
+
+    def __mul__(self, times):
+        if not isinstance(times, six.integer_types):
+            raise TypeError
+
+        return list(self.__iter__()) * times
+
+    def __rmul__(self, times):
+        return self.__mul__(times)
+
+    def __imul__(self, times):
+        if not isinstance(times, six.integer_types):
+            raise TypeError
+
+        # If multiplying by 1 there's no work to do
+        if times == 1:
+            return self
+
+        def imul_trans(pipe):
+            # If multiplying by 0 or a negative number all values are deleted
+            if times <= 0:
+                self.clear(pipe)
+
+            # Synchronize the cache before writing
+            if self.writeback:
+                self._sync_helper(pipe)
+
+            # Pull in pickled values
+            pickled_values = pipe.lrange(self.key, 0, -1)
+            pipe.multi()
+
+            # Write the values repeatedly
+            for __ in six.moves.xrange(times - 1):
+                pipe.rpush(self.key, *pickled_values)
+
+        self._transaction(imul_trans)
+        return self
 
     def _repr_data(self, data):
         return repr(list(data))

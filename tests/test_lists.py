@@ -340,5 +340,14 @@ class ListTest(RedisTestCase):
 
         self.assertEqual(list(redis_cached._data())[0], {'one': 2})
 
+    def test_imul(self):
+        values = ('zero', 'one', 'two', 'three')
+        for times in (-1, 0, 1, 2):
+            redis_list = self.create_list(values)
+            python_list = list(values)
+            redis_list *= times
+            python_list *= times
+            self.assertEqual(list(redis_list), python_list)
+
 if __name__ == '__main__':
     unittest.main()
