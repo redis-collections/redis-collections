@@ -348,6 +348,7 @@ class List(RedisCollection, collections.MutableSequence):
         if index == 0:
             self.redis.lpush(self.key, self._pickle(value))
             if self.writeback:
+                self.cache = {k + 1: v for k, v in six.iteritems(self.cache)}
                 self.cache[0] = value
         # Almost as easy case: insert on the right
         elif index == -1:
