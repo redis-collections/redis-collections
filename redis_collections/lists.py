@@ -100,26 +100,32 @@ class List(RedisCollection, collections.MutableSequence):
         pickled_value = self.redis.lpop(self.key)
         if pickled_value is None:
             raise IndexError
-        value = self.cache.get(0, self._unpickle(pickled_value))
+        value = self._unpickle(pickled_value)
 
         if self.writeback:
+            value = self.cache.get(0, value)
             items = six.iteritems(self.cache)
             self.cache = {i - 1: v for i, v in items if i != 0}
 
         return value
 
     def _pop_right(self):
+        if not self.writeback:
+            pickled_value = self.redis.rpop(self.key)
+            if pickled_value is None:
+                raise IndexError
+            return self._unpickle(pickled_value)
+
+        # If writeback is enabled we'll need the size of the list; compute that
+        # in a transaction
         def pop_right_trans(pipe):
             len_self, cache_index = self._normalize_index(-1, pipe)
             if len_self == 0:
                 raise IndexError
             pickled_value = pipe.rpop(self.key)
-            value = self._unpickle(pickled_value)
-
-            if self.writeback:
-                value = self.cache.get(cache_index, value)
-                items = six.iteritems(self.cache)
-                self.cache = {i: v for i, v in items if i != cache_index}
+            value = self.cache.get(cache_index, self._unpickle(pickled_value))
+            items = six.iteritems(self.cache)
+            self.cache = {i: v for i, v in items if i != cache_index}
 
             return value
 
