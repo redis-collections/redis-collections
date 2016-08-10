@@ -190,7 +190,8 @@ class List(RedisCollection, collections.MutableSequence):
                 left_values = pipe.lrange(self.key, 0, max(start - 2, 0))
                 right_values = pipe.lrange(self.key, stop + 1, -1)
                 pipe.delete(self.key)
-                pipe.rpush(self.key, *left_values, *right_values)
+                all_values = itertools.chain(left_values, right_values)
+                pipe.rpush(self.key, *all_values)
 
         return self._transaction(del_slice_trans)
 
@@ -210,8 +211,10 @@ class List(RedisCollection, collections.MutableSequence):
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
             )
+
             if start == stop:
                 return []
+
             ret = []
             redis_values = pipe.lrange(self.key, start, max(stop - 1, 0))
             for i, v in enumerate(redis_values, start):
@@ -231,6 +234,17 @@ class List(RedisCollection, collections.MutableSequence):
         if isinstance(index, slice):
             return self._get_slice(index)
 
+        # If writeback is off we can just query Redis, since its indexing
+        # scheme matches Python's. If the index is out of range we get None.
+        if not self.writeback:
+            pickled_value = self.redis.lindex(self.key, index)
+            if pickled_value is None:
+                raise IndexError
+
+            return self._unpickle(pickled_value)
+
+        # If writeback is on we'll need to know the size of the list,
+        # so we'll need to use a transaction
         def getitem_trans(pipe):
             len_self, cache_index = self._normalize_index(index, pipe)
 
@@ -238,16 +252,13 @@ class List(RedisCollection, collections.MutableSequence):
                 raise IndexError
 
             if cache_index in self.cache:
-                return cache_index, self.cache[cache_index]
+                return self.cache[cache_index]
 
             value = self._unpickle(pipe.lindex(self.key, index))
-            return cache_index, value
-
-        cache_index, value = self._transaction(getitem_trans)
-
-        if self.writeback:
             self.cache[cache_index] = value
-        return value
+            return value
+
+        return self._transaction(getitem_trans)
 
     def _data(self, pipe=None):
         pipe = pipe or self.redis
@@ -291,7 +302,10 @@ class List(RedisCollection, collections.MutableSequence):
             # Delete everything
             pipe.delete(self.key)
             # Push everything back, with the new values in the middle
-            pipe.rpush(self.key, *left_values, *middle_values, *right_values)
+            all_values = itertools.chain(
+                left_values, middle_values, right_values
+            )
+            pipe.rpush(self.key, *all_values)
 
         return self._transaction(set_slice_trans)
 

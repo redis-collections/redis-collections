@@ -64,8 +64,10 @@ class ListTest(RedisTestCase):
         with self.assertRaises(IndexError):
             L[42] = 4
 
-        self.assertEqual(L.get(42), None)
-        self.assertEqual(L.get(1), 2)
+        with self.assertRaises(IndexError):
+            L[42]
+
+        self.assertEqual(L[1], 2)
 
     def test_index_count(self):
         for init in (self.create_list, list):
@@ -273,7 +275,7 @@ class ListTest(RedisTestCase):
         self.assertEqual(redis_cached[-1], ['jpertwee'])
 
         # get
-        self.assertEqual(redis_cached.get(0), ['whartnell'])
+        # self.assertEqual(redis_cached.get(0), ['whartnell'])
 
         # __setitem__
         redis_cached.append(None)
