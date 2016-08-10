@@ -162,10 +162,15 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(pop_middle_trans)
 
     def _del_slice(self, index):
+        # Steps are not supported
+        if index.step is not None:
+            raise NotImplementedError
+
         def del_slice_trans(pipe):
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
             )
+
             # Empty slice: nothing to do
             if start == stop:
                 return
@@ -257,9 +262,42 @@ class List(RedisCollection, collections.MutableSequence):
     def __reversed__(self):
         return reversed(list(self.__iter__()))
 
+    def _set_slice(self, index, value):
+        # Steps are not supported
+        if index.step is not None:
+            raise NotImplementedError
+
+        def set_slice_trans(pipe):
+            start, stop, step, forward, len_self = self._normalize_slice(
+                index, pipe
+            )
+
+            # Write back the cache before making changes
+            if self.writeback:
+                self._sync_helper(pipe)
+
+            # Get everything from 0 to before the beginning of the slice
+            if start == 0:
+                left_values = []
+            else:
+                left_values = pipe.lrange(self.key, 0, start - 1)
+            # Pickle what's been passed
+            middle_values = (self._pickle(v) for v in value)
+            # Get everything from where the slice ends to the end of the list
+            if stop == len_self:
+                right_values = []
+            else:
+                right_values = pipe.lrange(self.key, stop, -1)
+            # Delete everything
+            pipe.delete(self.key)
+            # Push everything back, with the new values in the middle
+            pipe.rpush(self.key, *left_values, *middle_values, *right_values)
+
+        return self._transaction(set_slice_trans)
+
     def __setitem__(self, index, value):
         if isinstance(index, slice):
-            raise NotImplementedError
+            return self._set_slice(index, value)
 
         with self.redis.pipeline() as pipe:
             if self.writeback:
