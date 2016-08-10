@@ -23,17 +23,6 @@ class List(RedisCollection, collections.MutableSequence):
     <http://docs.python.org/2/library/functions.html#list>`_ for
     further details. The Redis implementation is based on the
     `list <http://redis.io/commands#list>`_ type.
-
-    .. warning::
-        In comparing with original :class:`list` type, :class:`List` does not
-        implement methods :func:`sort` and :func:`reverse`.
-
-    .. note::
-        Some operations, which are usually not used so often, can be more
-        efficient than their "popular" equivalents. Some operations are
-        shortened in their capabilities and can raise
-        :exc:`NotImplementedError` for some inputs (e.g. most of the slicing
-        functionality).
     """
 
     def __init__(self, *args, **kwargs):
@@ -279,10 +268,6 @@ class List(RedisCollection, collections.MutableSequence):
         return reversed(list(self.__iter__()))
 
     def _set_slice(self, index, value):
-        # Steps are not supported
-        if index.step is not None:
-            raise NotImplementedError
-
         def set_slice_trans(pipe):
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
@@ -292,25 +277,31 @@ class List(RedisCollection, collections.MutableSequence):
             if self.writeback:
                 self._sync_helper(pipe)
 
-            # Get everything from 0 to before the beginning of the slice
-            if start == 0:
-                left_values = []
+            if index.step is not None:
+                new_values = list(value)
+                change_indexes = six.moves.xrange(start, stop, step)
+                if len(new_values) != len(change_indexes):
+                    raise ValueError
+                for i, v in six.moves.zip(change_indexes, new_values):
+                    pipe.lset(self.key, i, self._pickle(v))
             else:
-                left_values = pipe.lrange(self.key, 0, start - 1)
-            # Pickle what's been passed
-            middle_values = (self._pickle(v) for v in value)
-            # Get everything from where the slice ends to the end of the list
-            if stop == len_self:
-                right_values = []
-            else:
-                right_values = pipe.lrange(self.key, stop, -1)
-            # Delete everything
-            pipe.delete(self.key)
-            # Push everything back, with the new values in the middle
-            all_values = itertools.chain(
-                left_values, middle_values, right_values
-            )
-            pipe.rpush(self.key, *all_values)
+                if start == 0:
+                    left_values = []
+                else:
+                    left_values = pipe.lrange(self.key, 0, start - 1)
+
+                middle_values = (self._pickle(v) for v in value)
+
+                if stop == len_self:
+                    right_values = []
+                else:
+                    right_values = pipe.lrange(self.key, stop, -1)
+
+                pipe.delete(self.key)
+                all_values = itertools.chain(
+                    left_values, middle_values, right_values
+                )
+                pipe.rpush(self.key, *all_values)
 
         return self._transaction(set_slice_trans)
 
@@ -441,6 +432,23 @@ class List(RedisCollection, collections.MutableSequence):
                 pipe.lset(self.key, n - i - 1, left)
 
         self._transaction(reverse_trans)
+
+    def sort(self):
+        # This is not the in-place sort that Python's built-in list class
+        # has - this pulls in the objects from Redis, sorts them, and then
+        # writes them back.
+        def sort_trans(pipe):
+            values = list(self.__iter__(pipe))
+            values.sort()
+
+            pipe.multi()
+            pipe.delete(self.key)
+            pipe.rpush(self.key, *(self._pickle(v) for v in values))
+
+            if self.writeback:
+                self.cache = {}
+
+        return self._transaction(sort_trans)
 
     def __iadd__(self):
         pass
