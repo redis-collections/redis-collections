@@ -60,6 +60,7 @@ class List(RedisCollection, collections.MutableSequence):
             self.extend(data)
 
     def _normalize_index(self, index, pipe=None):
+        """Convert negative indexes into their positive equivalents."""
         pipe = pipe or self.redis
         len_self = pipe.llen(self.key)
         positive_index = index if index >= 0 else len_self + index
@@ -67,6 +68,11 @@ class List(RedisCollection, collections.MutableSequence):
         return len_self, positive_index
 
     def _normalize_slice(self, index, pipe=None):
+        """Given a :obj:`slice` *index*, return a 4-tuple
+        ``(start, stop, step, fowrward)``. The first three items can be used
+        with the ``range`` function to retrieve the values associated with the
+        slice; the last item indicates the direction.
+        """
         if index.step == 0:
             raise ValueError
         pipe = pipe or self.redis
@@ -97,6 +103,7 @@ class List(RedisCollection, collections.MutableSequence):
         return start, stop, step, forward, len_self
 
     def _pop_left(self):
+        """Retrieve a value from the 0 index, remove it, and return it."""
         pickled_value = self.redis.lpop(self.key)
         if pickled_value is None:
             raise IndexError
@@ -110,6 +117,7 @@ class List(RedisCollection, collections.MutableSequence):
         return value
 
     def _pop_right(self):
+        """Retrieve a value from the -1 index, remove it, and return it."""
         if not self.writeback:
             pickled_value = self.redis.rpop(self.key)
             if pickled_value is None:
@@ -132,11 +140,14 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(pop_right_trans)
 
     def _pop_middle(self, index):
+        """Retrieve the value at *index*, remove it, and return it."""
         def pop_middle_trans(pipe):
             len_self, cache_index = self._normalize_index(index, pipe)
             if (cache_index < 0) or (cache_index >= len_self):
                 raise IndexError
 
+            # Retrieve the value at index, then overwrite it with a special
+            # marker, and then remove the marker.
             value = self._unpickle(pipe.lindex(self.key, index))
             pipe.multi()
             pipe.lset(self.key, index, self.__marker)
@@ -157,6 +168,7 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(pop_middle_trans)
 
     def _del_slice(self, index):
+        """Delete the values associated with :obj:`slice` *index*."""
         def del_slice_trans(pipe):
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
@@ -179,7 +191,7 @@ class List(RedisCollection, collections.MutableSequence):
             # Slice covers entire range: delete the whole list
             elif start == 0 and stop == len_self:
                 self.clear(pipe)
-            # Slice starts on the left: keep  the right
+            # Slice starts on the left: keep the right
             elif start == 0 and stop != len_self:
                 pipe.ltrim(self.key, stop + 1, -1)
             # Slice stops on the right: kep the left
@@ -196,6 +208,7 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(del_slice_trans)
 
     def __delitem__(self, index):
+        """Delete the item at **index**."""
         if isinstance(index, slice):
             return self._del_slice(index)
 
@@ -207,6 +220,9 @@ class List(RedisCollection, collections.MutableSequence):
             self._pop_middle(index)
 
     def _get_slice(self, index):
+        """
+        Return the values specified by :obj:`slice` *index* as a :obj:``list``.
+        """
         def get_slice_trans(pipe):
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
@@ -231,6 +247,11 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(get_slice_trans)
 
     def __getitem__(self, index):
+        """
+        If *index* is an :obj:``int``, return the value at that index.
+        If *index* is a :obj:``slice``, return the values from that slice
+        as a :obj:``list``.
+        """
         if isinstance(index, slice):
             return self._get_slice(index)
 
@@ -261,19 +282,35 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(getitem_trans)
 
     def _data(self, pipe=None):
+        """
+        Return a :obj:``list`` of all values from Redis
+        (without checking the local cache).
+        """
         pipe = pipe or self.redis
         return [self._unpickle(v) for v in pipe.lrange(self.key, 0, -1)]
 
     def __iter__(self, pipe=None):
+        """
+        Return a :obj:``list`` of all values from Redis (overriding those with
+        values from the local cache)
+        """
         return (self.cache.get(i, v) for i, v in enumerate(self._data(pipe)))
 
     def __len__(self):
+        """Return the length of this collection."""
         return self.redis.llen(self.key)
 
     def __reversed__(self):
+        """
+        Return an iterator over this collection's items in reverse order.
+        """
         return reversed(list(self.__iter__()))
 
     def _set_slice(self, index, value):
+        """
+        Set the values for the indexes associated with :obj:``slice`` *index*
+        to the contents of the iterable *value*.
+        """
         def set_slice_trans(pipe):
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
@@ -283,6 +320,7 @@ class List(RedisCollection, collections.MutableSequence):
             if self.writeback:
                 self._sync_helper(pipe)
 
+            # Loop through each index for slices with steps
             if index.step is not None:
                 new_values = list(value)
                 change_indexes = six.moves.xrange(start, stop, step)
@@ -290,6 +328,9 @@ class List(RedisCollection, collections.MutableSequence):
                     raise ValueError
                 for i, v in six.moves.zip(change_indexes, new_values):
                     pipe.lset(self.key, i, self._pickle(v))
+            # For slices without steps retrieve the items to the left and right
+            # of the slice, clear the collection, then re-insert the items
+            # with the new values in the middle.
             else:
                 if start == 0:
                     left_values = []
@@ -312,6 +353,11 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(set_slice_trans)
 
     def __setitem__(self, index, value):
+        """
+        If *index* is an :obj:``int``, set the value for that index to *value*.
+        If *index* is a :obj:``slice``, set the values for the indexes
+        associated with that slice  to the contents of the iterable *value*.
+        """
         if isinstance(index, slice):
             return self._set_slice(index, value)
 
@@ -330,22 +376,44 @@ class List(RedisCollection, collections.MutableSequence):
                 self.cache[cache_index] = value
 
     def append(self, value):
+        """Insert *value* at the end of this collection."""
         len_self = self.redis.rpush(self.key, self._pickle(value))
 
         if self.writeback:
             self.cache[len_self - 1] = value
 
     def clear(self, pipe=None):
+        """Delete all values from this collection."""
         pipe = pipe or self.redis
         pipe.delete(self.key)
 
         if self.writeback:
             self.cache.clear()
 
+    def copy(self, redis=None, key=None):
+        """
+        Return a new :obj:``List`` with the specified *key*. The new collection
+        will have the same values as this collection.
+        """
+        redis = redis or self.redis
+        other = self.__class__(redis=redis, key=key, writeback=self.writeback)
+        other.extend(self)
+
+        return other
+
     def count(self, value):
+        """
+        Return the number of occurences of *value*.
+
+        .. note::
+            Counting is implemented in Python.
+        """
         return sum(1 for v in self.__iter__() if v == value)
 
     def insert(self, index, value):
+        """
+        Insert *value* into the collection at *index*.
+        """
         # Easy case: insert on the left
         if index == 0:
             self.redis.lpush(self.key, self._pickle(value))
@@ -379,6 +447,10 @@ class List(RedisCollection, collections.MutableSequence):
             self._transaction(insert_middle_trans)
 
     def extend(self, other):
+        """
+        Adds the values from the iterable *other* to the end of this
+        collection.
+        """
         def extend_trans(pipe):
             if use_redis:
                 values = list(other.__iter__(pipe))
@@ -397,6 +469,11 @@ class List(RedisCollection, collections.MutableSequence):
             self._transaction(extend_trans)
 
     def index(self, value, start=None, stop=None):
+        """
+        Return the index of the first occurence of *value*.
+        If *start* or *stop* are provided, return the smallest
+        index such that ``s[index] == value`` and ``start <= index < stop``.
+        """
         def index_trans(pipe):
             len_self, normal_start = self._normalize_index(start or 0, pipe)
             __, normal_stop = self._normalize_index(stop or len_self, pipe)
@@ -412,6 +489,10 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(index_trans)
 
     def pop(self, index=-1):
+        """
+        Retrieve the value at *index*, remove it from the collection, and
+        return it.
+        """
         if index == 0:
             return self._pop_left()
         elif index == -1:
@@ -429,7 +510,14 @@ class List(RedisCollection, collections.MutableSequence):
             pipe.execute()
 
     def reverse(self):
+        """
+        Reverses the items of this collection "in place" (only two values are
+        retrieved from Redis at a time).
+        """
         def reverse_trans(pipe):
+            if self.writeback:
+                self._sync_helper(pipe)
+
             n = pipe.llen(self.key)
             for i in six.moves.xrange(n // 2):
                 left = pipe.lindex(self.key, i)
@@ -439,13 +527,18 @@ class List(RedisCollection, collections.MutableSequence):
 
         self._transaction(reverse_trans)
 
-    def sort(self):
-        # This is not the in-place sort that Python's built-in list class
-        # has - this pulls in the objects from Redis, sorts them, and then
-        # writes them back.
+    def sort(self, key=None, reverse=False):
+        """
+        Sort the items of this collection according to the optional callable
+        *key*. If *reverse* is set then the sort order is reversed.
+
+        .. note::
+            This sort requires all items to be retrieved from Redis and stored
+            in memory.
+         """
         def sort_trans(pipe):
             values = list(self.__iter__(pipe))
-            values.sort()
+            values.sort(key=key, reverse=reverse)
 
             pipe.multi()
             pipe.delete(self.key)
