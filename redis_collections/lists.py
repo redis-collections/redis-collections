@@ -185,7 +185,7 @@ class List(RedisCollection, collections.MutableSequence):
             # Steps must be done index by index
             if index.step is not None:
                 pipe.multi()
-                for i in six.moves.xrange(start, stop, step):
+                for i in list(six.moves.xrange(len_self))[index]:
                     pipe.lset(self.key, i, self.__marker)
                 pipe.lrem(self.key, 0, self.__marker)
             # Slice covers entire range: delete the whole list
@@ -193,14 +193,14 @@ class List(RedisCollection, collections.MutableSequence):
                 self.clear(pipe)
             # Slice starts on the left: keep the right
             elif start == 0 and stop != len_self:
-                pipe.ltrim(self.key, stop + 1, -1)
-            # Slice stops on the right: kep the left
+                pipe.ltrim(self.key, stop, -1)
+            # Slice stops on the right: keep the left
             elif start != 0 and stop == len_self:
                 pipe.ltrim(self.key, 0, start - 1)
             # Slice starts and ends in the middle
             else:
-                left_values = pipe.lrange(self.key, 0, max(start - 2, 0))
-                right_values = pipe.lrange(self.key, stop + 1, -1)
+                left_values = pipe.lrange(self.key, 0, start - 1)
+                right_values = pipe.lrange(self.key, stop, -1)
                 pipe.delete(self.key)
                 all_values = itertools.chain(left_values, right_values)
                 pipe.rpush(self.key, *all_values)

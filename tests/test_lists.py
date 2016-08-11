@@ -4,8 +4,6 @@ from __future__ import division, print_function, unicode_literals
 
 import unittest
 
-import six
-
 from redis_collections import List
 
 from .base import RedisTestCase
@@ -18,31 +16,85 @@ class ListTest(RedisTestCase):
         return List(*args, **kwargs)
 
     def test_init(self):
-        for init in (self.create_list, list):
-            # List from list
-            L = init([1, 2, 3])
-            self.assertEqual(list(L), [1, 2, 3])
+        for init_args in [
+            [[0, 1, 2, 3]],  # List from list
+            ['0123'],  # List from str
+            [b'0123'],  # List from bytes
+            [],  # Empty List
+        ]:
+            redis_list = self.create_list(*init_args)
+            python_list = list(*init_args)
+            self.assertEqual(list(redis_list), python_list)
 
-            # List from str
-            L = init('abc')
-            self.assertEqual(list(L), ['a', 'b', 'c'])
+    def test_contains(self):
+        data = (0, 1, 2, 3)
+        redis_list = self.create_list(data)
+        python_list = list(data)
 
-            # List from bytes
-            L = init(b'abc')
-            if six.PY2:
-                self.assertEqual(list(L), [b'a', b'b', b'c'])
-            else:
-                self.assertEqual(list(L), [ord('a'), ord('b'), ord('c')])
-
-            # Empty list
-            L = init()
-            self.assertEqual(list(L), [])
-
-    def test_in(self):
-        for init in (self.create_list, list):
-            L = init([1, 2, 3])
-            self.assertIn(2, L)
+        for L in (redis_list, python_list):
+            self.assertIn(0, L)
+            self.assertIn(3, L)
             self.assertNotIn(4, L)
+
+    def test_delitem(self):
+        data = (0, 1, 2, 3)
+        for i in (0, 1, 2, 3, -1, -2, -3, -4):
+            redis_list = self.create_list(data)
+            redis_cached = self.create_list(data, writeback=True)
+            python_list = list(data)
+
+            del redis_list[i]
+            del python_list[i]
+            del redis_cached[i]
+
+            self.assertEqual(list(redis_list), python_list, i)
+            self.assertEqual(list(redis_cached), python_list, i)
+
+    def test_delitem_slice(self):
+        data = (0, 1, 2, 3, 4, 5)
+        for slice_args in [
+            # Delete everything
+            (None, None, None),
+            (0, None, None),
+            (0, 5, None),
+            (0, 6, None),
+            # Delete from the left
+            (None, 1, None),
+            (0, 2, None),
+            (0, -3, None),
+            (0, 4, None),
+            (0, -1, None),
+            (0, 6, None),
+            # Delete to the right
+            (1, None, None),
+            (2, 6, None),
+            (3, 6, None),
+            (-2, None, None),
+            (-1, None, None),
+            # Delete in the mdidle
+            (1, -1, None),
+            (2, -2, None),
+            (3, -3, None),
+            (-5, 5, None),
+            # Delete with a step
+            (None, None, -1),
+            (None, None, 1),
+            (None, None, 2),
+            (None, None, 3),
+            (1, -1, 2),
+            (5, 1, -1),
+            (5, 1, -2),
+        ]:
+            redis_list = self.create_list(data)
+            redis_cached = self.create_list(data, writeback=True)
+            python_list = list(data)
+
+            del redis_list[slice(*slice_args)]
+            del python_list[slice(*slice_args)]
+            del redis_cached[slice(*slice_args)]
+
+            self.assertEqual(list(redis_list), python_list, slice_args)
+            self.assertEqual(list(redis_cached), python_list, slice_args)
 
     def test_concat(self):
         for init in (self.create_list, list):
