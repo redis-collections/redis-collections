@@ -41,7 +41,7 @@ setup(
     name=meta['title'],
     version=meta['version'],
     description='Set of basic Python collections backed by Redis.',
-    long_description=open('README.rst').read(),
+    long_description=open('README.rst', encoding='utf-8').read(),
     author=meta['author'],
     author_email='mail@honzajavorek.cz',
     url='https://github.com/honzajavorek/redis-collections',
