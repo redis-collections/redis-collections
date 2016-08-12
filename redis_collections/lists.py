@@ -410,42 +410,6 @@ class List(RedisCollection, collections.MutableSequence):
         """
         return sum(1 for v in self.__iter__() if v == value)
 
-    def insert(self, index, value):
-        """
-        Insert *value* into the collection at *index*.
-        """
-        # Easy case: insert on the left
-        if index == 0:
-            self.redis.lpush(self.key, self._pickle(value))
-            if self.writeback:
-                self.cache = {k + 1: v for k, v in six.iteritems(self.cache)}
-                self.cache[0] = value
-        # Almost as easy case: insert on the right
-        elif index == -1:
-            len_self = self.redis.rpush(self.key, self._pickle(value))
-            if self.writeback:
-                cache_index = index if index >= 0 else len_self + index
-                self.cache[cache_index] = value
-        # Difficult case: insert in the middle.
-        # Retrieve everything from ``index`` up to the end, insert ``value``
-        # on the right, then re-insert the retrieved items on the right
-        else:
-            def insert_middle_trans(pipe):
-                __, cache_index = self._normalize_index(index, pipe)
-                right_values = pipe.lrange(self.key, cache_index, -1)
-                pipe.ltrim(self.key, 0, cache_index - 1)
-                pipe.rpush(self.key, self._pickle(value), *right_values)
-                if self.writeback:
-                    new_cache = {}
-                    for i, v in six.iteritems(self.cache):
-                        if i < cache_index:
-                            new_cache[i] = v
-                        elif i >= cache_index:
-                            new_cache[i + 1] = v
-                    new_cache[cache_index] = value
-                    self.cache = new_cache
-            self._transaction(insert_middle_trans)
-
     def extend(self, other):
         """
         Adds the values from the iterable *other* to the end of this
@@ -488,6 +452,37 @@ class List(RedisCollection, collections.MutableSequence):
 
         return self._transaction(index_trans)
 
+    def insert(self, index, value):
+        """
+        Insert *value* into the collection at *index*.
+        """
+        # Easy case: insert on the left
+        if index == 0:
+            self.redis.lpush(self.key, self._pickle(value))
+            if self.writeback:
+                self.cache = {k + 1: v for k, v in six.iteritems(self.cache)}
+                self.cache[0] = value
+        # Difficult case: insert in the middle.
+        # Retrieve everything from ``index`` up to the end, insert ``value``
+        # on the right, then re-insert the retrieved items on the right
+        else:
+            def insert_middle_trans(pipe):
+                __, cache_index = self._normalize_index(index, pipe)
+                right_values = pipe.lrange(self.key, cache_index, -1)
+                pipe.multi()
+                pipe.ltrim(self.key, 0, cache_index - 1)
+                pipe.rpush(self.key, self._pickle(value), *right_values)
+                if self.writeback:
+                    new_cache = {}
+                    for i, v in six.iteritems(self.cache):
+                        if i < cache_index:
+                            new_cache[i] = v
+                        elif i >= cache_index:
+                            new_cache[i + 1] = v
+                    new_cache[cache_index] = value
+                    self.cache = new_cache
+            self._transaction(insert_middle_trans)
+
     def pop(self, index=-1):
         """
         Retrieve the value at *index*, remove it from the collection, and
@@ -507,7 +502,10 @@ class List(RedisCollection, collections.MutableSequence):
             if self.writeback:
                 self._sync_helper(pipe)
             pipe.lrem(self.key, 1, self._pickle(value))
-            pipe.execute()
+            results = pipe.execute()
+
+        if results[-1] == 0:
+            raise ValueError
 
     def reverse(self):
         """
@@ -553,7 +551,8 @@ class List(RedisCollection, collections.MutableSequence):
         return list(self.__iter__()) + list(other)
 
     def __iadd__(self, other):
-        return self.extend(other)
+        self.extend(other)
+        return self
 
     def __mul__(self, times):
         if not isinstance(times, six.integer_types):
