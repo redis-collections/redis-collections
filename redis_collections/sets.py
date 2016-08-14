@@ -322,9 +322,9 @@ class Set(RedisCollection, collections.MutableSet):
         redis = pipe if pipe is not None else self.redis
         return (self._unpickle(v) for v in redis.smembers(self.key))
 
-    def __iter__(self):
+    def __iter__(self, pipe=None):
         """Return an iterator over elements of the set."""
-        return self._data()
+        return self._data(pipe)
 
     def __contains__(self, elem):
         """Test for membership of *elem* in the set."""

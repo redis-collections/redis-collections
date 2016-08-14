@@ -4,8 +4,6 @@ from __future__ import division, print_function, unicode_literals
 
 import unittest
 
-import six
-
 from redis_collections import List
 
 from .base import RedisTestCase
@@ -18,203 +16,389 @@ class ListTest(RedisTestCase):
         return List(*args, **kwargs)
 
     def test_init(self):
-        for init in (self.create_list, list):
-            # List from list
-            L = init([1, 2, 3])
-            self.assertEqual(list(L), [1, 2, 3])
+        for init_args in [
+            [[0, 1, 2, 3]],  # List from list
+            ['0123'],  # List from str
+            [b'0123'],  # List from bytes
+            [],  # Empty List
+        ]:
+            redis_list = self.create_list(*init_args)
+            python_list = list(*init_args)
+            self.assertEqual(list(redis_list), python_list)
 
-            # List from str
-            L = init('abc')
-            self.assertEqual(list(L), ['a', 'b', 'c'])
+    def test_contains(self):
+        data = (0, 1, 2, 3)
+        redis_list = self.create_list(data)
+        python_list = list(data)
 
-            # List from bytes
-            L = init(b'abc')
-            if six.PY2:
-                self.assertEqual(list(L), [b'a', b'b', b'c'])
-            else:
-                self.assertEqual(list(L), [ord('a'), ord('b'), ord('c')])
-
-            # Empty list
-            L = init()
-            self.assertEqual(list(L), [])
-
-    def test_in(self):
-        for init in (self.create_list, list):
-            L = init([1, 2, 3])
-            self.assertIn(2, L)
+        for L in (redis_list, python_list):
+            self.assertIn(0, L)
+            self.assertIn(3, L)
             self.assertNotIn(4, L)
 
-    def test_concat(self):
-        for init in (self.create_list, list):
-            L_1 = init([1, 2, 3])
-            L_2 = init([1, 4, 5])
-            self.assertEqual(list(L_1 + L_2), [1, 2, 3, 1, 4, 5])
-            self.assertEqual(list(L_1 * 2), [1, 2, 3, 1, 2, 3])
-            self.assertEqual(list(2 * L_1), [1, 2, 3, 1, 2, 3])
-            self.assertEqual(list(L_1 * 2), [1, 2, 3, 1, 2, 3])
-            self.assertEqual(list(L_1 * 0), [])
-            self.assertEqual(list(L_1 * -1), [])
+    def test_get_set_del_index(self):
+        data = ('zero', 'one', 'two', 'three')
+        for i in (0, 1, 2, 3, -1, -2, -3, -4):
+            redis_list = self.create_list(data)
+            redis_cached = self.create_list(data, writeback=True)
+            python_list = list(data)
 
-    def test_set_get_overflow(self):
-        L = self.create_list([1, 2, 3])
+            # Get the values
+            self.assertEqual(redis_list[i], python_list[i], i)
+            self.assertEqual(redis_cached[i], python_list[i], i)
 
-        with self.assertRaises(IndexError):
-            L[42]
+            # Set the values and get them again
+            redis_list[i] = i
+            redis_cached[i] = i
+            python_list[i] = i
+            self.assertEqual(redis_list[i], python_list[i], i)
+            self.assertEqual(redis_cached[i], python_list[i], i)
 
-        with self.assertRaises(IndexError):
-            L[42] = 4
+            # Delete the values
+            del redis_list[i]
+            del python_list[i]
+            del redis_cached[i]
 
-        self.assertIsNone(L.get(42))
-        self.assertEqual(L.get(42, 'MISSING'), 'MISSING')
-        self.assertEqual(L.get(1), 2)
+            self.assertEqual(list(redis_list), python_list, i)
+            self.assertEqual(list(redis_cached), python_list, i)
 
-    def test_index_count(self):
-        for init in (self.create_list, list):
-            L = init([1, 2, 3])
-            self.assertEqual(L[0], 1)
-            self.assertEqual(L[1], 2)
-            self.assertEqual(L[2], 3)
-            self.assertEqual(L[-1], 3)
-            self.assertEqual(L[-2], 2)
-            self.assertEqual(L[-3], 1)
-            self.assertRaises(IndexError, lambda: L[42])
-            self.assertRaises(IndexError, lambda: L[-42])
+        for L in (redis_list, redis_cached, python_list):
+            self.assertRaises(IndexError, L.__getitem__, 4)
+            self.assertRaises(IndexError, L.__getitem__, -5)
 
-            L = init([1, 2, 3, 2, 3])
-            self.assertEqual(L.index(2), 1)
-            self.assertEqual(L.index(2, 2), 3)
-            self.assertRaises(ValueError, L.index, 2, 2, 3)
-            self.assertEqual(L.count(2), 2)
+            with self.assertRaises(IndexError):
+                L[100] = 'x'
 
-    def test_slice(self):
-        redis_list = self.create_list([0, 1, 2, 3])
-        python_list = [0, 1, 2, 3]
-
-        for index in [
-            slice(None, None),  # L[:]
-            slice(0, None, None),  # L[0:]
-            slice(1, None, None),  # L[1:]
-            slice(3, None, None),  # L[3:]
-            slice(4, None, None),  # L[4:]
-            slice(None, 0, None),  # L[:0]
-            slice(None, 1, None),  # L[:1]
-            slice(None, 3, None),  # L[:3]
-            slice(None, 4, None),  # L[:3]
-            slice(0, 0, None),  # L[0:0]
-            slice(1, 1, None),  # L[1:1]
-            slice(3, 3, None),  # L[3:3]
-            slice(3, 3, None),  # L[3:3]
-            slice(-1, None, None),  # L[-1:]
-            slice(-2, None, None),  # L[-2:]
-            slice(-4, None, None),  # L[-4:]
-            slice(None, -1, None),  # L[-1:]
-            slice(None, -2, None),  # L[-2:]
-            slice(None, -4, None),  # L[-4:]
-            slice(0, -1, None),  # L[0:-1]
-            slice(1, -1, None),  # L[1:-1]
-            slice(1, -2, None),  # L[1:-2]
-            slice(-3, -1, None),  # L[-3:-1]
-            slice(None, None, 1),  # L[::1]
-            slice(None, None, 2),  # L[::2]
-            slice(None, None, 3),  # L[::3]
-            slice(None, None, 4),  # L[::4]
-            slice(None, None, -1),  # L[::-1]
-            slice(None, None, -2),  # L[::-2]
-            slice(1, -1, 2),  # L[1:-1:1]
-            slice(1, -1, -2),  # L[1:-1:-2]
+    def test_get_del_slice(self):
+        data = (0, 1, 2, 3, 4, 5)
+        for slice_args in [
+            (None, None, None),
+            (0, None, None),
+            (0, 0, None),
+            (0, 5, None),
+            (0, 6, None),
+            (None, 1, None),
+            (0, 2, None),
+            (0, -3, None),
+            (0, 4, None),
+            (0, -1, None),
+            (0, 6, None),
+            (1, None, None),
+            (2, 6, None),
+            (3, 6, None),
+            (-2, None, None),
+            (-1, None, None),
+            (1, -1, None),
+            (2, -2, None),
+            (3, -3, None),
+            (-5, 5, None),
+            (None, None, -1),
+            (None, None, 1),
+            (None, None, 2),
+            (None, None, 3),
+            (1, -1, 2),
+            (5, 1, -1),
+            (5, 1, -2),
         ]:
-            self.assertEqual(list(redis_list[index]), python_list[index])
+            slice_obj = slice(*slice_args)
 
-    def test_len_min_max(self):
-        for init in (self.create_list, list):
-            L = init([1, 2, 3])
-            self.assertEqual(len(L), 3)
-            self.assertEqual(min(L), 1)
-            self.assertEqual(max(L), 3)
+            redis_list = self.create_list(data)
+            redis_cached = self.create_list(data, writeback=True)
+            python_list = list(data)
 
-            self.assertEqual(len(init([])), 0)
+            self.assertEqual(redis_list[slice_obj], python_list[slice_obj])
+            self.assertEqual(redis_cached[slice_obj], python_list[slice_obj])
 
-    def test_modify(self):
-        for init in (self.create_list, list):
-            L = init([1, 2, 3])
-            L[2] = 42
-            self.assertEqual(L[2], 42)
+            del redis_list[slice_obj]
+            del redis_cached[slice_obj]
+            del python_list[slice_obj]
 
-            L[1:] = []
-            self.assertEqual(list(L), [1])
+            self.assertEqual(list(redis_list), python_list, slice_args)
+            self.assertEqual(list(redis_cached), python_list, slice_args)
 
-            L.append(2013)
-            self.assertEqual(list(L), [1, 2013])
+    def test_iter(self):
+        data = ('zero', 'one', 'two', 'three')
+        redis_list_iter = iter(self.create_list(data))
+        redis_cached_iter = iter(self.create_list(data, writeback=True))
+        python_iter = iter(list(data))
+        for v in data:
+            self.assertEqual(next(redis_list_iter), v)
+            self.assertEqual(next(redis_cached_iter), v)
+            self.assertEqual(next(python_iter), v)
 
-    def test_del(self):
-        for init in (self.create_list, list):
-            L = init([1, 2013])
+    def test_len(self):
+        for data, expected in [(tuple(), 0), ((0,), 1), ((0, 1,), 2)]:
+            redis_list = self.create_list(data)
+            redis_cached = self.create_list(data, writeback=True)
+            python_list = list(data)
 
-            del L[0]
-            self.assertEqual(list(L), [2013])
-
-            del L[1:]
-            self.assertEqual(list(L), [2013])
-
-            L.append(5)
-            self.assertEqual(list(L), [2013, 5])
-
-            L[1] = 8
-            self.assertEqual(list(L), [2013, 8])
-
-            del L[1:]
-            self.assertEqual(list(L), [2013])
-
-            del L[:]
-            self.assertEqual(list(L), [])
-
-    def test_extend_insert(self):
-        for init in (self.create_list, list):
-            L = init([2013])
-            L.extend([4, 5, 6, 7])
-            self.assertEqual(list(L), [2013, 4, 5, 6, 7])
-
-            # insert does not replace
-            L.insert(0, 3)
-            self.assertEqual(list(L), [3, 2013, 4, 5, 6, 7])
-
-    def test_pop_remove(self):
-        for init in (self.create_list, list):
-            L = init([3, 4, 5, 6, 7])
-            self.assertEqual(L.pop(), 7)
-            self.assertEqual(list(L), [3, 4, 5, 6])
-            self.assertEqual(L.pop(0), 3)
-            self.assertEqual(list(L), [4, 5, 6])
-            L.extend([4, 5, 6])
-            L.remove(4)
-            self.assertEqual(list(L), [5, 6, 4, 5, 6])
-
-    def test_slice_trim(self):
-        for init in (self.create_list, list):
-            L = init([5, 6, 4, 5, 6])
-            L[2:] = []
-            self.assertEqual(list(L), [5, 6])
-
-    def test_reverse(self):
-        for init in (self.create_list, list):
-            L = init([1, 2, 3])
-            L.reverse()
-            self.assertEqual(list(L), [3, 2, 1])
-
-    def test_lset_issue(self):
-        for init in (self.create_list, list):
-            L = init([1])
-            L.insert(0, 5)
-            self.assertEqual(list(L), [5, 1])
-            L.insert(0, 6)
-            self.assertEqual(list(L), [6, 5, 1])
-            L.append(7)
-            self.assertEqual(list(L), [6, 5, 1, 7])
+            self.assertEqual(len(redis_list), expected)
+            self.assertEqual(len(redis_cached), expected)
+            self.assertEqual(len(python_list), expected)
 
     def test_reversed(self):
-        for init in (self.create_list, list):
-            L = init([0, 1, 2, 3])
-            self.assertEqual(list(reversed(L)), [3, 2, 1, 0])
+        data = ('zero', 'one', 'two', 'three')
+        redis_list = self.create_list(data)
+        redis_cached = self.create_list(data, writeback=True)
+        python_list = list(data)
+
+        for L in (redis_list, redis_cached, python_list):
+            self.assertEqual(list(reversed(L)), list(reversed(data)))
+            self.assertEqual(list(reversed(L)), list(reversed(data)))
+
+            L.reverse()
+            self.assertEqual(list(L), list(reversed(data)))
+
+    def test_set_slice(self):
+        data = ('a', 'b', 'c', 'd', 'e', 'f')
+        for init, kwargs in (
+            (self.create_list, {}),
+            (self.create_list, {'writeback': True}),
+            (list, {}),
+        ):
+            L = init(data, **kwargs)
+            L[:1] = ['A', 'B']
+            self.assertEqual(list(L), ['A', 'B', 'b', 'c', 'd', 'e', 'f'])
+
+            L[2:-2] = ['C', 'D']
+            self.assertEqual(list(L), ['A', 'B', 'C', 'D', 'e', 'f'])
+
+            L[4:100] = ['E', 'F', 'G', 'H']
+            self.assertEqual(list(L), ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'])
+
+            L[::2] = ['x', 'x', 'x', 'x']
+            self.assertEqual(list(L), ['x', 'B', 'x', 'D', 'x', 'F', 'x', 'H'])
+
+            L[6:1:-2] = ['y', 'y', 'y']
+            self.assertEqual(list(L), ['x', 'B', 'y', 'D', 'y', 'F', 'y', 'H'])
+
+            # Sequence length doesn't match
+            with self.assertRaises(ValueError):
+                L[6:1:-2] = ['y', 'y', 'y', 'y']
+
+            # Zero step
+            with self.assertRaises(ValueError):
+                L[::0] = []
+
+    def test_append(self):
+        for init, kwargs in (
+            (self.create_list, {}),
+            (self.create_list, {'writeback': True}),
+            (list, {}),
+        ):
+            L = init(**kwargs)
+            L.append('zero')
+            L.append('one')
+            L.append('two')
+
+            self.assertEqual(list(L), ['zero', 'one', 'two'])
+
+    def test_clear(self):
+        data = ('zero', 'one', 'two', 'three')
+        redis_list = self.create_list(data)
+        redis_cached = self.create_list(data, writeback=True)
+
+        # Python 2.x lists don't have a clear method
+        for L in (redis_list, redis_cached):
+            L[0] = 'Zero'
+            L.clear()
+            self.assertEqual(list(L), [])
+
+            with self.assertRaises(IndexError):
+                L[0]
+
+    def test_copy(self):
+        data = ('zero', 'one', 'two', 'three')
+
+        redis_list = self.create_list(data)
+        redis_list[0] = 'Zero'
+        new_list = redis_list.copy(redis=redis_list.redis)
+        self.assertEqual(list(new_list), list(redis_list))
+        self.assertTrue(new_list.redis is redis_list.redis)
+        self.assertFalse(new_list.writeback)
+
+        redis_cached = self.create_list(data, writeback=True)
+        redis_cached[0] = 'ZERO'
+        new_cached = redis_cached.copy()
+        self.assertEqual(list(new_cached), list(redis_cached))
+        self.assertTrue(new_cached.redis is redis_cached.redis)
+        self.assertTrue(new_cached.writeback)
+
+    def test_count(self):
+        data = ('a', 'b', 'b', 'c', 'c', 'c', None)
+        redis_list = self.create_list(data)
+        redis_cached = self.create_list(data, writeback=True)
+        python_list = list(data)
+
+        for L in (redis_list, redis_cached, python_list):
+            self.assertEqual(L.count('a'), 1)
+            self.assertEqual(L.count('b'), 2)
+            self.assertEqual(L.count('c'), 3)
+            self.assertEqual(L.count(None), 1)
+            self.assertEqual(L.count('A'), 0)
+
+    def test_extend(self):
+        data = (0, 1,)
+        redis_cached = self.create_list(data, writeback=True)
+        redis_list = self.create_list(data)
+        python_list = list(data)
+
+        for L in (redis_list, redis_cached, python_list):
+            L.extend([2, 3])
+            self.assertEqual(list(L), [0, 1, 2, 3])
+
+            L += [4, 5]
+            self.assertEqual(list(L), [0, 1, 2, 3, 4, 5])
+
+        redis_list.extend(redis_cached)
+        self.assertEqual(list(redis_list), [0, 1, 2, 3, 4, 5] * 2)
+
+    def test_index(self):
+        data = ('a', 'b', 'b', 'c', 'c', 'c', None)
+        redis_list = self.create_list(data)
+        redis_cached = self.create_list(data, writeback=True)
+        python_list = list(data)
+
+        for L in (redis_list, redis_cached, python_list):
+            self.assertEqual(L.index('a'), 0)
+            self.assertEqual(L.index('b'), 1)
+            self.assertEqual(L.index('b', 1), 1)
+            self.assertEqual(L.index('b', 2), 2)
+            self.assertRaises(ValueError, L.index, 'b', 3)
+            self.assertEqual(L.index('c', 4, 5), 4)
+
+    def test_insert(self):
+        redis_list = self.create_list()
+        redis_cached = self.create_list(writeback=True)
+        python_list = list()
+
+        for L in (redis_list, redis_cached, python_list):
+            L.insert(0, 'b')
+            L.insert(0, 'a')
+            self.assertEqual(list(L), ['a', 'b'])
+
+            L.insert(2, 'd')
+            L.insert(-1, 'c')
+            self.assertEqual(list(L), ['a', 'b', 'c', 'd'])
+
+            L.insert(-2, 'x')
+            self.assertEqual(list(L), ['a', 'b', 'x', 'c', 'd'])
+
+            L.insert(10, '!')
+            self.assertEqual(list(L), ['a', 'b', 'x', 'c', 'd', '!'])
+
+    def test_pop(self):
+        data = ('zero', 'one', 'two', 'three', 'four', 'five')
+        redis_list = self.create_list(data)
+        redis_cached = self.create_list(data, writeback=True)
+        python_list = list(data)
+
+        for L in (redis_list, redis_cached, python_list):
+            self.assertEqual(L.pop(), 'five')
+            self.assertEqual(list(L), list(data[:-1]))
+
+            self.assertEqual(L.pop(0), 'zero')
+            self.assertEqual(list(L), list(data[1:-1]))
+
+            self.assertEqual(L.pop(-1), 'four')
+            self.assertEqual(list(L), list(data[1:-2]))
+
+            self.assertEqual(L.pop(1), 'two')
+            self.assertEqual(list(L), ['one', 'three'])
+
+            self.assertRaises(IndexError, L.pop, 100)
+            self.assertEqual(L.pop(), 'three')
+            self.assertEqual(L.pop(), 'one')
+            self.assertRaises(IndexError, L.pop)
+            self.assertRaises(IndexError, L.pop, 0)
+
+    def test_remove(self):
+        data = ('a', 'b', 'b', 'c', 'c', 'c', None)
+        redis_list = self.create_list(data)
+        redis_cached = self.create_list(data, writeback=True)
+        python_list = list(data)
+
+        for L in (redis_list, redis_cached, python_list):
+            L.remove(None)
+            self.assertEqual(list(L), ['a', 'b', 'b', 'c', 'c', 'c'])
+
+            L.remove('a')
+            self.assertEqual(list(L), ['b', 'b', 'c', 'c', 'c'])
+
+            L.remove('b')
+            self.assertEqual(list(L), ['b', 'c', 'c', 'c'])
+
+            L.remove('c')
+            self.assertEqual(list(L), ['b', 'c', 'c'])
+
+            self.assertRaises(ValueError, L.remove, 'd')
+
+    def test_sort(self):
+        data = ('zero', 'one', 'two', 'three')
+        redis_list = self.create_list(data)
+        redis_cached = self.create_list(data, writeback=True)
+        python_list = list(data)
+
+        for L in (redis_list, redis_cached, python_list):
+            L.sort()
+            self.assertEqual(list(L), ['one', 'three', 'two', 'zero'])
+
+            L.sort(key=lambda x: x[::-1])
+            self.assertEqual(list(L), ['three', 'one', 'zero', 'two'])
+
+            L.sort(reverse=True)
+            self.assertEqual(list(L), ['zero', 'two', 'three', 'one'])
+
+            L.sort(key=lambda x: x[::-1], reverse=True)
+            self.assertEqual(list(L), ['two', 'zero', 'one', 'three'])
+
+    def test_add(self):
+        data = (0, 1, 2, 3)
+        redis_list = self.create_list(data)
+        redis_cached = self.create_list(data, writeback=True)
+        python_list = list(data)
+
+        for L in (redis_list, redis_cached, python_list):
+            self.assertEqual(L + ['x', 'y'], [0, 1, 2, 3, 'x', 'y'])
+
+    def test_mul(self):
+        data = (0, 1)
+        redis_list = self.create_list(data)
+        redis_cached = self.create_list(data, writeback=True)
+        python_list = list(data)
+
+        for L in (redis_list, redis_cached, python_list):
+            self.assertEqual(L * 2, [0, 1, 0, 1])
+            self.assertEqual(L * 0, [])
+            self.assertEqual(L * -1, [])
+
+            self.assertEqual(2 * L, [0, 1, 0, 1])
+            self.assertEqual(0 * L, [])
+            self.assertEqual(-1 * L, [])
+
+            with self.assertRaises(TypeError):
+                L * None
+
+    def test_imul(self):
+        data = (0, 1)
+        for init, kwargs in (
+            (self.create_list, {}),
+            (self.create_list, {'writeback': True}),
+            (list, {}),
+        ):
+            L = init(data, **kwargs)
+
+            L *= 1
+            self.assertEqual(list(L), [0, 1])
+
+            L *= 2
+            self.assertEqual(list(L), [0, 1] * 2)
+
+            L *= 0
+            self.assertEqual(list(L), [])
+
+            with self.assertRaises(TypeError):
+                L *= None
 
     def test_mutable(self):
         redis_cached = self.create_list(writeback=True)
@@ -274,7 +458,7 @@ class ListTest(RedisTestCase):
         self.assertEqual(redis_cached[-1], ['jpertwee'])
 
         # get
-        self.assertEqual(redis_cached.get(0), ['whartnell'])
+        # self.assertEqual(redis_cached.get(0), ['whartnell'])
 
         # __setitem__
         redis_cached.append(None)
