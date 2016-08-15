@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, unicode_literals
 
+from decimal import Decimal
+from fractions import Fraction
 import unittest
 import sys
 
@@ -325,12 +327,13 @@ class SetTest(RedisTestCase):
                 s_1 ^= s_7
 
     def test_add(self):
-        s = self.create_set('ab')
-        s.add('b')
-        s.add('c')
-        self.assertEqual(sorted(s), ['a', 'b', 'c'])
+        for init in (self.create_set, set):
+            s = init('ab')
+            s.add('b')
+            s.add('c')
+            self.assertEqual(sorted(s), ['a', 'b', 'c'])
 
-        self.assertRaises(TypeError, s.add, dict())
+            self.assertRaises(TypeError, s.add, dict())
 
     def test_remove_discard(self):
         for init in (self.create_set, set):
@@ -367,6 +370,37 @@ class SetTest(RedisTestCase):
             elem = 'ěščřžýáíéůú\U0001F4A9'
             s.add(elem)
             self.assertEqual(sorted(s), [elem])
+
+    def test_add_equal_hashes(self):
+        redis_set = Set()
+        python_set = set()
+        for value in [
+            1.0,
+            1,
+            complex(1.0, 0.0),
+            Decimal(1.0),
+            Fraction(2, 2),
+            u'a',
+            b'a',
+            'a',
+        ]:
+            redis_set.add(value)
+            python_set.add(value)
+
+            self.assertEqual(len(redis_set), len(python_set))
+
+            self.assertIn(value, redis_set)
+            self.assertIn(value, python_set)
+
+            redis_values = []
+            while redis_set:
+                redis_values.append(redis_set.pop())
+
+            python_values = []
+            while python_set:
+                python_values.append(python_set.pop())
+
+            self.assertEqual(sorted(redis_values), sorted(python_values))
 
     def test_clear(self):
         for init in (self.create_set, set):
