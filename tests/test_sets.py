@@ -199,8 +199,9 @@ class SetTest(RedisTestCase):
             self.assertEqual(
                 sorted(s_1.symmetric_difference(s_3)), [1, 2, 5, 6]
             )
-            self.assertEqual(sorted(s_1 ^ s_3), [1, 2, 5, 6])
-            self.assertEqual(sorted(s_3 ^ s_1), [1, 2, 5, 6])
+            if PYTHON_VERSION >= (3, 4):
+                self.assertEqual(sorted(s_1 ^ s_3), [1, 2, 5, 6])
+                self.assertEqual(sorted(s_3 ^ s_1), [1, 2, 5, 6])
 
             self.assertEqual(
                 sorted(s_1.symmetric_difference(s_4)), [1, 2, 5, 6]
