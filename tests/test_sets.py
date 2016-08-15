@@ -3,10 +3,14 @@
 from __future__ import division, print_function, unicode_literals
 
 import unittest
+import sys
 
 from redis_collections import Set
 
 from .base import RedisTestCase
+
+
+PYTHON_VERSION = (sys.version_info[0], sys.version_info[1])
 
 
 class SetTest(RedisTestCase):
@@ -86,7 +90,8 @@ class SetTest(RedisTestCase):
             self.assertFalse(s_1 < s_4)
 
             self.assertTrue(s_1.issubset(s_5))
-            self.assertRaises(TypeError, lambda: s_1 <= s_5)
+            if PYTHON_VERSION >= (3, 4):
+                self.assertRaises(TypeError, lambda: s_1 <= s_5)
 
             self.assertRaises(TypeError, s_1.issubset, None)
 
@@ -116,7 +121,8 @@ class SetTest(RedisTestCase):
             self.assertFalse(s_1 > s_5)
 
             self.assertTrue(s_1.issuperset(s_6))
-            self.assertRaises(TypeError, lambda: s_1 >= s_6)
+            if PYTHON_VERSION >= (3, 4):
+                self.assertRaises(TypeError, lambda: s_1 >= s_6)
 
             self.assertRaises(TypeError, s_1.issuperset, None)
 
