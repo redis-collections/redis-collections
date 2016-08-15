@@ -199,6 +199,33 @@ class RedisCollection(object):
         """
         return pickle.dumps(data)
 
+    def _pickle_2(self, data):
+        # On Python 2 some values of the str and unicode types have the same
+        # hash, are equal to each other, but nonetheless pickle to different
+        # byte strings. This method encodes unicode types to str to help match
+        # Python's behavior.
+        # The length of {b'a', u'a'} is 1 on Python 2.x and 2 on Python 3.x
+        if isinstance(data, six.text_type):
+            data = data.encode('utf-8')
+
+        return self._pickle_3(data)
+
+    def _pickle_3(self, data):
+        # Several numeric types are equal, have the same hash, but nonetheless
+        # pickle to different byte strings. This method reduces them down to
+        # integers to help match with Python's behavior.
+        # len({1.0, 1, complex(1, 0)}) == 1
+        if isinstance(data, complex):
+            int_data = int(data.real)
+            if data == int_data:
+                data = int_data
+        elif isinstance(data, NUMERIC_TYPES):
+            int_data = int(data)
+            if data == int_data:
+                data = int_data
+
+        return pickle.dumps(data)
+
     def _unpickle(self, string):
         """Converts given string serialization back to corresponding data.
         If :obj:`None` or empty string given, :obj:`None` is returned.
@@ -208,6 +235,15 @@ class RedisCollection(object):
         :rtype: anything serializable
         """
         return pickle.loads(string) if string else None
+
+    def _unpickle_2(self, string):
+        # Because we encoded text data in the pickle method, we should decode
+        # it on the way back out
+        data = pickle.loads(string) if string else None
+        if isinstance(data, six.binary_type):
+            data = data.decode('utf-8')
+
+        return data
 
     def _update(self, data, pipe=None):
         """Helper for update operations.
