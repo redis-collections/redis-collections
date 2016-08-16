@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, unicode_literals
 
+import io
 import os
 import re
 import subprocess
@@ -41,7 +42,7 @@ setup(
     name=meta['title'],
     version=meta['version'],
     description='Set of basic Python collections backed by Redis.',
-    long_description=open('README.rst', encoding='utf-8').read(),
+    long_description=io.open('README.rst', encoding='utf-8').read(),
     author=meta['author'],
     author_email='mail@honzajavorek.cz',
     url='https://github.com/honzajavorek/redis-collections',
