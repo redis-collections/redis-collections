@@ -368,9 +368,14 @@ class SetTest(RedisTestCase):
     def test_add_unicode(self):
         for init in (self.create_set, set):
             s = init()
-            elem = 'ěščřžýáíéůú\U0001F4A9'
-            s.add(elem)
-            self.assertEqual(sorted(s), [elem])
+
+            elem_1 = 'ěščřžýáíéůú\U0001F4A9'
+            s.add(elem_1)
+            self.assertEqual(s.pop(), elem_1)
+
+            elem_2 = b'\x81'
+            s.add(elem_2)
+            self.assertEqual(s.pop(), elem_2)
 
     def test_add_equal_hashes(self):
         redis_set = Set()
