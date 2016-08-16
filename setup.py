@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, unicode_literals
 
+import io
 import os
 import re
 import subprocess
@@ -25,7 +26,7 @@ base_path = os.path.dirname(__file__)
 
 # version
 meta_file = os.path.join(base_path, 'redis_collections/__init__.py')
-meta_file_contents = open(meta_file).read()
+meta_file_contents = io.open(meta_file, encoding='utf-8').read()
 meta = dict(re.findall(r'__([^_]+)__ = \'([^\']*)\'', meta_file_contents))
 
 
@@ -41,11 +42,11 @@ setup(
     name=meta['title'],
     version=meta['version'],
     description='Set of basic Python collections backed by Redis.',
-    long_description=open('README.rst', encoding='utf-8').read(),
+    long_description=io.open('README.rst', encoding='utf-8').read(),
     author=meta['author'],
     author_email='mail@honzajavorek.cz',
     url='https://github.com/honzajavorek/redis-collections',
-    license=open('LICENSE').read(),
+    license=io.open('LICENSE', encoding='utf-8').read(),
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
     install_requires=['redis>=2.7.2', 'six>=1.10.0'],
