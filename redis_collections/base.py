@@ -241,7 +241,10 @@ class RedisCollection(object):
         # it on the way back out
         data = pickle.loads(string) if string else None
         if isinstance(data, six.binary_type):
-            data = data.decode('utf-8')
+            try:
+                data = data.decode('utf-8')
+            except UnicodeDecodeError:
+                pass
 
         return data
 
