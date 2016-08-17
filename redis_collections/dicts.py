@@ -34,10 +34,12 @@ class Dict(RedisCollection, collections.MutableMapping):
     """
 
     if six.PY2:
-        _pickle = RedisCollection._pickle_2
-        _unpickle = RedisCollection._unpickle_2
+        _pickle_key = RedisCollection._pickle_2
+        _unpickle_key = RedisCollection._unpickle_2
     else:
-        _pickle = RedisCollection._pickle_3
+        _pickle_key = RedisCollection._pickle_3
+
+    _pickle_value = RedisCollection._pickle_3
 
     class __missing_value(object):
         def __repr__(self):
@@ -97,14 +99,14 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def __contains__(self, key):
         """Return ``True`` if *key* is present, else ``False``."""
-        pickled_key = self._pickle(key)
+        pickled_key = self._pickle_key(key)
         return bool(self.redis.hexists(self.key, pickled_key))
 
     def getmany(self, *keys):
         """Return the value for *keys*. If particular key is not in the
         dictionary, return :obj:`None`.
         """
-        pickled_keys = (self._pickle(k) for k in keys)
+        pickled_keys = (self._pickle_key(k) for k in keys)
         pickled_values = self.redis.hmget(self.key, *pickled_keys)
 
         ret = []
@@ -127,7 +129,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         try:
             value = self.cache[key]
         except KeyError:
-            pickled_key = self._pickle(key)
+            pickled_key = self._pickle_key(key)
             pickled_value = self.redis.hget(self.key, pickled_key)
             if pickled_value is None:
                 if hasattr(self, '__missing__'):
@@ -142,8 +144,8 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def __setitem__(self, key, value):
         """Set ``d[key]`` to *value*."""
-        pickled_key = self._pickle(key)
-        pickled_value = self._pickle(value)
+        pickled_key = self._pickle_key(key)
+        pickled_value = self._pickle_value(value)
         self.redis.hset(self.key, pickled_key, pickled_value)
 
         if self.writeback:
@@ -153,7 +155,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         """Remove ``d[key]`` from dictionary.
         Raises a :func:`KeyError` if *key* is not in the map.
         """
-        pickled_key = self._pickle(key)
+        pickled_key = self._pickle_key(key)
         deleted_count = self.redis.hdel(self.key, pickled_key)
         if not deleted_count:
             raise KeyError(key)
@@ -204,7 +206,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         else return *default*. If *default* is not given and *key* is not
         in the dictionary, a :exc:`KeyError` is raised.
         """
-        pickled_key = self._pickle(key)
+        pickled_key = self._pickle_key(key)
 
         if key in self.cache:
             self.redis.hdel(self.key, pickled_key)
@@ -261,10 +263,10 @@ class Dict(RedisCollection, collections.MutableMapping):
             return self.cache[key]
 
         def setdefault_trans(pipe):
-            pickled_key = self._pickle(key)
+            pickled_key = self._pickle_key(key)
 
             pipe.multi()
-            pipe.hsetnx(self.key, pickled_key, self._pickle(default))
+            pipe.hsetnx(self.key, pickled_key, self._pickle_value(default))
             pipe.hget(self.key, pickled_key)
 
             __, pickled_value = pipe.execute()
@@ -290,7 +292,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
             pickled_data = {}
             for k, v in six.iteritems(data):
-                pickled_data[self._pickle(k)] = self._pickle(v)
+                pickled_data[self._pickle_key(k)] = self._pickle_value(v)
 
             if pickled_data:
                 pipe.hmset(self.key, pickled_data)
@@ -450,8 +452,8 @@ class Counter(Dict):
 
             pickled_data = {}
             for k, v in six.iteritems(data):
-                pickled_key = self._pickle(k)
-                pickled_value = self._pickle(op(self.get(k, 0), v))
+                pickled_key = self._pickle_key(k)
+                pickled_value = self._pickle_value(op(self.get(k, 0), v))
                 pickled_data[pickled_key] = pickled_value
 
             if pickled_data:
@@ -542,8 +544,8 @@ class Counter(Dict):
             # Otherwise we need to update `self` in this transaction
             pickled_data = {}
             for key, value in six.iteritems(result):
-                pickled_key = self._pickle(key)
-                pickled_value = self._pickle(value)
+                pickled_key = self._pickle_key(key)
+                pickled_value = self._pickle_value(value)
                 pickled_data[pickled_key] = pickled_value
 
             pipe.multi()
