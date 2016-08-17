@@ -145,18 +145,6 @@ class RedisCollection(object):
 
         return data
 
-    def _update(self, data, pipe=None):
-        """Helper for update operations.
-
-        :param data: Data for update in form of a classic, built-in collection.
-        :param pipe: Redis pipe in case update is performed as a part
-                     of transaction.
-        :type pipe: :class:`redis.client.StrictPipeline` or
-                    :class:`redis.client.StrictRedis`
-        """
-        assert not isinstance(data, RedisCollection), \
-            "Not atomic. Use '_data()' within a transaction first."
-
     def _clear(self, pipe=None):
         """Helper for clear operations.
 
