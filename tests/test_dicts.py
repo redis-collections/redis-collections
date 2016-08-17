@@ -524,28 +524,28 @@ class CounterTest(RedisTestCase):
         self._test_op(operator.add)
 
         result = self.create_counter('abbccc') + self.create_counter('aabbcc')
-        self.assertTrue(isinstance(result, Counter))
+        self.assertTrue(isinstance(result, collections.Counter))
         self.assertEqual(result, {'a': 3, 'b': 4, 'c': 5})
 
     def test_sub(self):
         self._test_op(operator.sub)
 
         result = self.create_counter('abbccc') - self.create_counter('aabbcc')
-        self.assertTrue(isinstance(result, Counter))
+        self.assertTrue(isinstance(result, collections.Counter))
         self.assertEqual(result, {'c': 1})
 
     def test_or(self):
         self._test_op(operator.or_)
 
         result = self.create_counter('abbccc') | self.create_counter('aabbcc')
-        self.assertTrue(isinstance(result, Counter))
+        self.assertTrue(isinstance(result, collections.Counter))
         self.assertEqual(result, {'a': 2, 'b': 2, 'c': 3})
 
     def test_and(self):
         self._test_op(operator.and_)
 
         result = self.create_counter('abbccc') & self.create_counter('aabbcc')
-        self.assertTrue(isinstance(result, Counter))
+        self.assertTrue(isinstance(result, collections.Counter))
         self.assertEqual(result, {'a': 1, 'b': 2, 'c': 2})
 
     def test_iadd(self):

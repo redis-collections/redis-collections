@@ -567,12 +567,7 @@ class Counter(Dict):
         else:
             raise TypeError('Unsupported type {}'.format(type(other)))
 
-        if inplace:
-            return self
-        else:
-            new_instance = self.__class__(redis=self.redis)
-            new_instance.update(result)
-            return new_instance
+        return self if inplace else result
 
     def __add__(self, other):
         return self._op_helper(other, operator.add)
