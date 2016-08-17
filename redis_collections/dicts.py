@@ -84,13 +84,6 @@ class Dict(RedisCollection, collections.MutableMapping):
         if data:
             self.update(data)
 
-    def _get_hash_dict(self, key, redis):
-        key_hash = hash(key)
-        D = redis.hget(self.key, key_hash)
-        D = {} if D is None else self._unpickle(D)
-
-        return key_hash, D
-
     def __len__(self, pipe=None):
         """Return the number of items in the dictionary."""
         pipe = pipe or self.redis
