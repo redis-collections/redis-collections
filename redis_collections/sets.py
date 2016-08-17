@@ -120,9 +120,9 @@ class Set(RedisCollection, collections.MutableSet):
 
             return self_values.isdisjoint(other_values)
 
-        if isinstance(other, Set):
+        if self._same_redis(other):
             return self._transaction(isdisjoint_trans_pure, other.key)
-        if isinstance(other, RedisCollection):
+        if self._same_redis(other, RedisCollection):
             use_redis = True
             return self._transaction(isdisjoint_trans_mixed, other.key)
 
@@ -195,9 +195,9 @@ class Set(RedisCollection, collections.MutableSet):
             values = set(other.__iter__(pipe)) if use_redis else set(other)
             return all(self.__contains__(v, pipe=pipe) for v in values)
 
-        if isinstance(other, Set):
+        if self._same_redis(other):
             return self._transaction(ge_trans_pure, other.key)
-        if isinstance(other, RedisCollection):
+        if self._same_redis(other, RedisCollection):
             use_redis = True
             return self._transaction(ge_trans_mixed, other.key)
 
@@ -222,9 +222,9 @@ class Set(RedisCollection, collections.MutableSet):
             values = set(other.__iter__(pipe)) if use_redis else set(other)
             return all(v in values for v in self.__iter__(pipe))
 
-        if isinstance(other, Set):
+        if self._same_redis(other):
             return self._transaction(le_trans_pure, other.key)
-        if isinstance(other, RedisCollection):
+        if self._same_redis(other, RedisCollection):
             use_redis = True
             return self._transaction(le_trans_mixed, other.key)
 
@@ -272,9 +272,9 @@ class Set(RedisCollection, collections.MutableSet):
         other_keys = []
         all_redis_sets = True
         for other in others:
-            if isinstance(other, Set):
+            if self._same_redis(other):
                 other_keys.append(other.key)
-            elif isinstance(other, RedisCollection):
+            elif self._same_redis(other, RedisCollection):
                 other_keys.append(other.key)
                 all_redis_sets = False
             else:
@@ -329,9 +329,9 @@ class Set(RedisCollection, collections.MutableSet):
 
             return result
 
-        if isinstance(other, Set):
+        if self._same_redis(other):
             return self._transaction(xor_trans_pure, other.key)
-        elif isinstance(other, RedisCollection):
+        elif self._same_redis(other, RedisCollection):
             use_redis = True
             return self._transaction(xor_trans_mixed, other.key)
 

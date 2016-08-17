@@ -163,7 +163,10 @@ class Dict(RedisCollection, collections.MutableMapping):
         self.cache.pop(key, None)
 
     def _data(self, pipe=None):
-        """Returns a Python dictionary with the same values as this object"""
+        """
+        Returns a Python dictionary with the same values as this object
+        (without checking the local cache).
+        """
         pipe = pipe or self.redis
         items = six.iteritems(pipe.hgetall(self.key))
 
@@ -316,7 +319,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         ``d.update(red=1, blue=2)``.
         """
         if other is not None:
-            if isinstance(other, RedisCollection):
+            if self._same_redis(other, RedisCollection):
                 self._update_helper(other, use_redis=True)
             elif hasattr(other, 'keys'):
                 self._update_helper(other)
@@ -474,7 +477,7 @@ class Counter(Dict):
         a sequence of elements, not a sequence of ``(key, value)`` pairs.
         """
         if other is not None:
-            if isinstance(other, Dict):
+            if self._same_redis(other, RedisCollection):
                 self._update_helper(other, operator.add, use_redis=True)
             elif hasattr(other, 'keys'):
                 self._update_helper(other, operator.add)
@@ -490,7 +493,7 @@ class Counter(Dict):
         counts instead of replacing them.
         """
         if other is not None:
-            if isinstance(other, Dict):
+            if self._same_redis(other, RedisCollection):
                 self._update_helper(other, operator.sub, use_redis=True)
             elif hasattr(other, 'keys'):
                 self._update_helper(other, operator.sub)
@@ -555,7 +558,7 @@ class Counter(Dict):
 
         if other is None:
             result = self._transaction(op_trans, None)
-        elif isinstance(other, Counter):
+        elif self._same_redis(other, RedisCollection):
             result = self._transaction(op_trans, other.key)
         elif isinstance(other, collections.Counter):
             result = self._transaction(op_trans)

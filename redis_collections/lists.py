@@ -425,7 +425,7 @@ class List(RedisCollection, collections.MutableSequence):
                 for i, v in enumerate(values, len_self - len(values)):
                     self.cache[i] = v
 
-        if isinstance(other, RedisCollection):
+        if self._same_redis(other, RedisCollection):
             use_redis = True
             self._transaction(extend_trans, other.key)
         else:

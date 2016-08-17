@@ -156,6 +156,20 @@ class RedisCollection(object):
         redis = pipe or self.redis
         redis.delete(self.key)
 
+    def _same_redis(self, other, cls=None):
+        cls = cls or self.__class__
+        if not isinstance(other, cls):
+            return False
+
+        self_kwargs = self.redis.connection_pool.connection_kwargs
+        other_kwargs = other.redis.connection_pool.connection_kwargs
+
+        return (
+            self_kwargs['host'] == other_kwargs['host'] and
+            self_kwargs['port'] == other_kwargs['port'] and
+            self_kwargs.get('db', 0) == other_kwargs.get('db', 0)
+        )
+
     def _transaction(self, fn, *extra_keys):
         """Helper simplifying code within watched transaction.
 
