@@ -289,7 +289,7 @@ class Dict(RedisCollection, collections.MutableMapping):
             data = {}
 
             if isinstance(other, Dict):
-                data.update(other.iteritems())
+                data.update(other.iteritems(pipe))
             elif isinstance(other, RedisCollection):
                 data.update(other.__iter__(pipe))
             else:
@@ -449,7 +449,7 @@ class Counter(Dict):
             data = {}
 
             if isinstance(other, Dict):
-                data.update(other.iteritems())
+                data.update(other.iteritems(pipe))
             elif isinstance(other, RedisCollection):
                 data.update(other.__iter__(pipe))
             else:
