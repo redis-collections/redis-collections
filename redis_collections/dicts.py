@@ -85,15 +85,16 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         return key_hash, D
 
-    def __len__(self):
+    def __len__(self, pipe=None):
         """Return the number of items in the dictionary.
 
         .. note::
             Due to implementation on Redis side, this method is inefficient.
             The time taken is varies with the number of keys in stored.
         """
+        pipe = pipe or self.redis
         ret = 0
-        for D in six.itervalues(self.redis.hgetall(self.key)):
+        for D in six.itervalues(pipe.hgetall(self.key)):
             ret += len(self._unpickle(D))
 
         return ret

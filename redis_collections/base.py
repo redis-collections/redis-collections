@@ -6,7 +6,10 @@ base
 from __future__ import division, print_function, unicode_literals
 
 import abc
+from decimal import Decimal
+from fractions import Fraction
 import uuid
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -15,6 +18,8 @@ import functools
 
 import redis
 import six
+
+NUMERIC_TYPES = six.integer_types + (float, Decimal, Fraction, complex)
 
 
 def same_types(fn):

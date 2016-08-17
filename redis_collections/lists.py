@@ -296,9 +296,10 @@ class List(RedisCollection, collections.MutableSequence):
         """
         return (self.cache.get(i, v) for i, v in enumerate(self._data(pipe)))
 
-    def __len__(self):
+    def __len__(self, pipe=None):
         """Return the length of this collection."""
-        return self.redis.llen(self.key)
+        pipe = pipe or self.redis
+        return pipe.llen(self.key)
 
     def __reversed__(self):
         """
