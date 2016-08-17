@@ -45,7 +45,7 @@ class Set(RedisCollection, collections.MutableSet):
             internal method :func:`_create_key`.
         """
         data = args[0] if args else kwargs.pop('data', None)
-        super(Set, self).__init__(*args, **kwargs)
+        super(Set, self).__init__(**kwargs)
 
         if data:
             self.update(data)
@@ -89,9 +89,9 @@ class Set(RedisCollection, collections.MutableSet):
 
         return other
 
-    def clear(self):
+    def clear(self, pipe=None):
         """Remove all elements from the set."""
-        self.redis.delete(self.key)
+        self._clear(pipe)
 
     def discard(self, value):
         """Remove element *value* from the set if it is present."""

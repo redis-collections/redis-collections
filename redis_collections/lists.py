@@ -50,7 +50,7 @@ class List(RedisCollection, collections.MutableSequence):
         """
         data = args[0] if args else kwargs.pop('data', None)
         writeback = kwargs.pop('writeback', False)
-        super(List, self).__init__(*args, **kwargs)
+        super(List, self).__init__(**kwargs)
 
         self.__marker = uuid.uuid4().hex
         self.writeback = writeback
@@ -385,8 +385,7 @@ class List(RedisCollection, collections.MutableSequence):
 
     def clear(self, pipe=None):
         """Delete all values from this collection."""
-        pipe = pipe or self.redis
-        pipe.delete(self.key)
+        self._clear(pipe)
 
         if self.writeback:
             self.cache.clear()

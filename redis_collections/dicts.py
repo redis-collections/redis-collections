@@ -76,7 +76,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         """
         data = args[0] if args else kwargs.pop('data', None)
         writeback = kwargs.pop('writeback', False)
-        super(Dict, self).__init__(*args, **kwargs)
+        super(Dict, self).__init__(**kwargs)
 
         self.writeback = writeback
         self.cache = {}
@@ -330,9 +330,11 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         return other
 
-    def clear(self):
-        self.redis.delete(self.key)
-        self.cache.clear()
+    def clear(self, pipe=None):
+        self._clear(pipe)
+
+        if self.writeback:
+            self.cache.clear()
 
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):
@@ -380,8 +382,6 @@ class Counter(Dict):
         methods :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues`,
         which are available in Python 2.7's version.
     """
-
-    _same_types = (collections.Counter,)
 
     def __init__(self, *args, **kwargs):
         """Breakes the original :class:`Counter` API, because there is no
