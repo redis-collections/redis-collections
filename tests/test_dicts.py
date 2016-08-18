@@ -370,9 +370,9 @@ class DictTest(RedisTestCase):
     def test_repr(self):
         redis_dict = self.create_dict(writeback=True)
         redis_dict[0] = {}
-        redis_dict[0]['key'] = 'value'
+        redis_dict[0][1] = 2
 
-        self.assertIn("{0: {'key': 'value'}}", repr(redis_dict))
+        self.assertIn("{0: {1: 2}}", repr(redis_dict))
 
 
 class CounterTest(RedisTestCase):

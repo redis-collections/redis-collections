@@ -526,9 +526,9 @@ class ListTest(RedisTestCase):
     def test_repr(self):
         redis_list = self.create_list(writeback=True)
         redis_list.append({})
-        redis_list[0]['key'] = 'value'
+        redis_list[0][1] = 2
 
-        self.assertIn("[{'key': 'value'}]", repr(redis_list))
+        self.assertIn("[{1: 2}]", repr(redis_list))
 
 if __name__ == '__main__':
     unittest.main()
