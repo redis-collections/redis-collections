@@ -4,11 +4,10 @@ from __future__ import division, print_function, unicode_literals
 import collections
 from functools import reduce
 import operator
-import pickle
 
 import six
 
-from .base import NUMERIC_TYPES, RedisCollection
+from .base import RedisCollection
 
 
 class Set(RedisCollection, collections.MutableSet):
@@ -19,6 +18,12 @@ class Set(RedisCollection, collections.MutableSet):
     further details. The Redis implementation is based on the
     `set <http://redis.io/commands#set>`_ type.
     """
+
+    if six.PY2:
+        _pickle = RedisCollection._pickle_2
+        _unpickle = RedisCollection._unpickle_2
+    else:
+        _pickle = RedisCollection._pickle_3
 
     def __init__(self, *args, **kwargs):
         """
@@ -39,8 +44,6 @@ class Set(RedisCollection, collections.MutableSet):
             make your own implementation by subclassing and overriding
             internal method :func:`_create_key`.
         """
-        self._pickle = self._pickle_2 if six.PY2 else self._pickle_3
-        self._unpickle = self._unpickle_2 if six.PY2 else self._unpickle
         data = args[0] if args else kwargs.pop('data', None)
         super(Set, self).__init__(*args, **kwargs)
 
@@ -53,45 +56,6 @@ class Set(RedisCollection, collections.MutableSet):
 
     def _repr_data(self, data):
         return repr(set(data))
-
-    def _pickle_2(self, data):
-        # On Python 2 some values of the str and unicode types have the same
-        # hash, are equal to each other, but nonetheless pickle to different
-        # byte strings. This method encodes unicode types to str to help match
-        # Python's behavior.
-        # The length of {b'a', u'a'} is 1 on Python 2.x and 2 on Python 3.x
-        if isinstance(data, six.text_type):
-            data = data.encode('utf-8')
-
-        return self._pickle_3(data)
-
-    def _unpickle_2(self, string):
-        # Because we encoded text data in the pickle method, we should decode
-        # it on the way back out
-        data = pickle.loads(string) if string else None
-        if isinstance(data, six.binary_type):
-            try:
-                data = data.decode('utf-8')
-            except UnicodeDecodeError:
-                pass
-
-        return data
-
-    def _pickle_3(self, data):
-        # Several numeric types are equal, have the same hash, but nonetheless
-        # pickle to different byte strings. This method reduces them down to
-        # integers to help match with Python's behavior.
-        # len({1.0, 1, complex(1, 0)}) == 1
-        if isinstance(data, complex):
-            int_data = int(data.real)
-            if data == int_data:
-                data = int_data
-        elif isinstance(data, NUMERIC_TYPES):
-            int_data = int(data)
-            if data == int_data:
-                data = int_data
-
-        return pickle.dumps(data)
 
     # Magic methods
 
@@ -270,8 +234,10 @@ class Set(RedisCollection, collections.MutableSet):
     def _op_update_helper(
         self, others, op, redis_op, update=False, check_type=False
     ):
-        if check_type:
-            if not all(isinstance(x, collections.Set) for x in others):
+        if (
+            check_type and
+            not all(isinstance(x, collections.Set) for x in others)
+        ):
                 raise TypeError
 
         def op_update_trans_pure(pipe):
