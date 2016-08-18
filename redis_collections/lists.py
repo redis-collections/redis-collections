@@ -591,8 +591,9 @@ class List(RedisCollection, collections.MutableSequence):
         self._transaction(imul_trans)
         return self
 
-    def _repr_data(self, data):
-        return repr(list(data))
+    def _repr_data(self):
+        items = (repr(v) for v in self.__iter__())
+        return '[{}]'.format(', '.join(items))
 
     def _sync_helper(self, pipe):
         for i, v in six.iteritems(self.cache):

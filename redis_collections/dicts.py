@@ -355,8 +355,9 @@ class Dict(RedisCollection, collections.MutableMapping):
         values = ((item, value) for item in seq)
         return cls(values, **kwargs)
 
-    def _repr_data(self, data):
-        return repr(dict(data))
+    def _repr_data(self):
+        items = ('{}: {}'.format(repr(k), repr(v)) for k, v in self.items())
+        return '{{{}}}'.format(', '.join(items))
 
     def sync(self):
         self.writeback = False

@@ -201,10 +201,10 @@ class RedisCollection(object):
     def sync(self):
         pass
 
-    def _repr_data(self, data):
-        return repr(data)
+    def _repr_data(self):
+        return None
 
     def __repr__(self):
         cls_name = self.__class__.__name__
-        data = self._repr_data(self._data())
+        data = self._repr_data()
         return '<redis_collections.%s at %s %s>' % (cls_name, self.key, data)

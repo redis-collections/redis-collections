@@ -54,8 +54,9 @@ class Set(RedisCollection, collections.MutableSet):
         pipe = pipe or self.redis
         return (self._unpickle(x) for x in pipe.smembers(self.key))
 
-    def _repr_data(self, data):
-        return repr(set(data))
+    def _repr_data(self):
+        items = (repr(v) for v in self.__iter__())
+        return '{{{}}}'.format(', '.join(items))
 
     # Magic methods
 
