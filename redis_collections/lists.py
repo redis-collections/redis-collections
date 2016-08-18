@@ -594,13 +594,6 @@ class List(RedisCollection, collections.MutableSequence):
     def _repr_data(self, data):
         return repr(list(data))
 
-    def __enter__(self):
-        self.writeback = True
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.sync()
-
     def _sync_helper(self, pipe):
         for i, v in six.iteritems(self.cache):
             pipe.lset(self.key, i, self._pickle(v))

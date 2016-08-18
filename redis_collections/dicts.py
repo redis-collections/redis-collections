@@ -358,13 +358,6 @@ class Dict(RedisCollection, collections.MutableMapping):
     def _repr_data(self, data):
         return repr(dict(data))
 
-    def __enter__(self):
-        self.writeback = True
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.sync()
-
     def sync(self):
         self.writeback = False
         self._update_helper(self.cache)

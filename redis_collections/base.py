@@ -191,6 +191,16 @@ class RedisCollection(object):
         self.redis.transaction(trans, self.key, *extra_keys)
         return results[0]
 
+    def __enter__(self):
+        self.writeback = True
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.sync()
+
+    def sync(self):
+        pass
+    
     def _repr_data(self, data):
         return repr(data)
 
