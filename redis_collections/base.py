@@ -200,7 +200,7 @@ class RedisCollection(object):
 
     def sync(self):
         pass
-    
+
     def _repr_data(self, data):
         return repr(data)
 
