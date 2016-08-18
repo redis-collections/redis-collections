@@ -71,17 +71,21 @@ By default, collections use a new Redis connection with its default values, **wh
     >>> d = Dict(redis=r)
     >>> l = List(redis=r)  # using the same connection as Dict above
 
-There are several operations between collections resulting into creation of new instances of Redis Collections. These new instances
-always use the same Redis connection as the original object::
+A collection's ``copy`` method creates new instance that uses the same Redis connection as the original object::
 
-    >>> from redis import StrictRedis
-    >>> from redis_collections import List
-    >>> r = StrictRedis()
-    >>> l = List([1, 2], redis=r)
-    >>> l
+    >>> conn = StrictRedis()
+    >>> list_01 = List([1, 2], redis=conn)
+    >>> list_01
     <redis_collections.List at 196e407f8fc142728318a999ec821368 [1, 2]>
-    >>> l + [4, 5, 6]  # result is using the same connection
-    <redis_collections.List at 7790ef98639043c9abeacc80c2de0b93 [1, 2, 4, 5, 6]>
+    >>> list_02 = list_01.copy()  # result is using the same connection
+    <redis_collections.List at 7790ef98639043c9abeacc80c2de0b93 [1, 2]>
+
+Operations on two collections backed by different Redis servers will be performed in Python::
+
+    >>> list_1 = List((1, 2, 3), redis=StrictRedis(port=6379))
+    >>> list_2 = List((4, 5, 6), redis=StrictRedis(port=6380))
+    >>> list_1.extend(list_2)
+
 
 Synchronization
 ---------------
