@@ -212,7 +212,7 @@ class ListTest(RedisTestCase):
 
         redis_list = self.create_list(data)
         redis_list[0] = 'Zero'
-        new_list = redis_list.copy(redis=redis_list.redis)
+        new_list = redis_list.copy(key=redis_list.key)
         self.assertEqual(list(new_list), list(redis_list))
         self.assertTrue(new_list.redis is redis_list.redis)
         self.assertFalse(new_list.writeback)
