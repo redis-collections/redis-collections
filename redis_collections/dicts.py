@@ -671,8 +671,8 @@ class DefaultDict(Dict):
         self[key] = value
         return value
 
-    def copy(self, **kwargs):
-        other = self.__class__(self.default_factory, **kwargs)
+    def copy(self, key=None):
+        other = self.__class__(self.default_factory, redis=self.redis, key=key)
         other.update(self)
 
         return other

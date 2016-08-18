@@ -390,13 +390,14 @@ class List(RedisCollection, collections.MutableSequence):
         if self.writeback:
             self.cache.clear()
 
-    def copy(self, redis=None, key=None):
+    def copy(self, key=None):
         """
         Return a new :obj:``List`` with the specified *key*. The new collection
         will have the same values as this collection.
         """
-        redis = redis or self.redis
-        other = self.__class__(redis=redis, key=key, writeback=self.writeback)
+        other = self.__class__(
+            redis=self.redis, key=key, writeback=self.writeback
+        )
         other.extend(self)
 
         return other
