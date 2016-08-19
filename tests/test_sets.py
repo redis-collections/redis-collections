@@ -414,6 +414,13 @@ class SetTest(RedisTestCase):
             s.clear()
             self.assertEqual(sorted(s), [])
 
+    def test_repr(self):
+        redis_set = self.create_set()
+        redis_set.add(1)
+        redis_set.add(1.0)
+
+        self.assertIn("{1}", repr(redis_set))
+
 
 class _Set(Set):
     pass

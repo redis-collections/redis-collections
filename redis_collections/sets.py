@@ -45,7 +45,7 @@ class Set(RedisCollection, collections.MutableSet):
             internal method :func:`_create_key`.
         """
         data = args[0] if args else kwargs.pop('data', None)
-        super(Set, self).__init__(*args, **kwargs)
+        super(Set, self).__init__(**kwargs)
 
         if data:
             self.update(data)
@@ -54,8 +54,9 @@ class Set(RedisCollection, collections.MutableSet):
         pipe = pipe or self.redis
         return (self._unpickle(x) for x in pipe.smembers(self.key))
 
-    def _repr_data(self, data):
-        return repr(set(data))
+    def _repr_data(self):
+        items = (repr(v) for v in self.__iter__())
+        return '{{{}}}'.format(', '.join(items))
 
     # Magic methods
 
@@ -89,9 +90,9 @@ class Set(RedisCollection, collections.MutableSet):
 
         return other
 
-    def clear(self):
+    def clear(self, pipe=None):
         """Remove all elements from the set."""
-        self.redis.delete(self.key)
+        self._clear(pipe)
 
     def discard(self, value):
         """Remove element *value* from the set if it is present."""
@@ -120,9 +121,9 @@ class Set(RedisCollection, collections.MutableSet):
 
             return self_values.isdisjoint(other_values)
 
-        if isinstance(other, Set):
+        if self._same_redis(other):
             return self._transaction(isdisjoint_trans_pure, other.key)
-        if isinstance(other, RedisCollection):
+        if self._same_redis(other, RedisCollection):
             use_redis = True
             return self._transaction(isdisjoint_trans_mixed, other.key)
 
@@ -195,9 +196,9 @@ class Set(RedisCollection, collections.MutableSet):
             values = set(other.__iter__(pipe)) if use_redis else set(other)
             return all(self.__contains__(v, pipe=pipe) for v in values)
 
-        if isinstance(other, Set):
+        if self._same_redis(other):
             return self._transaction(ge_trans_pure, other.key)
-        if isinstance(other, RedisCollection):
+        if self._same_redis(other, RedisCollection):
             use_redis = True
             return self._transaction(ge_trans_mixed, other.key)
 
@@ -222,9 +223,9 @@ class Set(RedisCollection, collections.MutableSet):
             values = set(other.__iter__(pipe)) if use_redis else set(other)
             return all(v in values for v in self.__iter__(pipe))
 
-        if isinstance(other, Set):
+        if self._same_redis(other):
             return self._transaction(le_trans_pure, other.key)
-        if isinstance(other, RedisCollection):
+        if self._same_redis(other, RedisCollection):
             use_redis = True
             return self._transaction(le_trans_mixed, other.key)
 
@@ -272,9 +273,9 @@ class Set(RedisCollection, collections.MutableSet):
         other_keys = []
         all_redis_sets = True
         for other in others:
-            if isinstance(other, Set):
+            if self._same_redis(other):
                 other_keys.append(other.key)
-            elif isinstance(other, RedisCollection):
+            elif self._same_redis(other, RedisCollection):
                 other_keys.append(other.key)
                 all_redis_sets = False
             else:
@@ -329,9 +330,9 @@ class Set(RedisCollection, collections.MutableSet):
 
             return result
 
-        if isinstance(other, Set):
+        if self._same_redis(other):
             return self._transaction(xor_trans_pure, other.key)
-        elif isinstance(other, RedisCollection):
+        elif self._same_redis(other, RedisCollection):
             use_redis = True
             return self._transaction(xor_trans_mixed, other.key)
 

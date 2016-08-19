@@ -50,7 +50,7 @@ class List(RedisCollection, collections.MutableSequence):
         """
         data = args[0] if args else kwargs.pop('data', None)
         writeback = kwargs.pop('writeback', False)
-        super(List, self).__init__(*args, **kwargs)
+        super(List, self).__init__(**kwargs)
 
         self.__marker = uuid.uuid4().hex
         self.writeback = writeback
@@ -385,19 +385,19 @@ class List(RedisCollection, collections.MutableSequence):
 
     def clear(self, pipe=None):
         """Delete all values from this collection."""
-        pipe = pipe or self.redis
-        pipe.delete(self.key)
+        self._clear(pipe)
 
         if self.writeback:
             self.cache.clear()
 
-    def copy(self, redis=None, key=None):
+    def copy(self, key=None):
         """
         Return a new :obj:``List`` with the specified *key*. The new collection
         will have the same values as this collection.
         """
-        redis = redis or self.redis
-        other = self.__class__(redis=redis, key=key, writeback=self.writeback)
+        other = self.__class__(
+            redis=self.redis, key=key, writeback=self.writeback
+        )
         other.extend(self)
 
         return other
@@ -426,7 +426,7 @@ class List(RedisCollection, collections.MutableSequence):
                 for i, v in enumerate(values, len_self - len(values)):
                     self.cache[i] = v
 
-        if isinstance(other, RedisCollection):
+        if self._same_redis(other, RedisCollection):
             use_redis = True
             self._transaction(extend_trans, other.key)
         else:
@@ -592,15 +592,9 @@ class List(RedisCollection, collections.MutableSequence):
         self._transaction(imul_trans)
         return self
 
-    def _repr_data(self, data):
-        return repr(list(data))
-
-    def __enter__(self):
-        self.writeback = True
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.sync()
+    def _repr_data(self):
+        items = (repr(v) for v in self.__iter__())
+        return '[{}]'.format(', '.join(items))
 
     def _sync_helper(self, pipe):
         for i, v in six.iteritems(self.cache):

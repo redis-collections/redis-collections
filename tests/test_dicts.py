@@ -367,6 +367,13 @@ class DictTest(RedisTestCase):
         # Closing the context manager syncs to Redis
         self.assertEqual(D._data()['key'], [1, 2])
 
+    def test_repr(self):
+        redis_dict = self.create_dict(writeback=True)
+        redis_dict[0] = {}
+        redis_dict[0][1] = 2
+
+        self.assertIn("{0: {1: 2}}", repr(redis_dict))
+
 
 class CounterTest(RedisTestCase):
 
@@ -691,6 +698,7 @@ class DefaultDictTest(RedisTestCase):
         self.assertEqual(
             redis_ddict.default_factory, redis_copy.default_factory
         )
+
 
 if __name__ == '__main__':
     unittest.main()

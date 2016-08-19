@@ -212,7 +212,7 @@ class ListTest(RedisTestCase):
 
         redis_list = self.create_list(data)
         redis_list[0] = 'Zero'
-        new_list = redis_list.copy(redis=redis_list.redis)
+        new_list = redis_list.copy(key=redis_list.key)
         self.assertEqual(list(new_list), list(redis_list))
         self.assertTrue(new_list.redis is redis_list.redis)
         self.assertFalse(new_list.writeback)
@@ -522,6 +522,13 @@ class ListTest(RedisTestCase):
             self.assertEqual(list(redis_cached._data())[0], {'one': 1})
 
         self.assertEqual(list(redis_cached._data())[0], {'one': 2})
+
+    def test_repr(self):
+        redis_list = self.create_list(writeback=True)
+        redis_list.append({})
+        redis_list[0][1] = 2
+
+        self.assertIn("[{1: 2}]", repr(redis_list))
 
 if __name__ == '__main__':
     unittest.main()
