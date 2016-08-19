@@ -3,7 +3,7 @@
 dicts
 ~~~~~
 
-Collections based on dict interface.
+Collections based on the dict interface.
 """
 from __future__ import division, print_function, unicode_literals
 
@@ -64,13 +64,6 @@ class Dict(RedisCollection, collections.MutableMapping):
                           modifications to mutable values. Changes will be
                           written to Redis after calling the ``sync`` method.
         :type key: bool
-
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
 
         .. warning::
             As mentioned, :class:`Dict` does not support following
@@ -399,13 +392,6 @@ class Counter(Dict):
                     string is generated.
         :type key: str
 
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
-
         .. warning::
             As mentioned, :class:`Counter` does not support following
             initialization syntax: ``c = Counter(a=1, b=2)``
@@ -608,7 +594,7 @@ class Counter(Dict):
 class DefaultDict(Dict):
     """Mutable **mapping** collection aiming to have the same API as
     :class:`collections.defaultdict`. See
-    `defaultdict  <https://docs.python.org/2/library/collections.html`_ for
+    `defaultdict  <https://docs.python.org/2/library/collections.html>`_ for
     further details. The Redis implementation is based on the
     `hash <http://redis.io/commands#hash>`_ type.
 
@@ -636,13 +622,6 @@ class DefaultDict(Dict):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
-
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
 
         .. warning::
             As mentioned, :class:`DefaultDict` does not support following

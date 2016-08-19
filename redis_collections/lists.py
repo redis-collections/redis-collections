@@ -3,7 +3,7 @@
 lists
 ~~~~~
 
-Collections based on list interface.
+Collections based on the list interface.
 """
 from __future__ import division, print_function, unicode_literals
 
@@ -19,10 +19,10 @@ from .base import RedisCollection
 
 class List(RedisCollection, collections.MutableSequence):
     """Mutable **sequence** collection aiming to have the same API as the
-    standard sequence type, :class:`list`. See `list
+    standard sequence type, :class:`list`. See Python's `list documentation
     <http://docs.python.org/2/library/functions.html#list>`_ for
     further details. The Redis implementation is based on the
-    `list <http://redis.io/commands#list>`_ type.
+    `list type <http://redis.io/commands#list>`_.
     """
 
     def __init__(self, *args, **kwargs):
@@ -40,13 +40,6 @@ class List(RedisCollection, collections.MutableSequence):
                           modifications to mutable values. Changes will be
                           written to Redis after calling the ``sync`` method.
         :type key: bool
-
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
         """
         data = args[0] if args else kwargs.pop('data', None)
         writeback = kwargs.pop('writeback', False)
