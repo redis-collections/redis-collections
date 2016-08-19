@@ -12,7 +12,7 @@ This library builds on `Redis <http://redis.io/>`_, the excellent key-value stor
 Usage
 =====
 
-To get started, import one of the collections and use it store some data:
+To get started, import one of the collections and use it to store some data:
 
     >>> from redis_collections import Dict
     >>> d = Dict()
