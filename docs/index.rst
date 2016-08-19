@@ -75,7 +75,7 @@ Redis Connection
 
 By default, collections use a new Redis connection with its default values.
 This requires no configuration, but is inefficient if you plan to use multiple collections.
-To share a connection with multiple collections, create one (with ``redis.StrictRedis``) and pass it using the `redis`` keyword when creating the collections:
+To share a connection with multiple collections, create one (with ``redis.StrictRedis``) and pass it using the ``redis`` keyword when creating the collections:
 
     >>> from redis import StrictRedis
     >>> conn = StrictRedis()
