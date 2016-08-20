@@ -151,7 +151,7 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             Argument *k* is supported only for Redis of version 2.6 and higher.
-            This method is not available on from the Python :class:`set`.
+            This method is not available on the Python :class:`set`.
         """
         if k == 0:
             return []

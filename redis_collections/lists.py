@@ -214,7 +214,7 @@ class List(RedisCollection, collections.MutableSequence):
 
     def _get_slice(self, index):
         """
-        Return the values specified by :obj:`slice` *index* as a :obj:``list``.
+        Return the values specified by :obj:`slice` *index* as a :obj:`list`.
         """
         def get_slice_trans(pipe):
             start, stop, step, forward, len_self = self._normalize_slice(
@@ -241,9 +241,9 @@ class List(RedisCollection, collections.MutableSequence):
 
     def __getitem__(self, index):
         """
-        If *index* is an :obj:``int``, return the value at that index.
-        If *index* is a :obj:``slice``, return the values from that slice
-        as a :obj:``list``.
+        If *index* is an :obj:`int`, return the value at that index.
+        If *index* is a :obj:`slice`, return the values from that slice
+        as a :obj:`list`.
         """
         if isinstance(index, slice):
             return self._get_slice(index)
@@ -276,7 +276,7 @@ class List(RedisCollection, collections.MutableSequence):
 
     def _data(self, pipe=None):
         """
-        Return a :obj:``list`` of all values from Redis
+        Return a :obj:`list` of all values from Redis
         (without checking the local cache).
         """
         pipe = pipe or self.redis
@@ -284,7 +284,7 @@ class List(RedisCollection, collections.MutableSequence):
 
     def __iter__(self, pipe=None):
         """
-        Return a :obj:``list`` of all values from Redis (overriding those with
+        Return a :obj:`list` of all values from Redis (overriding those with
         values from the local cache)
         """
         return (self.cache.get(i, v) for i, v in enumerate(self._data(pipe)))
@@ -302,7 +302,7 @@ class List(RedisCollection, collections.MutableSequence):
 
     def _set_slice(self, index, value):
         """
-        Set the values for the indexes associated with :obj:``slice`` *index*
+        Set the values for the indexes associated with :obj:`slice` *index*
         to the contents of the iterable *value*.
         """
         def set_slice_trans(pipe):
@@ -348,8 +348,8 @@ class List(RedisCollection, collections.MutableSequence):
 
     def __setitem__(self, index, value):
         """
-        If *index* is an :obj:``int``, set the value for that index to *value*.
-        If *index* is a :obj:``slice``, set the values for the indexes
+        If *index* is an :obj:`int`, set the value for that index to *value*.
+        If *index* is a :obj:`slice`, set the values for the indexes
         associated with that slice  to the contents of the iterable *value*.
         """
         if isinstance(index, slice):
@@ -385,7 +385,7 @@ class List(RedisCollection, collections.MutableSequence):
 
     def copy(self, key=None):
         """
-        Return a new :obj:``List`` with the specified *key*. The new collection
+        Return a new :obj:`List` with the specified *key*. The new collection
         will have the same values as this collection.
         """
         other = self.__class__(

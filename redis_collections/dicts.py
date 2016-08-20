@@ -26,11 +26,6 @@ class Dict(RedisCollection, collections.MutableMapping):
         In comparing with original :class:`dict` type, :class:`Dict` does not
         implement methods :func:`viewitems`, :func:`viewkeys`, and
         :func:`viewvalues`.
-
-    .. note::
-        Some operations, which are usually not used so often, can be more
-        efficient than their "popular" equivalents. For example, :func:`get`
-        should be preffered over the classic ``d[key]`` approach.
     """
 
     if six.PY2:
@@ -341,11 +336,10 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         .. note::
             :func:`fromkeys` is a class method that returns a new dictionary.
-            *value* defaults to :obj:`None`. It is possible to specify
-            additional keyword arguments to be passed to :func:`__init__` of
-            the new object.
+            It is possible to specify additional keyword arguments to be passed
+             to :func:`__init__` of the new object.
         """
-        values = ((item, value) for item in seq)
+        values = ((key, value) for key in seq)
         return cls(values, **kwargs)
 
     def _repr_data(self):

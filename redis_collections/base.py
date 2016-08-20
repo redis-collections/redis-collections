@@ -41,13 +41,6 @@ class RedisCollection(object):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
-
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
         """
         #: Redis client instance. :class:`StrictRedis` object with default
         #: connection settings is used if not set by :func:`__init__`.

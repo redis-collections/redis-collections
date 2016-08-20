@@ -9,10 +9,17 @@ This exposes Redis functionality with a Pythonic interface, and provides a simpl
 
 This library builds on `Redis <http://redis.io/>`_, the excellent key-value store, and on `redis-py <https://github.com/andymccurdy/redis-py>`_, the well-designed Python interface for it.
 
-Usage
-=====
+Installation and Usage
+======================
 
-To get started, import one of the collections and use it to store some data:
+To get started, install the library with `pip <https://pip.pypa.io/en/stable/>`_:
+
+.. code:: shell
+
+   pip install redis-collections
+
+
+With the library installed, import one the collections and use it to store some data:
 
     >>> from redis_collections import Dict
     >>> d = Dict()
@@ -25,7 +32,7 @@ To get started, import one of the collections and use it to store some data:
 In Redis you will see can see a ``hash`` structure under key ``fe267c1dde5d4f648e7bac836a0168fe``.
 That structure stores a field and value that corresponds to ``{'answer': 42}`` (the key and value are pickled, because Redis can store only strings).
 
-In Python you'll find that the collections can do most everything their Python counterparts can.
+In Python you'll find that the collections can do most everything their Python counterparts can:
 
     >>> d.update({'hasek': 39, 'jagr': 68})
     >>> d
@@ -33,15 +40,6 @@ In Python you'll find that the collections can do most everything their Python c
     >>> del d['answer']
     >>> d
     <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'jagr': 68, 'hasek': 39}>
-
-Installation
-------------
-
-The current version is |release|.
-
-.. code:: shell
-
-   pip install redis-collections
 
 Persistence
 -----------
@@ -142,7 +140,7 @@ Collections use :mod:`pickle`, which means you should never retrieve data from a
 
 For example: suppose you maintain a web application that has user profiles.
 Users can submit their name, birthday, and a brief biography; and ultimately this is information stored in a Redis hash.
-*Do not* attach a `redis_collection.Dict` instance to that hash key - a user could construct a string that gives them the ability to execute arbitrary code with your Python process's privileges.
+*Do not* attach a ``redis_collection.Dict`` instance to that hash key - a user could construct a string that gives them the ability to execute arbitrary code with your Python process's privileges.
 
 Philosophy
 ----------
