@@ -413,7 +413,7 @@ class List(RedisCollection, collections.MutableSequence):
             if use_redis:
                 values = list(other.__iter__(pipe))
             else:
-                values = other
+                values = list(other)
             len_self = pipe.rpush(self.key, *(self._pickle(v) for v in values))
             if self.writeback:
                 for i, v in enumerate(values, len_self - len(values)):
@@ -446,36 +446,42 @@ class List(RedisCollection, collections.MutableSequence):
 
         return self._transaction(index_trans)
 
+    def _insert_left(self, value, pipe=None):
+        """Insert *value* at index 0."""
+        pipe = pipe or self.redis
+        pipe.lpush(self.key, self._pickle(value))
+        if self.writeback:
+            self.cache = {k + 1: v for k, v in six.iteritems(self.cache)}
+            self.cache[0] = value
+
     def insert(self, index, value):
         """
         Insert *value* into the collection at *index*.
         """
         # Easy case: insert on the left
         if index == 0:
-            self.redis.lpush(self.key, self._pickle(value))
-            if self.writeback:
-                self.cache = {k + 1: v for k, v in six.iteritems(self.cache)}
-                self.cache[0] = value
+            return self._insert_left(value)
+
         # Difficult case: insert in the middle.
         # Retrieve everything from ``index`` up to the end, insert ``value``
         # on the right, then re-insert the retrieved items on the right
-        else:
-            def insert_middle_trans(pipe):
-                __, cache_index = self._normalize_index(index, pipe)
-                right_values = pipe.lrange(self.key, cache_index, -1)
-                pipe.multi()
-                pipe.ltrim(self.key, 0, cache_index - 1)
-                pipe.rpush(self.key, self._pickle(value), *right_values)
-                if self.writeback:
-                    new_cache = {}
-                    for i, v in six.iteritems(self.cache):
-                        if i < cache_index:
-                            new_cache[i] = v
-                        elif i >= cache_index:
-                            new_cache[i + 1] = v
-                    new_cache[cache_index] = value
-                    self.cache = new_cache
-            self._transaction(insert_middle_trans)
+        def insert_middle_trans(pipe):
+            __, cache_index = self._normalize_index(index, pipe)
+            right_values = pipe.lrange(self.key, cache_index, -1)
+            pipe.multi()
+            pipe.ltrim(self.key, 0, cache_index - 1)
+            pipe.rpush(self.key, self._pickle(value), *right_values)
+            if self.writeback:
+                new_cache = {}
+                for i, v in six.iteritems(self.cache):
+                    if i < cache_index:
+                        new_cache[i] = v
+                    elif i >= cache_index:
+                        new_cache[i + 1] = v
+                new_cache[cache_index] = value
+                self.cache = new_cache
+
+        self._transaction(insert_middle_trans)
 
     def pop(self, index=-1):
         """
@@ -601,3 +607,127 @@ class List(RedisCollection, collections.MutableSequence):
             self._sync_helper(pipe)
 
         self._transaction(sync_trans)
+
+
+class Deque(List):
+    def __init__(self, *args, **kwargs):
+        if len(args) > 2:
+            msg = '{} takes at most 2 positional arguments ({} given)'
+            raise TypeError(msg.format(self.__class__, len(args)))
+        elif len(args) == 2:
+            maxlen = args[1]
+            args = args[:1]
+        else:
+            maxlen = None
+
+        if not (maxlen is not None) and isinstance(maxlen, six.integer_types):
+            raise TypeError('an integer is required')
+
+        self.maxlen = maxlen
+        super(Deque, self).__init__(*args, **kwargs)
+
+    def _append_helper(self, value, pipe):
+        # Append on the right
+        len_self = pipe.rpush(self.key, self._pickle(value))
+        if self.writeback:
+            self.cache[len_self - 1] = value
+
+        # Check the length restriction
+        if (self.maxlen is None) or (len_self <= self.maxlen):
+            return
+
+        # Pop from the left
+        pipe.lpop(self.key)
+        if self.writeback:
+            items = six.iteritems(self.cache)
+            self.cache = {i - 1: v for i, v in items if i != 0}
+
+    def append(self, value):
+        """Add *value* to the right side of the collection."""
+        def append_trans(pipe):
+            self._append_helper(value, pipe)
+
+        self._transaction(append_trans)
+
+    def _appendleft_helper(self, value, pipe):
+        # Append on the left
+        len_self = pipe.lpush(self.key, self._pickle(value))
+        if self.writeback:
+            self.cache = {k + 1: v for k, v in six.iteritems(self.cache)}
+            self.cache[0] = value
+
+        # Check the length restriction
+        if (self.maxlen is None) or (len_self <= self.maxlen):
+            return
+
+        # Pop from the right
+        pipe.rpop(self.key)
+        if self.writeback:
+            cache_index = len_self - 1
+            items = six.iteritems(self.cache)
+            self.cache = {i: v for i, v in items if i != cache_index}
+
+    def appendleft(self, value):
+        """Add *value* to the left side of the collection."""
+        def appendleft_trans(pipe):
+            self._appendleft_helper(value, pipe)
+
+        self._transaction(appendleft_trans)
+
+    def copy(self, key=None):
+        """
+        Return a new :obj:`Deque` with the specified *key*. The new collection
+        will have the same values and maxlen as this collection.
+        """
+        other = self.__class__(
+            self.__iter__(), self.maxlen, key=key, writeback=self.writeback
+        )
+
+        return other
+
+    def extend(self, other):
+        """
+        Extend the right side of the the collection by appending values from
+        the iterable *other*.
+        """
+        def extend_trans(pipe):
+            values = list(other.__iter__(pipe)) if use_redis else list(other)
+            for v in values:
+                self.append(v)
+
+        if self._same_redis(other, RedisCollection):
+            use_redis = True
+            self._transaction(extend_trans, other.key)
+        else:
+            use_redis = False
+            self._transaction(extend_trans)
+
+    def extendleft(self, other):
+        """
+        Extend the left side of the the collection by appending values from
+        the iterable *other*. Note that the appends will reverse the order
+        of the given values.
+        """
+        def extendleft_trans(pipe):
+            values = list(other.__iter__(pipe)) if use_redis else list(other)
+            for v in values:
+                self.appendleft(v)
+
+        if self._same_redis(other, RedisCollection):
+            use_redis = True
+            self._transaction(extendleft_trans, other.key)
+        else:
+            use_redis = False
+            self._transaction(extendleft_trans)
+
+    def pop(self):
+        """
+        Remove and return an element from the right side of the collection.
+        """
+        return self._pop_right()
+
+    def popleft(self):
+        """
+        Remove and return an element from the right side of the collection.
+        """
+        return self._pop_left()
