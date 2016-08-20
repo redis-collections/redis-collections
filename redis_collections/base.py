@@ -34,12 +34,12 @@ class RedisCollection(object):
     def __init__(self, redis=None, key=None):
         """
         :param data: Initial data.
-        :param redis: Redis client instance. If not provided, default Redis
-                      connection is used.
+        :param redis: Redis client instance. If not provided, a new Redis
+                      connection is created.
         :type redis: :class:`redis.StrictRedis`
-        :param key: Redis key of the collection. Collections with the same key
-                    point to the same data. If not provided, default random
-                    string is generated.
+        :param key: The key at which the collection will be stored in Redis.
+                    Collections with the same key point to the same data.
+                    If not provided a random key is generated.
         :type key: str
         """
         #: Redis client instance. :class:`StrictRedis` object with default
@@ -50,14 +50,17 @@ class RedisCollection(object):
         self.key = key or self._create_key()
 
     def _create_redis(self):
-        """Creates default Redis connection.
+        """
+        Creates a new Redis connection when none is specified during
+        initialization.
 
         :rtype: :class:`redis.StrictRedis`
         """
         return redis.StrictRedis()
 
     def _create_key(self):
-        """Creates new Redis key.
+        """
+        Creates a random Redis key for storing this collection's data.
 
         :rtype: string
 
@@ -72,7 +75,7 @@ class RedisCollection(object):
 
     @abc.abstractmethod
     def _data(self, pipe=None):
-        """Helper for getting collection's data within a transaction.
+        """Helper for getting the collection's data within a transaction.
 
         :param pipe: Redis pipe in case creation is performed as a part
                      of transaction.
@@ -81,11 +84,11 @@ class RedisCollection(object):
         """
 
     def _pickle(self, data):
-        """Converts given data to string.
+        """Converts given data to a bytes string.
 
         :param data: Data to be serialized.
         :type data: anything serializable
-        :rtype: string
+        :rtype: bytes
         """
         return pickle.dumps(data)
 
@@ -116,15 +119,14 @@ class RedisCollection(object):
 
         return pickle.dumps(data)
 
-    def _unpickle(self, string):
-        """Converts given string serialization back to corresponding data.
-        If :obj:`None` or empty string given, :obj:`None` is returned.
+    def _unpickle(self, pickled_data):
+        """Convert *pickled_data* to a Python object and return it.
 
-        :param string: String to be unserialized.
-        :type string: string
+        :param pickled_data: Serialized data.
+        :type pickled_data: bytes
         :rtype: anything serializable
         """
-        return pickle.loads(string) if string else None
+        return pickle.loads(pickled_data) if pickled_data else None
 
     def _unpickle_2(self, string):
         # Because we encoded text data in the pickle method, we should decode

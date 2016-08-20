@@ -80,7 +80,7 @@ To share a connection with multiple collections, create one (with ``redis.Strict
     >>> d = Dict(redis=conn)
     >>> l = List(redis=conn)  # using the same connection as Dict above
 
-A collection's ``copy`` method creates new instance that uses the same Redis connection as the original object::
+A collection's ``copy`` method creates new a instance that uses the same Redis connection as the original object::
 
     >>> conn = StrictRedis()
     >>> list_01 = List([1, 2], redis=conn)
@@ -127,7 +127,7 @@ The ``writeback`` option is automatically enabled for ``DefaultDict`` objects.
 Subclass customization
 ----------------------
 
-Collections use :func:`uuid.uuid4` for generting unique keys.
+Collections use :func:`uuid.uuid4` for generating unique keys.
 If you are not satisfied with that function's `collision probability <http://stackoverflow.com/a/786541/325365>`_ you may sublclass a collection and override its :func:`_create_key` method.
 
 If you don't like how  :mod:`pickle` does serialization, you may override the ``_pickle`` and ``_unpickle`` methods of the collection classes.
