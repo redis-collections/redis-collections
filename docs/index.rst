@@ -201,10 +201,10 @@ Redis Collections are composed of only several classes. All items listed below a
 Changelog
 ---------
 
-.. toctree::
-   :maxdepth: 1
+Changelog
+---------
 
-   changelog.rst
+**→** :ref:`changelog`
 
 Maintainers
 -----------
