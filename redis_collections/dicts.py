@@ -337,7 +337,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         .. note::
             :func:`fromkeys` is a class method that returns a new dictionary.
             It is possible to specify additional keyword arguments to be passed
-             to :func:`__init__` of the new object.
+            to :func:`__init__` of the new object.
         """
         values = ((key, value) for key in seq)
         return cls(values, **kwargs)
