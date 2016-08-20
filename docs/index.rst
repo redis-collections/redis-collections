@@ -201,9 +201,6 @@ Redis Collections are composed of only several classes. All items listed below a
 Changelog
 ---------
 
-Changelog
----------
-
 **→** :ref:`changelog`
 
 Maintainers
