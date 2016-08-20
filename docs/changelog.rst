@@ -24,7 +24,7 @@ Breaking changes from 0.2.x
 
 - ``List`` slicing, ``Set`` methods like ``union``, and ``Counter`` operator methods now return Python objects instead of creating new Redis collections at randomly-generated keys.
 
-  For example, previously ``List([0, 1, 2][:1])`` would create a new ``List`` and store its items in Redis - now it returns a Python ``list``.
+  For example, previously ``List([0, 1, 2])[:1]`` would create a new ``List`` and store its items in Redis - now it returns a Python ``list``.
 
   Methods like ``copy`` (all collections) and ``fromkeys`` (``Dict``) that allow you to specify a Redis key as a keyword argument will still create new Redis collections.
 
