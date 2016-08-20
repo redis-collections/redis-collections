@@ -578,9 +578,6 @@ class List(RedisCollection, collections.MutableSequence):
         return self._add_helper(other)
 
     def __radd__(self, other):
-        if self._same_redis(other, RedisCollection):
-            return self._add_helper(other, use_redis=True, swap_args=True)
-
         return self._add_helper(other, swap_args=True)
 
     def __iadd__(self, other):
@@ -655,7 +652,7 @@ class Deque(List):
         else:
             maxlen = None
 
-        if not (maxlen is not None) and isinstance(maxlen, six.integer_types):
+        if (maxlen is not None) and not isinstance(maxlen, six.integer_types):
             raise TypeError('an integer is required')
 
         if (maxlen is not None) and maxlen < 0:
@@ -740,7 +737,11 @@ class Deque(List):
         will have the same values and maxlen as this collection.
         """
         other = self.__class__(
-            self.__iter__(), self.maxlen, key=key, writeback=self.writeback
+            self.__iter__(),
+            self.maxlen,
+            redis=self.redis,
+            key=key,
+            writeback=self.writeback,
         )
 
         return other
@@ -790,7 +791,10 @@ class Deque(List):
             if (self.maxlen is not None) and (len_self >= self.maxlen):
                 raise IndexError
 
-            self._insert_middle(index, value, pipe=pipe)
+            if index == 0:
+                self._insert_left(value, pipe)
+            else:
+                self._insert_middle(index, value, pipe=pipe)
 
         self._transaction(insert_trans)
 
