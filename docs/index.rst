@@ -10,7 +10,7 @@ This exposes Redis functionality with a Pythonic interface, and provides a simpl
 This library builds on `Redis <http://redis.io/>`_, the excellent key-value store, and on `redis-py <https://github.com/andymccurdy/redis-py>`_, the well-designed Python interface for it.
 
 Installation and Usage
-======================
+----------------------
 
 To get started, install the library with `pip <https://pip.pypa.io/en/stable/>`_:
 
@@ -197,6 +197,14 @@ Redis Collections are composed of only several classes. All items listed below a
 .. autoclass:: Set
     :members:
     :special-members:
+
+Changelog
+---------
+
+.. toctree::
+   :maxdepth: 1
+
+   changelog.rst
 
 Maintainers
 -----------
