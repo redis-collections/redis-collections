@@ -360,6 +360,7 @@ class ListTest(RedisTestCase):
 
         for L in (redis_list, redis_cached, python_list):
             self.assertEqual(L + ['x', 'y'], [0, 1, 2, 3, 'x', 'y'])
+            self.assertEqual(['x', 'y'] + L, ['x', 'y', 0, 1, 2, 3])
 
     def test_mul(self):
         data = (0, 1)
