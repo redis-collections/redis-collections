@@ -47,4 +47,6 @@ New features in 0.3.x
 
 - `Cross-process Dict access <https://github.com/honzajavorek/redis-collections/issues/58>`_ should now work for Python 3.3 and later again.
 
+- `Deque <https://github.com/honzajavorek/redis-collections/issues/6>`_ was added.
+
 See the `Github milestone <https://github.com/honzajavorek/redis-collections/milestone/1>`_ for more details.

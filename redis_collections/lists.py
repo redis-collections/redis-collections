@@ -640,9 +640,33 @@ class List(RedisCollection, collections.MutableSequence):
 
 
 class Deque(List):
+    """A Redis-backed version of Python's :class:`collections.deque`.
+    See Python's `deque documentation
+    <https://docs.python.org/3/library/collections.html#collections.deque>`_
+    for more details. The Redis implementation is based on the `list type
+    <http://redis.io/commands#list>`_.
+    """
+
     python_cls = collections.deque
 
     def __init__(self, *args, **kwargs):
+        """
+        :param data: Initial data.
+        :type data: iterable
+        :param maxlen: Maximum size.
+        :type maxlen: int
+        :param redis: Redis client instance. If not provided, default Redis
+                      connection is used.
+        :type redis: :class:`redis.StrictRedis`
+        :param key: Redis key of the collection. Collections with the same key
+                    point to the same data. If not provided, default random
+                    string is generated.
+        :type key: str
+        :param writeback: If ``True`` keep a local cache of changes for storing
+                          modifications to mutable values. Changes will be
+                          written to Redis after calling the ``sync`` method.
+        :type key: bool
+        """
         if len(args) > 2:
             msg = '{} takes at most 2 positional arguments ({} given)'
             raise TypeError(msg.format(self.__class__, len(args)))
