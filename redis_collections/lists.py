@@ -666,6 +666,10 @@ class Deque(List):
                           modifications to mutable values. Changes will be
                           written to Redis after calling the ``sync`` method.
         :type key: bool
+
+        .. warning::
+            The ``maxlen`` of the collection can't be enforced when multiple
+            processes are accessing its Redis collection.
         """
         if len(args) > 2:
             msg = '{} takes at most 2 positional arguments ({} given)'
