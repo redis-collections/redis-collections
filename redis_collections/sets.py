@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+"""
+sets
+~~~~~
+
+Collections based on the set interface.
+"""
 from __future__ import division, print_function, unicode_literals
 
 import collections
@@ -13,10 +19,10 @@ from .base import RedisCollection
 class Set(RedisCollection, collections.MutableSet):
     """
     Mutable **set** collection aiming to have the same API as the standard
-    set type. See `set
+    set type. See Python's `set documentation
     <http://docs.python.org/2/library/stdtypes.html#set>`_ for
     further details. The Redis implementation is based on the
-    `set <http://redis.io/commands#set>`_ type.
+    `set type <http://redis.io/commands#set>`_.
     """
 
     if six.PY2:
@@ -36,13 +42,6 @@ class Set(RedisCollection, collections.MutableSet):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
-
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
         """
         data = args[0] if args else kwargs.pop('data', None)
         super(Set, self).__init__(**kwargs)
@@ -152,7 +151,7 @@ class Set(RedisCollection, collections.MutableSet):
 
         .. note::
             Argument *k* is supported only for Redis of version 2.6 and higher.
-            This method is not available on from the Python :class:`set`.
+            This method is not available on the Python :class:`set`.
         """
         if k == 0:
             return []

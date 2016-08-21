@@ -3,7 +3,7 @@
 dicts
 ~~~~~
 
-Collections based on dict interface.
+Collections based on the dict interface.
 """
 from __future__ import division, print_function, unicode_literals
 
@@ -26,11 +26,6 @@ class Dict(RedisCollection, collections.MutableMapping):
         In comparing with original :class:`dict` type, :class:`Dict` does not
         implement methods :func:`viewitems`, :func:`viewkeys`, and
         :func:`viewvalues`.
-
-    .. note::
-        Some operations, which are usually not used so often, can be more
-        efficient than their "popular" equivalents. For example, :func:`get`
-        should be preffered over the classic ``d[key]`` approach.
     """
 
     if six.PY2:
@@ -64,13 +59,6 @@ class Dict(RedisCollection, collections.MutableMapping):
                           modifications to mutable values. Changes will be
                           written to Redis after calling the ``sync`` method.
         :type key: bool
-
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
 
         .. warning::
             As mentioned, :class:`Dict` does not support following
@@ -348,11 +336,10 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         .. note::
             :func:`fromkeys` is a class method that returns a new dictionary.
-            *value* defaults to :obj:`None`. It is possible to specify
-            additional keyword arguments to be passed to :func:`__init__` of
-            the new object.
+            It is possible to specify additional keyword arguments to be passed
+            to :func:`__init__` of the new object.
         """
-        values = ((item, value) for item in seq)
+        values = ((key, value) for key in seq)
         return cls(values, **kwargs)
 
     def _repr_data(self):
@@ -398,13 +385,6 @@ class Counter(Dict):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
-
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
 
         .. warning::
             As mentioned, :class:`Counter` does not support following
@@ -608,7 +588,7 @@ class Counter(Dict):
 class DefaultDict(Dict):
     """Mutable **mapping** collection aiming to have the same API as
     :class:`collections.defaultdict`. See
-    `defaultdict  <https://docs.python.org/2/library/collections.html`_ for
+    `defaultdict  <https://docs.python.org/2/library/collections.html>`_ for
     further details. The Redis implementation is based on the
     `hash <http://redis.io/commands#hash>`_ type.
 
@@ -636,13 +616,6 @@ class DefaultDict(Dict):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
-
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
 
         .. warning::
             As mentioned, :class:`DefaultDict` does not support following
