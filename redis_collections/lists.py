@@ -846,7 +846,7 @@ class Deque(List):
     # Operator methods
 
     def __add__(self, other):
-        if not isinstance(other, (Deque, collections.deque)):
+        if not isinstance(other, (self.__class__, self.python_cls)):
             raise TypeError
 
         if self._same_redis(other, RedisCollection):
@@ -857,23 +857,19 @@ class Deque(List):
         return self._add_helper(other, maxlen=self.maxlen)
 
     def __radd__(self, other):
-        if not isinstance(other, (Deque, collections.deque)):
+        if not isinstance(other, (self.__class__, self.python_cls)):
             raise TypeError
-
-        if self._same_redis(other, RedisCollection):
-            return self._add_helper(
-                other, use_redis=True, swap_args=True, maxlen=other.maxlen
-            )
 
         return self._add_helper(
             other, swap_args=True, maxlen=other.maxlen
         )
 
     def __iadd__(self, other):
-        if not isinstance(other, (Deque, collections.deque)):
+        if not isinstance(other, (self.__class__, self.python_cls)):
             raise TypeError
 
-        return self.extend(other)
+        self.extend(other)
+        return self
 
     def __mul__(self, times):
         if not isinstance(times, six.integer_types):
