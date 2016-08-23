@@ -4,7 +4,7 @@
 Redis Collections
 =================
 
-`redis-collections` is a library that provides several Python collection types backed by Redis.
+`redis-collections` is a library that provides several Python collection types (such as ``Dict``, ``List``, ``Set``, and more) backed by Redis.
 This exposes Redis functionality with a Pythonic interface, and provides a simple way to store Python objects across sessions and processes.
 
 This library builds on `Redis <http://redis.io/>`_, the excellent key-value store, and on `redis-py <https://github.com/andymccurdy/redis-py>`_, the well-designed Python interface for it.
@@ -189,6 +189,10 @@ Redis Collections are composed of only several classes. All items listed below a
 .. automodule:: redis_collections.lists
 
 .. autoclass:: List
+    :members:
+    :special-members:
+
+.. autoclass:: Deque
     :members:
     :special-members:
 

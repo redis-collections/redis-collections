@@ -2,11 +2,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, unicode_literals
 
+import collections
+import sys
 import unittest
 
-from redis_collections import List
+from redis_collections import List, Deque
 
 from .base import RedisTestCase
+
+
+PYTHON_VERSION = (sys.version_info[0], sys.version_info[1])
 
 
 class ListTest(RedisTestCase):
@@ -360,6 +365,9 @@ class ListTest(RedisTestCase):
 
         for L in (redis_list, redis_cached, python_list):
             self.assertEqual(L + ['x', 'y'], [0, 1, 2, 3, 'x', 'y'])
+            self.assertEqual(L + ['x', 'y'], [0, 1, 2, 3, 'x', 'y'])
+            self.assertEqual(L + redis_list, [0, 1, 2, 3, 0, 1, 2, 3])
+            self.assertEqual(redis_list + L, [0, 1, 2, 3, 0, 1, 2, 3])
 
     def test_mul(self):
         data = (0, 1)
@@ -529,6 +537,279 @@ class ListTest(RedisTestCase):
         redis_list[0][1] = 2
 
         self.assertIn("[{1: 2}]", repr(redis_list))
+
+
+class DequeTest(RedisTestCase):
+
+    def create_deque(self, *args, **kwargs):
+        kwargs['redis'] = self.redis
+        return Deque(*args, **kwargs)
+
+    def test_init(self):
+        for init in (self.create_deque, collections.deque):
+            self.assertRaises(TypeError, init, 'abcd', 4, None)
+
+            Q = init('abcd', 4)
+            self.assertEqual(list(Q), list('abcd'))
+            self.assertEqual(Q.maxlen, 4)
+
+            Q = init('abcd')
+            self.assertEqual(list(Q), list('abcd'))
+            self.assertIsNone(Q.maxlen)
+
+            self.assertRaises(TypeError, init, 'abcd', Ellipsis)
+
+            self.assertRaises(ValueError, init, 'abcd', -4)
+
+    def test_delitem(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data)
+
+            with self.assertRaises(TypeError):
+                del Q[1:-1]
+
+            del Q[1]
+            self.assertEqual(list(Q), ['a', 'c', 'd'])
+
+    def test_getitem(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data)
+
+            self.assertRaises(TypeError, lambda: Q[1:-1])
+            self.assertEqual(Q[0], 'a')
+            self.assertEqual(Q[1], 'b')
+            self.assertEqual(Q[-2], 'c')
+            self.assertEqual(Q[-1], 'd')
+
+    def test_setitem(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data)
+
+            with self.assertRaises(TypeError):
+                Q[1:-1] = ['x', 'y']
+
+            Q[0] = 'w'
+            Q[1] = 'x'
+            Q[-2] = 'y'
+            Q[-1] = 'z'
+            self.assertEqual(list(Q), ['w', 'x', 'y', 'z'])
+
+    def test_append(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data)
+            Q_limit = init(data, 5)
+
+            Q.append('e')
+            self.assertEqual(list(Q), ['a', 'b', 'c', 'd', 'e'])
+
+            Q_limit.append('e')
+            self.assertEqual(list(Q_limit), ['a', 'b', 'c', 'd', 'e'])
+
+            Q.append('f')
+            self.assertEqual(list(Q), ['a', 'b', 'c', 'd', 'e', 'f'])
+
+            Q_limit.append('f')
+            self.assertEqual(list(Q_limit), ['b', 'c', 'd', 'e', 'f'])
+
+    def test_appendleft(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data)
+            Q_limit = init(data, 5)
+
+            Q.appendleft('e')
+            self.assertEqual(list(Q), ['e', 'a', 'b', 'c', 'd'])
+
+            Q_limit.appendleft('e')
+            self.assertEqual(list(Q_limit), ['e', 'a', 'b', 'c', 'd'])
+
+            Q.appendleft('f')
+            self.assertEqual(list(Q), ['f', 'e', 'a', 'b', 'c', 'd'])
+
+            Q_limit.appendleft('f')
+            self.assertEqual(list(Q_limit), ['f', 'e', 'a', 'b', 'c'])
+
+    def test_copy(self):
+        data = ['a', 'b', 'c', 'd']
+        Q = self.create_deque(data, 5, writeback=True)
+        Q_copy = Q.copy()
+        self.assertEqual(list(Q), list(Q_copy))
+        self.assertEqual(Q.maxlen, Q_copy.maxlen)
+        self.assertTrue(Q.redis is Q_copy.redis)
+        self.assertTrue(Q_copy.writeback)
+
+    def test_extend(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data)
+            Q_limit = init(data, 5)
+
+            Q.extend(['e', 'f'])
+            self.assertEqual(list(Q), ['a', 'b', 'c', 'd', 'e', 'f'])
+
+            Q_limit.extend(['e', 'f'])
+            self.assertEqual(list(Q_limit), ['b', 'c', 'd', 'e', 'f'])
+
+            Q.extend(Q_limit)
+            self.assertEqual(list(Q), list('abcdefbcdef'))
+
+    def test_extendleft(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data)
+            Q_limit = init(data, 5)
+
+            Q.extendleft(['e', 'f'])
+            self.assertEqual(list(Q), list('feabcd'))
+
+            Q_limit.extendleft(['e', 'f'])
+            self.assertEqual(list(Q_limit), list('feabc'))
+
+            Q.extendleft(Q_limit)
+            self.assertEqual(list(Q), list('cbaeffeabcd'))
+
+    @unittest.skipIf(PYTHON_VERSION < (3, 5), 'requires Python 3.5')
+    def test_insert(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data)
+            Q_limit = init(data, 5)
+
+            Q.insert(1, 'x')
+            self.assertEqual(list(Q), list('axbcd'))
+
+            Q_limit.insert(1, 'x')
+            self.assertEqual(list(Q_limit), list('axbcd'))
+
+            Q.insert(0, 'y')
+            self.assertEqual(list(Q), list('yaxbcd'))
+
+            self.assertRaises(IndexError, Q_limit.insert, 1, 'y')
+
+            Q.insert(-1, 'z')
+            self.assertEqual(list(Q), list('yaxbczd'))
+
+    def test_pop_popleft(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data)
+
+            self.assertEqual(Q.pop(), 'd')
+            self.assertEqual(list(Q), list('abc'))
+
+            self.assertEqual(Q.popleft(), 'a')
+            self.assertEqual(list(Q), list('bc'))
+
+            self.assertEqual(Q.pop(), 'c')
+            self.assertEqual(Q.popleft(), 'b')
+
+            self.assertRaises(IndexError, Q.pop)
+            self.assertRaises(IndexError, Q.popleft)
+
+    def test_rotate(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data)
+
+            Q.rotate(0)
+            self.assertEqual(list(Q), list('abcd'))
+
+            Q.rotate()
+            self.assertEqual(list(Q), list('dabc'))
+
+            Q.rotate(1)
+            self.assertEqual(list(Q), list('cdab'))
+
+            Q.rotate(2)
+            self.assertEqual(list(Q), list('abcd'))
+
+            Q.rotate(-1)
+            self.assertEqual(list(Q), list('bcda'))
+
+            Q.rotate(-2)
+            self.assertEqual(list(Q), list('dabc'))
+
+    @unittest.skipIf(PYTHON_VERSION < (3, 5), 'requires Python 3.5')
+    def test_add(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data, 7)
+
+            self.assertRaises(TypeError, lambda: Q + [1, 2, 3])
+            self.assertRaises(TypeError, lambda: [1, 2, 3] + Q)
+
+            result = Q + collections.deque(data[::-1])
+            self.assertEqual(list(result), list('bcddcba'))
+            self.assertEqual(result.maxlen, 7)
+
+            result = Q + self.create_deque(data[::-1])
+            self.assertEqual(list(result), list('bcddcba'))
+            self.assertEqual(result.maxlen, 7)
+
+            result = collections.deque(data[::-1]) + Q
+            self.assertEqual(list(result), list('dcbaabcd'))
+            self.assertIsNone(result.maxlen)
+
+            result = self.create_deque(data[::-1]) + Q
+            self.assertEqual(list(result), list('dcbaabcd'))
+            self.assertIsNone(result.maxlen)
+
+    @unittest.skipIf(PYTHON_VERSION < (3, 5), 'requires Python 3.5')
+    def test_iadd(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data, 7)
+
+            with self.assertRaises(TypeError):
+                Q += Ellipsis
+
+            Q += collections.deque('efgh')
+            self.assertEqual(list(Q), list('bcdefgh'))
+
+            Q += self.create_deque('ijkl')
+            self.assertEqual(list(Q), list('fghijkl'))
+
+    @unittest.skipIf(PYTHON_VERSION < (3, 5), 'requires Python 3.5')
+    def test_mul(self):
+        data = 'abcd'
+        for init in (self.create_deque, collections.deque):
+            Q = init(data, 9)
+
+            self.assertRaises(TypeError, lambda: Q * Ellipsis)
+
+            result = Q * 2
+            self.assertEqual(list(result), list('abcdabcd'))
+            self.assertEqual(result.maxlen, 9)
+
+            result = 2 * Q
+            self.assertEqual(list(result), list('abcdabcd'))
+            self.assertEqual(result.maxlen, 9)
+
+            self.assertEqual(list(Q * 3), list('dabcdabcd'))
+
+            self.assertEqual(list(Q * 0), [])
+            self.assertEqual(list(Q * -1), [])
+
+    def test_mutable(self):
+        Q_redis = self.create_deque('abcd', 4, writeback=True)
+        Q_python = collections.deque('abcd', 4)
+        for Q in (Q_redis, Q_python):
+            Q.append({})
+            Q[-1]['key'] = 'value'
+            self.assertEqual(Q[-1], {'key': 'value'})
+
+            Q.appendleft({1, 2})
+            Q[0].add(3)
+            self.assertEqual(Q[0], {1, 2, 3})
+
+            Q[-1] = [1, 2]
+            Q[-1].append(3)
+            Q.rotate()
+            self.assertEqual(Q[0], [1, 2, 3])
 
 if __name__ == '__main__':
     unittest.main()
