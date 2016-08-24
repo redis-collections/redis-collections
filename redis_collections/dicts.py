@@ -90,6 +90,23 @@ class Dict(RedisCollection, collections.MutableMapping):
         pickled_key = self._pickle_key(key)
         return bool(self.redis.hexists(self.key, pickled_key))
 
+    def __eq__(self, other):
+        if not isinstance(other, collections.Mapping):
+            return False
+
+        def eq_trans(pipe):
+            self_items = self.iteritems(pipe)
+            other_items = other.items(pipe) if use_redis else other.items()
+
+            return dict(self_items) == dict(other_items)
+
+        if self._same_redis(other, RedisCollection):
+            use_redis = True
+            return self._transaction(eq_trans, other.key)
+        else:
+            use_redis = False
+            return self._transaction(eq_trans)
+
     def getmany(self, *keys):
         """Return the value for *keys*. If particular key is not in the
         dictionary, return :obj:`None`.
@@ -160,9 +177,9 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         return {self._unpickle(k): self._unpickle(v) for k, v in items}
 
-    def items(self):
+    def items(self, pipe=None):
         """Return a copy of the dictionary's list of ``(key, value)`` pairs."""
-        return list(self.iteritems())
+        return list(self.iteritems(pipe))
 
     def iteritems(self, pipe=None):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
@@ -577,12 +594,11 @@ class Counter(Dict):
     def __iand__(self, other):
         return self._op_helper(other, operator.iand, inplace=True)
 
-    if not six.PY2:
-        def __pos__(self):
-            return self._op_helper(None, operator.pos)
+    def __pos__(self):
+        return self._op_helper(None, operator.pos)
 
-        def __neg__(self):
-            return self._op_helper(None, operator.neg)
+    def __neg__(self):
+        return self._op_helper(None, operator.neg)
 
 
 class DefaultDict(Dict):

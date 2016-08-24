@@ -374,6 +374,22 @@ class DictTest(RedisTestCase):
 
         self.assertIn("{0: {1: 2}}", repr(redis_dict))
 
+    def test_eq(self):
+        data = {'a': 1, 'b': 2}
+        redis_dict = self.create_dict(data)
+        redis_cached = self.create_dict(data)
+        python_dict = data.copy()
+
+        self.assertEqual(redis_dict, python_dict)
+        self.assertEqual(python_dict, redis_dict)
+
+        self.assertEqual(redis_cached, python_dict)
+        self.assertEqual(python_dict, redis_cached)
+
+        self.assertNotEqual(redis_dict, data.items())
+        self.assertNotEqual(redis_cached, data.items())
+        self.assertNotEqual(python_dict, data.items())
+
 
 class CounterTest(RedisTestCase):
 

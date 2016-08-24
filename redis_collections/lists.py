@@ -24,7 +24,7 @@ class List(RedisCollection, collections.MutableSequence):
     further details. The Redis implementation is based on the
     `list type <http://redis.io/commands#list>`_.
     """
-    python_cls = list
+    _python_cls = list
 
     def __init__(self, *args, **kwargs):
         """
@@ -557,11 +557,11 @@ class List(RedisCollection, collections.MutableSequence):
         self, other, use_redis=False, swap_args=False, **kwargs
     ):
         def add_helper_trans(pipe):
-            self_values = self.python_cls(self.__iter__(pipe), **kwargs)
+            self_values = self._python_cls(self.__iter__(pipe), **kwargs)
             if use_redis:
-                other_values = self.python_cls(other.__iter__(pipe), **kwargs)
+                other_values = self._python_cls(other.__iter__(pipe), **kwargs)
             else:
-                other_values = self.python_cls(other, **kwargs)
+                other_values = self._python_cls(other, **kwargs)
 
             if swap_args:
                 return other_values + self_values
@@ -584,11 +584,31 @@ class List(RedisCollection, collections.MutableSequence):
         self.extend(other)
         return self
 
+    def __eq__(self, other):
+        if not isinstance(other, (self.__class__, self._python_cls)):
+            return False
+
+        def eq_trans(pipe):
+            self_values = self.__iter__(pipe)
+            other_values = other.__iter__(pipe) if use_redis else other
+            for v_self, v_other in six.moves.zip(self_values, other_values):
+                if v_self != v_other:
+                    return False
+
+            return True
+
+        if self._same_redis(other, RedisCollection):
+            use_redis = True
+            return self._transaction(eq_trans, other.key)
+        else:
+            use_redis = False
+            return self._transaction(eq_trans)
+
     def __mul__(self, times):
         if not isinstance(times, six.integer_types):
             raise TypeError
 
-        return self.python_cls(self.__iter__()) * times
+        return self._python_cls(self.__iter__()) * times
 
     def __rmul__(self, times):
         return self.__mul__(times)
@@ -647,7 +667,7 @@ class Deque(List):
     <http://redis.io/commands#list>`_.
     """
 
-    python_cls = collections.deque
+    _python_cls = collections.deque
 
     def __init__(self, *args, **kwargs):
         """
@@ -874,7 +894,7 @@ class Deque(List):
     # Operator methods
 
     def __add__(self, other):
-        if not isinstance(other, (self.__class__, self.python_cls)):
+        if not isinstance(other, (self.__class__, self._python_cls)):
             raise TypeError
 
         if self._same_redis(other, RedisCollection):
@@ -885,7 +905,7 @@ class Deque(List):
         return self._add_helper(other, maxlen=self.maxlen)
 
     def __radd__(self, other):
-        if not isinstance(other, (self.__class__, self.python_cls)):
+        if not isinstance(other, (self.__class__, self._python_cls)):
             raise TypeError
 
         return self._add_helper(
@@ -893,7 +913,7 @@ class Deque(List):
         )
 
     def __iadd__(self, other):
-        if not isinstance(other, (self.__class__, self.python_cls)):
+        if not isinstance(other, (self.__class__, self._python_cls)):
             raise TypeError
 
         self.extend(other)
@@ -903,4 +923,4 @@ class Deque(List):
         if not isinstance(times, six.integer_types):
             raise TypeError
 
-        return self.python_cls(self.__iter__(), self.maxlen) * times
+        return self._python_cls(self.__iter__(), self.maxlen) * times

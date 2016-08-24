@@ -41,6 +41,15 @@ class ListTest(RedisTestCase):
             self.assertIn(3, L)
             self.assertNotIn(4, L)
 
+    def test_equal(self):
+        data = (0, 1, 2, 3)
+        for init in (self.create_list, list):
+            L = init(data)
+            self.assertTrue(L == list(data))
+            self.assertTrue(list(data) == L)
+            self.assertFalse(L == data)
+            self.assertFalse(data == L)
+
     def test_get_set_del_index(self):
         data = ('zero', 'one', 'two', 'three')
         for i in (0, 1, 2, 3, -1, -2, -3, -4):

@@ -55,6 +55,7 @@ class SetTest(RedisTestCase):
             self.assertNotEqual(s_1, s_3)
             self.assertEqual(s_2, s_3)
             self.assertEqual(s_3, s_3)
+            self.assertNotEqual(s_3, [4, 5])
 
     def test_disjoint(self):
         for init in (self.create_set, set):
@@ -75,6 +76,7 @@ class SetTest(RedisTestCase):
             s_3 = {1, 2, 3, 4}
             s_4 = {1, 2}
             s_5 = [1, 2, 3, 4]
+            s_6 = self.create_set([1, 2, 3, 4])
 
             self.assertTrue(s_1.issubset(s_2))
             self.assertFalse(s_1 == s_2)
@@ -96,6 +98,10 @@ class SetTest(RedisTestCase):
                 self.assertRaises(TypeError, lambda: s_1 <= s_5)
 
             self.assertRaises(TypeError, s_1.issubset, None)
+
+            self.assertNotEqual(s_1, s_6)
+            self.assertTrue(s_2 == s_6)
+            self.assertTrue(s_6 == s_6)
 
     def test_superset(self):
         for init in (self.create_set, set):
