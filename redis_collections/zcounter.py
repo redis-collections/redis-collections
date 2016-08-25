@@ -13,12 +13,6 @@ from .base import RedisCollection
 
 
 class ZCounter(RedisCollection):
-    if six.PY2:
-        _pickle = RedisCollection._pickle_2
-        _unpickle = RedisCollection._unpickle_2
-    else:
-        _pickle = RedisCollection._pickle_3
-
     def __init__(self, *args, **kwargs):
         data = args[0] if args else kwargs.pop('data', None)
 
@@ -32,7 +26,7 @@ class ZCounter(RedisCollection):
         items = pipe.zrange(self.key, 0, -1, withscores=True)
 
         return [(self._unpickle(member), score) for member, score in items]
-    
+
     # Magic methods
 
     def __contains__(self, member, pipe=None):
@@ -41,22 +35,28 @@ class ZCounter(RedisCollection):
 
         return score is not None
 
-    def __delitem__(self, member):
-        # zrem
-        pass
+    def _del_slice(self, member, pipe=None):
+        raise NotImplementedError()
 
-    def _get_slice(self, index):
+    def __delitem__(self, member, pipe=None):
+        pipe = self.redis if pipe is None else pipe
+        deleted_count = pipe.zrem(self.key, self._pickle(member))
+
+        if deleted_count == 0:
+            raise KeyError
+
+    def _get_slice(self, index, pipe=None):
         raise NotImplementedError()
 
     def __getitem__(self, member, pipe=None):
-        if isindex(member, slice):
+        if isinstance(member, slice):
             return self._get_slice(member)
 
         pipe = self.redis if pipe is None else pipe
         score = pipe.zscore(self.key, self._pickle(member))
 
         if score is None:
-            raise KeyError('{} is not in the collection'.format(member))
+            raise KeyError
 
         return score
 
@@ -67,7 +67,8 @@ class ZCounter(RedisCollection):
 
     def __len__(self, pipe=None):
         pipe = self.redis if pipe is None else pipe
-        score = pipe.zcard(self.key)
+
+        return pipe.zcard(self.key)
 
     def __setitem__(self, member, score, pipe=None):
         pipe = self.redis if pipe is None else pipe
@@ -87,11 +88,48 @@ class ZCounter(RedisCollection):
     def count(self, start=None, stop=None):
         pass
 
-    def index(self, member):
-        pass
+    def get(self, member, default=None):
+        try:
+            score = self.__getitem__(member)
+        except KeyError:
+            if default is not None:
+                score = default
+            else:
+                raise
+
+        return score
+
+    def index(self, member, reverse=False, pipe=None):
+        pipe = self.redis if pipe is None else pipe
+        method = getattr(pipe, 'zrevrank' if reverse else 'zrank')
+        rank = method(self.key, self._pickle(member))
+
+        if rank is None:
+            raise KeyError
+
+        return rank
 
     def items(self, start=None, stop=None, reverse=False):
         pass
 
     def update(self, other):
-        pass
+        if hasattr(other, 'items'):
+            method = other.items
+        elif hasattr(other, 'keys'):
+            method = other.keys
+        else hasattr(other, '__iter__'):
+            method = other.__iter__
+
+        def update_trans(pipe):
+            pipe.multi()
+            for 
+
+        if self._same_redis(other, RedisCollection):
+            use_redis = True
+            self._transaction(update_trans, other.key)
+        else:
+            use_redis = False
+            self._transaction(update_trans)
+            
+            
+            

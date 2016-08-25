@@ -22,10 +22,14 @@ class ZCounterTestCase(RedisTestCase):
 
         self.assertNotIn('member_2', zc)
 
+        del zc['member_1']
+        self.assertNotIn('member_1', zc)
+
         zc[1] = 100
-        self.assertIn(1, zc)
+        self.assertNotIn(1.0, zc)
+
+        zc[1.0] = 1000
         self.assertIn(1.0, zc)
-        self.assertIn(complex(1, 0), zc)
 
     def test_delitem_index(self):
         self.fail()
@@ -33,17 +37,31 @@ class ZCounterTestCase(RedisTestCase):
     def test_delitem_slice(self):
         self.fail()
 
-    def test_getitem_rank(self):
-        self.fail()
+    def test_getitem(self):
+        zc = self.create_zcounter()
+        zc['member_1'] = 1
+        zc['member_2'] = 2.0
 
-    def test_getitem_slice(self):
-        self.fail()
+        self.assertEqual(zc['member_1'], 1)
+        self.assertEqual(zc['member_2'], 2.0)
+        self.assertRaises(KeyError, lambda: zc['member_3'])
 
     def test_iter(self):
         self.fail()
 
     def test_len(self):
-        self.fail()
+        zc = self.create_zcounter()
+
+        self.assertEqual(len(zc), 0)
+
+        zc['member_1'] = 1
+        self.assertEqual(len(zc), 1)
+
+        zc['member_2'] = 2.0
+        self.assertEqual(len(zc), 2)
+
+        del zc['member_1']
+        self.assertEqual(len(zc), 1)
 
     def test_setitem(self):
         self.fail()
@@ -57,8 +75,31 @@ class ZCounterTestCase(RedisTestCase):
     def test_count(self):
         self.fail()
 
+    def test_get(self):
+        zc = self.create_zcounter()
+        zc['member_1'] = 1
+        zc['member_2'] = 2.0
+
+        self.assertEqual(zc.get('member_1'), 1)
+        self.assertEqual(zc.get('member_2'), 2.0)
+        self.assertEqual(zc.get('member_3', 0), 0)
+        self.assertRaises(KeyError, lambda: zc['member_3'])
+
     def test_index(self):
-        self.fail()
+        zc = self.create_zcounter()
+        zc['member_1'] = 1
+        zc['member_2'] = 2.0
+        zc['member_3'] = 30.0
+
+        self.assertEqual(zc.index('member_1'), 0)
+        self.assertEqual(zc.index('member_2'), 1)
+        self.assertEqual(zc.index('member_3'), 2)
+        self.assertRaises(KeyError, lambda: zc.index('member_4'))
+
+        self.assertRaises(KeyError, lambda: zc.index('member_4', reverse=True))
+        self.assertEqual(zc.index('member_3', reverse=True), 0)
+        self.assertEqual(zc.index('member_2', reverse=True), 1)
+        self.assertEqual(zc.index('member_1', reverse=True), 2)
 
     def test_items(self):
         self.fail()
