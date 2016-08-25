@@ -7,8 +7,6 @@ Collections based on the dict interface.
 """
 from __future__ import division, print_function, unicode_literals
 
-import six
-
 from .base import RedisCollection
 
 
@@ -35,7 +33,7 @@ class ZCounter(RedisCollection):
 
         return score is not None
 
-    def _del_slice(self, member, pipe=None):
+    def _del_slice(self, index):
         raise NotImplementedError()
 
     def __delitem__(self, member, pipe=None):
@@ -45,7 +43,7 @@ class ZCounter(RedisCollection):
         if deleted_count == 0:
             raise KeyError
 
-    def _get_slice(self, index, pipe=None):
+    def _get_slice(self, index):
         raise NotImplementedError()
 
     def __getitem__(self, member, pipe=None):
@@ -85,8 +83,11 @@ class ZCounter(RedisCollection):
 
         return other
 
-    def count(self, start=None, stop=None):
-        pass
+    def count_between(self, start=None, stop=None):
+        start = float('-inf') if start is None else float(start)
+        stop = float('inf') if stop is None else float(stop)
+
+        return self.redis.zcount(self.key, start, stop)
 
     def get(self, member, default=None):
         try:
@@ -109,27 +110,41 @@ class ZCounter(RedisCollection):
 
         return rank
 
-    def items(self, start=None, stop=None, reverse=False):
-        pass
+    def items(self, start=None, stop=None, reverse=False, pipe=None):
+        pipe = self.redis if pipe is None else pipe
+
+        start = float('-inf') if start is None else float(start)
+        stop = float('inf') if stop is None else float(stop)
+
+        if reverse:
+            results = pipe.zrevrangebyscore(
+                self.key, stop, start, withscores=True
+            )
+        else:
+            results = pipe.zrangebyscore(
+                self.key, start, stop, withscores=True
+            )
+
+        return [(self._unpickle(member), score) for member, score in results]
 
     def update(self, other):
-        if hasattr(other, 'items'):
-            method = other.items
-        elif hasattr(other, 'keys'):
-            method = other.keys
-        else hasattr(other, '__iter__'):
-            method = other.__iter__
-
         def update_trans(pipe):
-            pipe.multi()
-            for 
+            other_items = method(pipe=pipe) if use_redis else method()
 
+            pipe.multi()
+            for member, score in other_items:
+                pipe.zadd(self.key, float(score), self._pickle(member))
+
+        watches = []
         if self._same_redis(other, RedisCollection):
             use_redis = True
-            self._transaction(update_trans, other.key)
+            watches.append(other.key)
         else:
             use_redis = False
-            self._transaction(update_trans)
-            
-            
-            
+
+        if hasattr(other, 'items'):
+            method = other.items
+        elif hasattr(other, '__iter__'):
+            method = other.__iter__
+
+        self._transaction(update_trans, *watches)
