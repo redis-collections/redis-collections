@@ -56,7 +56,7 @@ class List(RedisCollection, collections.MutableSequence):
     def _normalize_index(self, index, pipe=None):
         """Convert negative indexes into their positive equivalents."""
         pipe = self.redis if pipe is None else pipe
-        len_self = pipe.llen(self.key)
+        len_self = self.__len__(pipe)
         positive_index = index if index >= 0 else len_self + index
 
         return len_self, positive_index
@@ -71,7 +71,7 @@ class List(RedisCollection, collections.MutableSequence):
             raise ValueError
         pipe = self.redis if pipe is None else pipe
 
-        len_self = pipe.llen(self.key)
+        len_self = self.__len__(pipe)
 
         step = index.step or 1
         forward = step > 0
@@ -522,7 +522,7 @@ class List(RedisCollection, collections.MutableSequence):
             if self.writeback:
                 self._sync_helper(pipe)
 
-            n = pipe.llen(self.key)
+            n = self.__len__(pipe)
             for i in six.moves.xrange(n // 2):
                 left = pipe.lindex(self.key, i)
                 right = pipe.lindex(self.key, n - i - 1)
