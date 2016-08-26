@@ -7,6 +7,10 @@ Collections based on the dict interface.
 """
 from __future__ import division, print_function, unicode_literals
 
+import itertools
+
+import six
+
 from .base import RedisCollection
 
 
@@ -34,9 +38,34 @@ class ZCounter(RedisCollection):
         return score is not None
 
     def _del_slice(self, index):
-        raise NotImplementedError()
+        def del_slice_trans(pipe):
+            start, stop, step, forward, len_self = self._normalize_slice(
+                index, pipe
+            )
+
+            if start == stop:
+                return
+
+            # For slices with steps we find the members to remove by index,
+            # then remove them.
+            if index.step is not None:
+                all_items = pipe.zrangebyscore(
+                    self.key, float('-inf'), float('inf')
+                )
+                pipe.multi()
+                for i in list(six.moves.xrange(len_self))[index]:
+                    pickled_member = all_items[i]
+                    pipe.zrem(self.key, pickled_member)
+            # Otherwise ranks should match Python indexes
+            else:
+                pipe.zremrangebyrank(self.key, start, max(stop - 1, 0))
+
+        return self._transaction(del_slice_trans)
 
     def __delitem__(self, member, pipe=None):
+        if isinstance(member, slice):
+            return self._del_slice(member)
+
         pipe = self.redis if pipe is None else pipe
         deleted_count = pipe.zrem(self.key, self._pickle(member))
 
@@ -44,7 +73,31 @@ class ZCounter(RedisCollection):
             raise KeyError
 
     def _get_slice(self, index):
-        raise NotImplementedError()
+        def get_slice_trans(pipe):
+            start, stop, step, forward, len_self = self._normalize_slice(
+                index, pipe
+            )
+
+            if start == stop:
+                return []
+
+            ret = []
+            redis_values = pipe.zrange(
+                self.key, start, max(stop - 1, 0), withscores=True
+            )
+            for pickled_member, score in redis_values:
+                member = self._unpickle(pickled_member)
+                ret.append((member, score))
+
+            if not forward:
+                ret = reversed(ret)
+
+            if step != 1:
+                ret = itertools.islice(ret, None, None, step)
+
+            return list(ret)
+
+        return self._transaction(get_slice_trans)
 
     def __getitem__(self, member, pipe=None):
         if isinstance(member, slice):

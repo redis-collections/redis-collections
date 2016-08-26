@@ -52,11 +52,47 @@ class ZCounterTestCase(RedisTestCase):
         with self.assertRaises(KeyError):
             del zc['member_1']
 
-    def test_del_slice(self):
-        self.fail()
+    def test_get_slice_del_slice(self):
+        for slice_args in [
+            (None, None, None),
+            (0, None, None),
+            (0, 0, None),
+            (0, 5, None),
+            (0, 6, None),
+            (None, 1, None),
+            (0, 2, None),
+            (0, -3, None),
+            (0, 4, None),
+            (0, -1, None),
+            (0, 6, None),
+            (1, None, None),
+            (2, 6, None),
+            (3, 6, None),
+            (-2, None, None),
+            (-1, None, None),
+            (1, -1, None),
+            (2, -2, None),
+            (3, -3, None),
+            (-5, 5, None),
+            (None, None, -1),
+            (None, None, 1),
+            (None, None, 2),
+            (None, None, 3),
+            (1, -1, 2),
+            (5, 1, -1),
+            (5, 1, -2),
+        ]:
+            items = [
+                ('0', 1), ('1', 2), ('2', 4), ('3', 8), ('4', 16), ('5', 32)
+            ]
+            zc = self.create_zcounter(items)
 
-    def test_get_slice(self):
-        self.fail()
+            index = slice(*slice_args)
+            self.assertEqual(zc[index], items[index])
+
+            del items[index]
+            del zc[index]
+            self.assertEqual(zc.items(), items)
 
     def test_getitem_setitem(self):
         zc = self.create_zcounter()
