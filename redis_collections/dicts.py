@@ -3,7 +3,7 @@
 dicts
 ~~~~~
 
-Collections based on dict interface.
+Collections based on the dict interface.
 """
 from __future__ import division, print_function, unicode_literals
 
@@ -26,12 +26,15 @@ class Dict(RedisCollection, collections.MutableMapping):
         In comparing with original :class:`dict` type, :class:`Dict` does not
         implement methods :func:`viewitems`, :func:`viewkeys`, and
         :func:`viewvalues`.
-
-    .. note::
-        Some operations, which are usually not used so often, can be more
-        efficient than their "popular" equivalents. For example, :func:`get`
-        should be preffered over the classic ``d[key]`` approach.
     """
+
+    if six.PY2:
+        _pickle_key = RedisCollection._pickle_2
+        _unpickle_key = RedisCollection._unpickle_2
+    else:
+        _pickle_key = RedisCollection._pickle_3
+
+    _pickle_value = RedisCollection._pickle_3
 
     class __missing_value(object):
         def __repr__(self):
@@ -57,20 +60,13 @@ class Dict(RedisCollection, collections.MutableMapping):
                           written to Redis after calling the ``sync`` method.
         :type key: bool
 
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
-
         .. warning::
             As mentioned, :class:`Dict` does not support following
             initialization syntax: ``d = Dict(a=1, b=2)``
         """
         data = args[0] if args else kwargs.pop('data', None)
         writeback = kwargs.pop('writeback', False)
-        super(Dict, self).__init__(*args, **kwargs)
+        super(Dict, self).__init__(**kwargs)
 
         self.writeback = writeback
         self.cache = {}
@@ -78,49 +74,52 @@ class Dict(RedisCollection, collections.MutableMapping):
         if data:
             self.update(data)
 
-    def _get_hash_dict(self, key, redis):
-        key_hash = hash(key)
-        D = redis.hget(self.key, key_hash)
-        D = {} if D is None else self._unpickle(D)
-
-        return key_hash, D
-
-    def __len__(self):
-        """Return the number of items in the dictionary.
-
-        .. note::
-            Due to implementation on Redis side, this method is inefficient.
-            The time taken is varies with the number of keys in stored.
-        """
-        ret = 0
-        for D in six.itervalues(self.redis.hgetall(self.key)):
-            ret += len(self._unpickle(D))
-
-        return ret
+    def __len__(self, pipe=None):
+        """Return the number of items in the dictionary."""
+        pipe = pipe or self.redis
+        return pipe.hlen(self.key)
 
     def __iter__(self, pipe=None):
         """Return an iterator over the keys of the dictionary."""
         pipe = pipe or self.redis
-        for D in six.itervalues(pipe.hgetall(self.key)):
-            for k in six.iterkeys(self._unpickle(D)):
-                yield k
+        for k, v in six.iteritems(self._data(pipe)):
+            yield k
 
     def __contains__(self, key):
         """Return ``True`` if *key* is present, else ``False``."""
-        key_hash, D = self._get_hash_dict(key, self.redis)
+        pickled_key = self._pickle_key(key)
+        return bool(self.redis.hexists(self.key, pickled_key))
 
-        return key in D
+    def __eq__(self, other):
+        if not isinstance(other, collections.Mapping):
+            return False
+
+        def eq_trans(pipe):
+            self_items = self.iteritems(pipe)
+            other_items = other.items(pipe) if use_redis else other.items()
+
+            return dict(self_items) == dict(other_items)
+
+        if self._same_redis(other, RedisCollection):
+            use_redis = True
+            return self._transaction(eq_trans, other.key)
+        else:
+            use_redis = False
+            return self._transaction(eq_trans)
 
     def getmany(self, *keys):
         """Return the value for *keys*. If particular key is not in the
         dictionary, return :obj:`None`.
         """
-        D_subset = {}
-        for D in self.redis.hmget(self.key, *(hash(k) for k in keys)):
-            if D is not None:
-                D_subset.update(self._unpickle(D))
+        pickled_keys = (self._pickle_key(k) for k in keys)
+        pickled_values = self.redis.hmget(self.key, *pickled_keys)
 
-        return [D_subset.get(key) for key in keys]
+        ret = []
+        for k, v in six.moves.zip(keys, pickled_values):
+            value = self.cache.get(k, self._unpickle(v))
+            ret.append(value)
+
+        return ret
 
     def __getitem__(self, key):
         """Return the item of dictionary with key *key*. Raises a
@@ -135,14 +134,14 @@ class Dict(RedisCollection, collections.MutableMapping):
         try:
             value = self.cache[key]
         except KeyError:
-            key_hash, D = self._get_hash_dict(key, self.redis)
-            try:
-                value = D[key]
-            except KeyError:
+            pickled_key = self._pickle_key(key)
+            pickled_value = self.redis.hget(self.key, pickled_key)
+            if pickled_value is None:
                 if hasattr(self, '__missing__'):
                     return self.__missing__(key)
-                else:
-                    raise
+                raise KeyError(key)
+
+            value = self._unpickle(pickled_value)
 
         if self.writeback:
             self.cache[key] = value
@@ -150,10 +149,10 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def __setitem__(self, key, value):
         """Set ``d[key]`` to *value*."""
-        key_hash, D = self._get_hash_dict(key, self.redis)
-        D[key] = value
+        pickled_key = self._pickle_key(key)
+        pickled_value = self._pickle_value(value)
+        self.redis.hset(self.key, pickled_key, pickled_value)
 
-        self.redis.hset(self.key, key_hash, self._pickle(D))
         if self.writeback:
             self.cache[key] = value
 
@@ -161,45 +160,36 @@ class Dict(RedisCollection, collections.MutableMapping):
         """Remove ``d[key]`` from dictionary.
         Raises a :func:`KeyError` if *key* is not in the map.
         """
-        key_hash, D = self._get_hash_dict(key, self.redis)
-        del D[key]
+        pickled_key = self._pickle_key(key)
+        deleted_count = self.redis.hdel(self.key, pickled_key)
+        if not deleted_count:
+            raise KeyError(key)
 
-        if D:
-            self.redis.hset(self.key, key_hash, self._pickle(D))
-        else:
-            self.redis.hdel(self.key, key_hash)
-
-        try:
-            del self.cache[key]
-        except KeyError:
-            pass
+        self.cache.pop(key, None)
 
     def _data(self, pipe=None):
-        """Returns a Python dictionary with the same values as this object"""
-        redis = self.redis if pipe is None else pipe
+        """
+        Returns a Python dictionary with the same values as this object
+        (without checking the local cache).
+        """
+        pipe = pipe or self.redis
+        items = six.iteritems(pipe.hgetall(self.key))
 
-        ret = {}
-        for D in six.itervalues(redis.hgetall(self.key)):
-            ret.update(self._unpickle(D))
+        return {self._unpickle(k): self._unpickle(v) for k, v in items}
 
-        return ret
-
-    def items(self):
+    def items(self, pipe=None):
         """Return a copy of the dictionary's list of ``(key, value)`` pairs."""
-        return list(self.iteritems())
+        return list(self.iteritems(pipe))
 
-    def iteritems(self):
+    def iteritems(self, pipe=None):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
-        for D in six.itervalues(self.redis.hgetall(self.key)):
-            for k, v in six.iteritems(self._unpickle(D)):
-                try:
-                    yield k, self.cache[k]
-                except KeyError:
-                    yield k, v
+        pipe = pipe or self.redis
+        for k, v in six.iteritems(self._data(pipe)):
+            yield k, self.cache.get(k, v)
 
     def keys(self):
         """Return a copy of the dictionary's list of keys."""
-        return list(self.iterkeys())
+        return list(self.__iter__())
 
     def iter(self):
         """Return an iterator over the keys of the dictionary.
@@ -209,50 +199,39 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def iterkeys(self):
         """Return an iterator over the dictionary's keys."""
-        for D in six.itervalues(self.redis.hgetall(self.key)):
-            for k in six.iterkeys(self._unpickle(D)):
-                yield k
+        return self.__iter__()
 
     def values(self):
         """Return a copy of the dictionary's list of values."""
-        return list(self.itervalues())
+        return [v for k, v in self.iteritems()]
 
     def itervalues(self):
         """Return an iterator over the dictionary's values."""
-        for D in six.itervalues(self.redis.hgetall(self.key)):
-            for k, v in six.iteritems(self._unpickle(D)):
-                try:
-                    yield self.cache[k]
-                except KeyError:
-                    yield v
+        return (v for k, v in self.iteritems())
 
     def pop(self, key, default=__marker):
         """If *key* is in the dictionary, remove it and return its value,
         else return *default*. If *default* is not given and *key* is not
         in the dictionary, a :exc:`KeyError` is raised.
         """
+        pickled_key = self._pickle_key(key)
+
+        if key in self.cache:
+            self.redis.hdel(self.key, pickled_key)
+            return self.cache.pop(key)
+
         def pop_trans(pipe):
-            key_hash, D = self._get_hash_dict(key, pipe)
-            value = D.pop(key, default)
+            pickled_value = pipe.hget(self.key, pickled_key)
+            if pickled_value is None:
+                if default is self.__marker:
+                    raise KeyError(key)
+                return default
 
-            pipe.multi()
-            if D:
-                pipe.hset(self.key, key_hash, self._pickle(D))
-            else:
-                pipe.hdel(self.key, key_hash)
-
-            return value
+            pipe.hdel(self.key, pickled_key)
+            return self._unpickle(pickled_value)
 
         value = self._transaction(pop_trans)
-        try:
-            value = self.cache[key]
-        except KeyError:
-            pass
-        else:
-            del self.cache[key]
-
-        if value is self.__marker:
-            raise KeyError(key)
+        self.cache.pop(key, None)
 
         return value
 
@@ -266,49 +245,43 @@ class Dict(RedisCollection, collections.MutableMapping):
         a :exc:`KeyError`.
         """
         def popitem_trans(pipe):
-            entries = pipe.hgetall(self.key)
-            if not entries:
+            try:
+                pickled_key = pipe.hkeys(self.key)[0]
+            except IndexError:
                 raise KeyError
 
-            key_hash, D = entries.popitem()
-            D = self._unpickle(D)
-            item = D.popitem()
-
+            # pop its value
             pipe.multi()
-            if D:
-                pipe.hset(self.key, key_hash, self._pickle(D))
-            else:
-                pipe.hdel(self.key, key_hash)
+            pipe.hget(self.key, pickled_key)
+            pipe.hdel(self.key, pickled_key)
+            pickled_value, __ = pipe.execute()
 
-            return item
+            return self._unpickle(pickled_key), self._unpickle(pickled_value)
 
         key, value = self._transaction(popitem_trans)
-        try:
-            item = key, self.cache[key]
-        except KeyError:
-            item = key, value
-        else:
-            del self.cache[key]
 
-        return item
+        return key, self.cache.pop(key, value)
 
     def setdefault(self, key, default=None):
         """If *key* is in the dictionary, return its value.
         If not, insert *key* with a value of *default* and
         return *default*. *default* defaults to :obj:`None`.
         """
+        if key in self.cache:
+            return self.cache[key]
+
         def setdefault_trans(pipe):
-            key_hash, D = self._get_hash_dict(key, pipe)
-            value = D.setdefault(key, default)
-            if value == default:
-                pipe.hset(self.key, key_hash, self._pickle(D))
+            pickled_key = self._pickle_key(key)
 
-            return value
+            pipe.multi()
+            pipe.hsetnx(self.key, pickled_key, self._pickle_value(default))
+            pipe.hget(self.key, pickled_key)
 
-        try:
-            value = self.cache[key]
-        except KeyError:
-            value = self._transaction(setdefault_trans)
+            __, pickled_value = pipe.execute()
+
+            return self._unpickle(pickled_value)
+
+        value = self._transaction(setdefault_trans)
 
         if self.writeback:
             self.cache[key] = value
@@ -318,21 +291,19 @@ class Dict(RedisCollection, collections.MutableMapping):
         def _update_helper_trans(pipe):
             data = {}
 
-            if use_redis:
-                for D in six.itervalues(pipe.hgetall(other.key)):
-                    data.update(self._unpickle(D))
+            if isinstance(other, Dict):
+                data.update(other.iteritems(pipe))
+            elif isinstance(other, RedisCollection):
+                data.update(other.__iter__(pipe))
             else:
                 data.update(other)
 
-            D_load = {}
-            for key, value in six.iteritems(data):
-                key_hash = hash(key)
-                D_load.setdefault(key_hash, {})
-                D_load[key_hash][key] = value
+            pickled_data = {}
+            for k, v in six.iteritems(data):
+                pickled_data[self._pickle_key(k)] = self._pickle_value(v)
 
-            pipe.multi()
-            for key_hash, D in six.iteritems(D_load):
-                pipe.hset(self.key, key_hash, self._pickle(D))
+            if pickled_data:
+                pipe.hmset(self.key, pickled_data)
 
             if self.writeback:
                 self.cache.update(data)
@@ -353,7 +324,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         ``d.update(red=1, blue=2)``.
         """
         if other is not None:
-            if isinstance(other, RedisCollection):
+            if self._same_redis(other, RedisCollection):
                 self._update_helper(other, use_redis=True)
             elif hasattr(other, 'keys'):
                 self._update_helper(other)
@@ -369,9 +340,11 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         return other
 
-    def clear(self):
-        self.redis.delete(self.key)
-        self.cache.clear()
+    def clear(self, pipe=None):
+        self._clear(pipe)
+
+        if self.writeback:
+            self.cache.clear()
 
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):
@@ -380,37 +353,21 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         .. note::
             :func:`fromkeys` is a class method that returns a new dictionary.
-            *value* defaults to :obj:`None`. It is possible to specify
-            additional keyword arguments to be passed to :func:`__init__` of
-            the new object.
+            It is possible to specify additional keyword arguments to be passed
+            to :func:`__init__` of the new object.
         """
-        values = ((item, value) for item in seq)
+        values = ((key, value) for key in seq)
         return cls(values, **kwargs)
 
-    def _repr_data(self, data):
-        return repr(dict(data))
-
-    def __enter__(self):
-        self.writeback = True
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.sync()
+    def _repr_data(self):
+        items = ('{}: {}'.format(repr(k), repr(v)) for k, v in self.items())
+        return '{{{}}}'.format(', '.join(items))
 
     def sync(self):
-        def sync_trans(pipe):
-            D_load = {}
-            for key, value in six.iteritems(self.cache):
-                key_hash = hash(key)
-                D_load.setdefault(key_hash, {})
-                D_load[key_hash][key] = value
-
-            pipe.multi()
-            for key_hash, D in six.iteritems(D_load):
-                pipe.hset(self.key, key_hash, self._pickle(D))
-
-        self._transaction(sync_trans)
+        self.writeback = False
+        self._update_helper(self.cache)
         self.cache = {}
+        self.writeback = True
 
 
 class Counter(Dict):
@@ -429,8 +386,6 @@ class Counter(Dict):
         which are available in Python 2.7's version.
     """
 
-    _same_types = (collections.Counter,)
-
     def __init__(self, *args, **kwargs):
         """Breakes the original :class:`Counter` API, because there is no
         support for keyword syntax. The only single way to create
@@ -447,13 +402,6 @@ class Counter(Dict):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
-
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
 
         .. warning::
             As mentioned, :class:`Counter` does not support following
@@ -489,21 +437,21 @@ class Counter(Dict):
         def _update_helper_trans(pipe):
             data = {}
 
-            if use_redis:
-                for D in six.itervalues(pipe.hgetall(other.key)):
-                    data.update(self._unpickle(D))
+            if isinstance(other, Dict):
+                data.update(other.iteritems(pipe))
+            elif isinstance(other, RedisCollection):
+                data.update(other.__iter__(pipe))
             else:
                 data.update(other)
 
-            D_load = {}
-            for key, value in six.iteritems(data):
-                key_hash = hash(key)
-                D_load.setdefault(key_hash, {})
-                D_load[key_hash][key] = op(self.get(key, 0), value)
+            pickled_data = {}
+            for k, v in six.iteritems(data):
+                pickled_key = self._pickle_key(k)
+                pickled_value = self._pickle_value(op(self.get(k, 0), v))
+                pickled_data[pickled_key] = pickled_value
 
-            pipe.multi()
-            for key_hash, D in six.iteritems(D_load):
-                pipe.hset(self.key, key_hash, self._pickle(D))
+            if pickled_data:
+                pipe.hmset(self.key, pickled_data)
 
             if self.writeback:
                 self.cache.update(data)
@@ -520,7 +468,7 @@ class Counter(Dict):
         a sequence of elements, not a sequence of ``(key, value)`` pairs.
         """
         if other is not None:
-            if isinstance(other, Dict):
+            if self._same_redis(other, RedisCollection):
                 self._update_helper(other, operator.add, use_redis=True)
             elif hasattr(other, 'keys'):
                 self._update_helper(other, operator.add)
@@ -536,7 +484,7 @@ class Counter(Dict):
         counts instead of replacing them.
         """
         if other is not None:
-            if isinstance(other, Dict):
+            if self._same_redis(other, RedisCollection):
                 self._update_helper(other, operator.sub, use_redis=True)
             elif hasattr(other, 'keys'):
                 self._update_helper(other, operator.sub)
@@ -558,12 +506,18 @@ class Counter(Dict):
     def _op_helper(self, other, op, swap_args=False, inplace=False):
         def op_trans(pipe):
             # Get a collections.Counter copy of `self`
-            self_counter = collections.Counter(self._data(pipe))
+            self_counter = collections.Counter(
+                {k: v for k, v in self.iteritems(pipe=pipe)}
+            )
 
             # If `other` is also Redis-backed we'll want to pull its values
             # with the same transaction-provided pipeline as for `self`.
-            if use_redis:
-                other_counter = collections.Counter(other._data(pipe))
+            if isinstance(other, Dict):
+                other_counter = collections.Counter(
+                    {k: v for k, v in other.iteritems(pipe=pipe)}
+                )
+            elif isinstance(other, RedisCollection):
+                other_counter = collections.Counter(other.__iter__(pipe))
             else:
                 other_counter = other
 
@@ -582,35 +536,27 @@ class Counter(Dict):
                 return result
 
             # Otherwise we need to update `self` in this transaction
-            D_load = {}
+            pickled_data = {}
             for key, value in six.iteritems(result):
-                key_hash = hash(key)
-                D_load.setdefault(key_hash, {})
-                D_load[key_hash][key] = value
+                pickled_key = self._pickle_key(key)
+                pickled_value = self._pickle_value(value)
+                pickled_data[pickled_key] = pickled_value
 
             pipe.multi()
             pipe.delete(self.key)
-            for key_hash, D in six.iteritems(D_load):
-                pipe.hset(self.key, key_hash, self._pickle(D))
+            if pickled_data:
+                pipe.hmset(self.key, pickled_data)
 
         if other is None:
-            use_redis = False
             result = self._transaction(op_trans, None)
-        elif isinstance(other, Counter):
-            use_redis = True
+        elif self._same_redis(other, RedisCollection):
             result = self._transaction(op_trans, other.key)
         elif isinstance(other, collections.Counter):
-            use_redis = False
             result = self._transaction(op_trans)
         else:
             raise TypeError('Unsupported type {}'.format(type(other)))
 
-        if inplace:
-            return self
-        else:
-            new_instance = self.__class__(redis=self.redis)
-            new_instance.update(result)
-            return new_instance
+        return self if inplace else result
 
     def __add__(self, other):
         return self._op_helper(other, operator.add)
@@ -648,18 +594,17 @@ class Counter(Dict):
     def __iand__(self, other):
         return self._op_helper(other, operator.iand, inplace=True)
 
-    if not six.PY2:
-        def __pos__(self):
-            return self._op_helper(None, operator.pos)
+    def __pos__(self):
+        return self._op_helper(None, operator.pos)
 
-        def __neg__(self):
-            return self._op_helper(None, operator.neg)
+    def __neg__(self):
+        return self._op_helper(None, operator.neg)
 
 
 class DefaultDict(Dict):
     """Mutable **mapping** collection aiming to have the same API as
     :class:`collections.defaultdict`. See
-    `defaultdict  <https://docs.python.org/2/library/collections.html`_ for
+    `defaultdict  <https://docs.python.org/2/library/collections.html>`_ for
     further details. The Redis implementation is based on the
     `hash <http://redis.io/commands#hash>`_ type.
 
@@ -688,13 +633,6 @@ class DefaultDict(Dict):
                     string is generated.
         :type key: str
 
-        .. note::
-            :func:`uuid.uuid4` is used for default key generation.
-            If you are not satisfied with its `collision
-            probability <http://stackoverflow.com/a/786541/325365>`_,
-            make your own implementation by subclassing and overriding
-            internal method :func:`_create_key`.
-
         .. warning::
             As mentioned, :class:`DefaultDict` does not support following
             initialization syntax: ``d = DefaultDict(None, a=1, b=2)``
@@ -722,8 +660,8 @@ class DefaultDict(Dict):
         self[key] = value
         return value
 
-    def copy(self, **kwargs):
-        other = self.__class__(self.default_factory, **kwargs)
+    def copy(self, key=None):
+        other = self.__class__(self.default_factory, redis=self.redis, key=key)
         other.update(self)
 
         return other

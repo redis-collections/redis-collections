@@ -367,6 +367,29 @@ class DictTest(RedisTestCase):
         # Closing the context manager syncs to Redis
         self.assertEqual(D._data()['key'], [1, 2])
 
+    def test_repr(self):
+        redis_dict = self.create_dict(writeback=True)
+        redis_dict[0] = {}
+        redis_dict[0][1] = 2
+
+        self.assertIn("{0: {1: 2}}", repr(redis_dict))
+
+    def test_eq(self):
+        data = {'a': 1, 'b': 2}
+        redis_dict = self.create_dict(data)
+        redis_cached = self.create_dict(data)
+        python_dict = data.copy()
+
+        self.assertEqual(redis_dict, python_dict)
+        self.assertEqual(python_dict, redis_dict)
+
+        self.assertEqual(redis_cached, python_dict)
+        self.assertEqual(python_dict, redis_cached)
+
+        self.assertNotEqual(redis_dict, data.items())
+        self.assertNotEqual(redis_cached, data.items())
+        self.assertNotEqual(python_dict, data.items())
+
 
 class CounterTest(RedisTestCase):
 
@@ -524,28 +547,28 @@ class CounterTest(RedisTestCase):
         self._test_op(operator.add)
 
         result = self.create_counter('abbccc') + self.create_counter('aabbcc')
-        self.assertTrue(isinstance(result, Counter))
+        self.assertTrue(isinstance(result, collections.Counter))
         self.assertEqual(result, {'a': 3, 'b': 4, 'c': 5})
 
     def test_sub(self):
         self._test_op(operator.sub)
 
         result = self.create_counter('abbccc') - self.create_counter('aabbcc')
-        self.assertTrue(isinstance(result, Counter))
+        self.assertTrue(isinstance(result, collections.Counter))
         self.assertEqual(result, {'c': 1})
 
     def test_or(self):
         self._test_op(operator.or_)
 
         result = self.create_counter('abbccc') | self.create_counter('aabbcc')
-        self.assertTrue(isinstance(result, Counter))
+        self.assertTrue(isinstance(result, collections.Counter))
         self.assertEqual(result, {'a': 2, 'b': 2, 'c': 3})
 
     def test_and(self):
         self._test_op(operator.and_)
 
         result = self.create_counter('abbccc') & self.create_counter('aabbcc')
-        self.assertTrue(isinstance(result, Counter))
+        self.assertTrue(isinstance(result, collections.Counter))
         self.assertEqual(result, {'a': 1, 'b': 2, 'c': 2})
 
     def test_iadd(self):
@@ -691,6 +714,7 @@ class DefaultDictTest(RedisTestCase):
         self.assertEqual(
             redis_ddict.default_factory, redis_copy.default_factory
         )
+
 
 if __name__ == '__main__':
     unittest.main()
