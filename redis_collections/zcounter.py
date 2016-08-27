@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-dicts
+sortedsets
 ~~~~~
 
-Collections based on the dict interface.
+Collections based on the Redis Sorted Sets data type
 """
 from __future__ import division, print_function, unicode_literals
 
@@ -152,6 +152,9 @@ class ZCounter(RedisCollection):
                 raise
 
         return score
+
+    def increment(self, member, amount=1):
+        self.redis.zincrby(self.key, self._pickle(member), float(amount))
 
     def index(self, member, reverse=False, pipe=None):
         pipe = self.redis if pipe is None else pipe
