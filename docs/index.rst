@@ -4,11 +4,22 @@
 Redis Collections
 =================
 
-Redis Collections are a set of basic Python collections backed by Redis.
+`redis-collections` is a library that provides several Python collection types (such as ``Dict``, ``List``, ``Set``, and more) backed by Redis.
+This exposes Redis functionality with a Pythonic interface, and provides a simple way to store Python objects across sessions and processes.
 
-`Redis <http://redis.io/>`_ is a great key-value storage. There is well-designed `client for Python <https://github.com/andymccurdy/redis-py>`_, but sometimes working with it seems to be too *low-level*. You just call methods with names of corresponding Redis commands. Such approach is great when dealing with cutting edge software tasks, but if you write just a simple app or command line script for your own, you might appreciate a bit different interface.
+This library builds on `Redis <http://redis.io/>`_, the excellent key-value store, and on `redis-py <https://github.com/andymccurdy/redis-py>`_, the well-designed Python interface for it.
 
-The aim of this library is to provide such interface when dealing with collections. Redis has support for several types: strings, hashes, lists, sets, sorted sets. Why not to bring them to Python in a *pythonic* way? ::
+Installation and Usage
+----------------------
+
+To get started, install the library with `pip <https://pip.pypa.io/en/stable/>`_:
+
+.. code:: shell
+
+   pip install redis-collections
+
+
+With the library installed, import one the collections and use it to store some data:
 
     >>> from redis_collections import Dict
     >>> d = Dict()
@@ -18,9 +29,10 @@ The aim of this library is to provide such interface when dealing with collectio
     >>> d.items()
     [('answer', 42)]
 
-In Redis you will see can see a ``hash`` structure under key ``fe267c1dde5d4f648e7bac836a0168fe``. That structure stores a field and value that corresponds to ``{'answer': 42}``.  The value is pickled, because Redis can store only strings.
+In Redis you will see can see a ``hash`` structure under key ``fe267c1dde5d4f648e7bac836a0168fe``.
+That structure stores a field and value that corresponds to ``{'answer': 42}`` (the key and value are pickled, because Redis can store only strings).
 
-On the Python side, you can do most anything you can do with standard :class:`dict` instances:
+In Python you'll find that the collections can do most everything their Python counterparts can:
 
     >>> d.update({'hasek': 39, 'jagr': 68})
     >>> d
@@ -29,63 +41,64 @@ On the Python side, you can do most anything you can do with standard :class:`di
     >>> d
     <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'jagr': 68, 'hasek': 39}>
 
-"Write" operations atomically change data in Redis.
-
-Installation
-------------
-
-Current version is |release|.
-
-.. code:: shell
-
-   pip install redis-collections
-
 Persistence
 -----------
 
-When creating the :class:`Dict` object, your collection gets a unique Redis key. If you keep this key, you can summon your collection any time in the future:
+By default, a Redis key is generated when you create a new collection.
+If you specify a key when creating a collection you can retrieve what was stored there previously:
 
     >>> d.key
     fe267c1dde5d4f648e7bac836a0168fe
-    >>> Dict(key='fe267c1dde5d4f648e7bac836a0168fe')
+    >>> e = Dict(key='fe267c1dde5d4f648e7bac836a0168fe')
+    >>> e
     <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'jagr': 68, 'hasek': 39}>
 
-In case you wish to wipe all its data, use :func:`clear` method, which is available to all collections provided by this library::
+This should even work across processes, meaning if your Python script terminates, you can retrieve its data again from Redis.
+
+Each collection allows you to delete its Redis key with the :func:`clear` method::
 
     >>> d.clear()
     >>> d.items()
     []
 
-If I look to my Redis, key ``fe267c1dde5d4f648e7bac836a0168fe`` completely disappeared.
 
 .. note::
-    If you provide your own key string, a collection will be successfully created. If there is no key corresponding in Redis, it will be created and initialized as an empty collection. This means you can set up your own way of assigning unique keys dependent on your other code. For example, by using IDs of records from your relational database you can have exactly one unique collection in Redis for every record from your SQL storage.
+    You may provide your own key string when creating a collection
+    If there is no corresponding key already in Redis, one will be created.
+    This means you can set up your own way of assigning unique keys dependent on your other code.
+    For example, by using IDs of records from your relational database you can have exactly one unique collection in Redis for every record from your SQL storage.
 
 Redis Connection
 ----------------
 
-By default, collections use a new Redis connection with its default values, **which is highly inefficient, but needs no configuration**. If you wish to use your own :class:`Redis` instance, pass it in ``redis`` keyword argument::
+By default, collections use a new Redis connection with its default values.
+This requires no configuration, but is inefficient if you plan to use multiple collections.
+To share a connection with multiple collections, create one (with ``redis.StrictRedis``) and pass it using the ``redis`` keyword when creating the collections:
 
     >>> from redis import StrictRedis
-    >>> r = StrictRedis()
-    >>> d = Dict(redis=r)
-    >>> l = List(redis=r)  # using the same connection as Dict above
+    >>> conn = StrictRedis()
+    >>> d = Dict(redis=conn)
+    >>> l = List(redis=conn)  # using the same connection as Dict above
 
-There are several operations between collections resulting into creation of new instances of Redis Collections. These new instances
-always use the same Redis connection as the original object::
+A collection's ``copy`` method creates new a instance that uses the same Redis connection as the original object::
 
-    >>> from redis import StrictRedis
-    >>> from redis_collections import List
-    >>> r = StrictRedis()
-    >>> l = List([1, 2], redis=r)
-    >>> l
+    >>> conn = StrictRedis()
+    >>> list_01 = List([1, 2], redis=conn)
+    >>> list_01
     <redis_collections.List at 196e407f8fc142728318a999ec821368 [1, 2]>
-    >>> l + [4, 5, 6]  # result is using the same connection
-    <redis_collections.List at 7790ef98639043c9abeacc80c2de0b93 [1, 2, 4, 5, 6]>
+    >>> list_02 = list_01.copy()  # result is using the same connection
+    <redis_collections.List at 7790ef98639043c9abeacc80c2de0b93 [1, 2]>
+
+Operations on two collections backed by different Redis servers will be performed in Python::
+
+    >>> list_1 = List((1, 2, 3), redis=StrictRedis(port=6379))
+    >>> list_2 = List((4, 5, 6), redis=StrictRedis(port=6380))
+    >>> list_1.extend(list_2)
+
 
 Synchronization
 ---------------
-Storing a mutable object like a ``list`` in a ``Dict`` can lead to surprising behavior.
+Storing a mutable object like a ``list`` in a ``Dict`` or a ``Set`` can lead to surprising behavior.
 Because of Python semantics, it's impossible to automatically write to Redis when such an object is retrieved and modified.
 
     >>> d = Dict({'key': [1, 2]})  # Store a mutable object
@@ -93,7 +106,8 @@ Because of Python semantics, it's impossible to automatically write to Redis whe
     >>> d['key']  # Retrieve the object from Redis again
     [1, 2]
 
-To work with such objects you may use a ``Dict`` with ``writeback`` enabled. This will keep a local cache that is flushed to Redis when the ``sync`` method is called.
+To work with such objects you may use a ``Dict`` with ``writeback`` enabled.
+This will keep a local cache that is flushed to Redis when the ``sync`` method is called.
 
     >>> d = Dict({'key': [1, 2]}, writeback=True)
     >>> d['key'].append(3)
@@ -110,36 +124,39 @@ You may also use a ``with`` block to automatically call the ``sync`` method.
 
 The ``writeback`` option is automatically enabled for ``DefaultDict`` objects.
 
-Pickling
---------
+Subclass customization
+----------------------
 
-If you don't like the standard way of data serialization made by :mod:`pickle`, you may override the ``_pickle`` and ``_unpickle`` methods of the collection classes.
+Collections use :func:`uuid.uuid4` for generating unique keys.
+If you are not satisfied with that function's `collision probability <http://stackoverflow.com/a/786541/325365>`_ you may sublclass a collection and override its :func:`_create_key` method.
+
+If you don't like how  :mod:`pickle` does serialization, you may override the ``_pickle`` and ``_unpickle`` methods of the collection classes.
 Using other serializers may limit the objects you can store or retrieve.
 
-Known issues
-------------
+Security considerations
+-----------------------
 
-*   Storing objects that have the same hash (such as the float ``1.0`` and the int ``1``) in a ``Set`` can lead to surprising behavior. They can both be retrieved, unlike with a native Python ``set``. See `issue 49 <https://github.com/honzajavorek/redis-collections/issues/49>`_.
+Collections use :mod:`pickle`, which means you should never retrieve data from a source you don't trust.
 
-*   Support for Python 3 is in progress. Please `report <https://github.com/honzajavorek/redis-collections/issues>`_ any issues you find.
+For example: suppose you maintain a web application that has user profiles.
+Users can submit their name, birthday, and a brief biography; and ultimately this is information stored in a Redis hash.
+*Do not* attach a ``redis_collection.Dict`` instance to that hash key - a user could construct a string that gives them the ability to execute arbitrary code with your Python process's privileges.
 
 Philosophy
 ----------
 
-*   All operations are atomic.
-
-    .. warning::
-        If an operation has race conditions, it is a bug. Please, `report it <https://github.com/honzajavorek/redis-collections/issues>`_.
+*   All operations are atomic. Race conditions are bugs - please `report them <https://github.com/honzajavorek/redis-collections/issues>`_.
 
 *   Redis Collections stick to API of the original data structures known from Python standard library.
     To have the same (expected) behaviour is considered to be more important than efficiency.
 
-    .. warning::
-        If a collection has the method you want to use, but it does not behave as the original built-in and it does not raise NotImplementedError, then it is a bug. Please, `report it <https://github.com/honzajavorek/redis-collections/issues>`_.
+    If there is more efficient approach than the one complying with the model interface, a new method exposing this approach should be introduced.
 
-    If there is more efficient approach than the one complying with the model interface, new method exposing this approach should be introduced.
+    If a collection's behavior doesn't match its standard Python counterpart, please `create an issue <https://github.com/honzajavorek/redis-collections/issues>`_.
 
-*   Cases where different than standard approach would lead to better efficiency are mentioned and highlighted in API documentation as notes. Known incompatibilities with the original API are marked as warnings.
+*   Cases where different than standard approach would lead to better efficiency are mentioned and highlighted in API documentation as notes.
+    Known incompatibilities with the original API are marked as warnings.
+
 *   Behavior of **nested Redis Collections** containing other Redis Collections is **undefined**.
     It is not recommended to create such structures. Use collection of keys instead.
 
@@ -175,11 +192,20 @@ Redis Collections are composed of only several classes. All items listed below a
     :members:
     :special-members:
 
+.. autoclass:: Deque
+    :members:
+    :special-members:
+
 .. automodule:: redis_collections.sets
 
 .. autoclass:: Set
     :members:
     :special-members:
+
+Changelog
+---------
+
+**→** :ref:`changelog`
 
 Maintainers
 -----------
