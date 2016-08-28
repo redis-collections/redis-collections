@@ -121,10 +121,6 @@ class ZCounter(RedisCollection):
 
         return pipe.zcard(self.key)
 
-    def __setitem__(self, member, score, pipe=None):
-        pipe = self.redis if pipe is None else pipe
-        pipe.zadd(self.key, float(score), self._pickle(member))
-
     # Named methods
 
     def clear(self, pipe=None):
@@ -233,6 +229,10 @@ class ZCounter(RedisCollection):
                 ret.append((member, score))
 
         return ret
+
+    def set_score(self, member, score, pipe=None):
+        pipe = self.redis if pipe is None else pipe
+        pipe.zadd(self.key, float(score), self._pickle(member))
 
     def update(self, other):
         def update_trans(pipe):

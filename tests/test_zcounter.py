@@ -23,7 +23,7 @@ class ZCounterTestCase(RedisTestCase):
     def test_contains(self):
         zc = self.create_zcounter()
 
-        zc['member_1'] = 1
+        zc.set_score('member_1', 1)
         self.assertIn('member_1', zc)
 
         self.assertNotIn('member_2', zc)
@@ -34,16 +34,16 @@ class ZCounterTestCase(RedisTestCase):
         # Unlike a Python dict or collections.Counter instance ZCounter
         # does not refuse to store numeric types like 1, 1.0, complex(1, 0)
         # in the same collection
-        zc[1] = 100
+        zc.set_score(1, 100)
         self.assertNotIn(1.0, zc)
 
-        zc[1.0] = 1000
+        zc.set_score(1.0, 1000)
         self.assertIn(1.0, zc)
 
     def test_delitem(self):
         zc = self.create_zcounter()
 
-        zc['member_1'] = 1
+        zc.set_score('member_1', 1)
         self.assertIn('member_1', zc)
 
         del zc['member_1']
@@ -94,10 +94,10 @@ class ZCounterTestCase(RedisTestCase):
             del zc[index]
             self.assertEqual(zc.items(), items)
 
-    def test_getitem_setitem(self):
+    def test_getitem(self):
         zc = self.create_zcounter()
-        zc['member_1'] = 1
-        zc['member_2'] = 2.0
+        zc.set_score('member_1', 1)
+        zc.set_score('member_2', 2.0)
 
         self.assertEqual(zc['member_1'], 1)
         self.assertEqual(zc['member_2'], 2.0)
@@ -114,32 +114,28 @@ class ZCounterTestCase(RedisTestCase):
 
         self.assertEqual(len(zc), 0)
 
-        zc['member_1'] = 1
+        zc.set_score('member_1', 1)
         self.assertEqual(len(zc), 1)
 
-        zc['member_2'] = 2.0
+        zc.set_score('member_2', 2.0)
         self.assertEqual(len(zc), 2)
 
         del zc['member_1']
         self.assertEqual(len(zc), 1)
 
     def test_clear(self):
-        zc = self.create_zcounter()
-
-        zc['0'] = 1.0
-        zc['1'] = 2.0
+        zc = self.create_zcounter([('0', 1.0), ('1', 2.0)])
         self.assertEqual(zc.items(), [('0', 1.0), ('1', 2.0)])
 
         zc.clear()
         self.assertEqual(zc.items(), [])
 
     def test_copy(self):
-        zc = self.create_zcounter()
-        zc['0'] = 1.0
-        zc['1'] = 2.0
+        items = [('0', 1.0), ('1', 2.0)]
+        zc = self.create_zcounter(items)
 
         zc_2 = zc.copy()
-        self.assertEqual(zc_2.items(), [('0', 1.0), ('1', 2.0)])
+        self.assertEqual(zc_2.items(), items)
         self.assertTrue(zc.redis, zc_2.redis)
 
     def test_count_between(self):
@@ -156,9 +152,7 @@ class ZCounterTestCase(RedisTestCase):
         self.assertEqual(zc.count_between(4.0, 2.0), 0)
 
     def test_get(self):
-        zc = self.create_zcounter()
-        zc['member_1'] = 1
-        zc['member_2'] = 2.0
+        zc = self.create_zcounter([('member_1', 1), ('member_2', 2.0)])
 
         self.assertEqual(zc.get('member_1'), 1)
         self.assertEqual(zc.get('member_2'), 2.0)
@@ -177,10 +171,8 @@ class ZCounterTestCase(RedisTestCase):
         self.assertRaises(ValueError, zc.increment, 'member_1', '!')
 
     def test_index(self):
-        zc = self.create_zcounter()
-        zc['member_1'] = 1
-        zc['member_2'] = 2.0
-        zc['member_3'] = 30.0
+        items = [('member_1', 1), ('member_2', 2.0), ('member_3', 30.0)]
+        zc = self.create_zcounter(items)
 
         self.assertEqual(zc.index('member_1'), 0)
         self.assertEqual(zc.index('member_2'), 1)
@@ -214,8 +206,7 @@ class ZCounterTestCase(RedisTestCase):
         self.assertEqual(zc.items(1, 4, 4, 8), items[2:4])
 
     def test_update(self):
-        zc = self.create_zcounter()
-        zc['member_1'] = 0.0
+        zc = self.create_zcounter([('member_1', 0.0)])
 
         zc.update({'member_1': 1, 'member_2': 2.0})
         self.assertEqual(zc['member_1'], 1)
@@ -226,6 +217,6 @@ class ZCounterTestCase(RedisTestCase):
         self.assertEqual(zc['member_3'], 30.0)
 
         zc_2 = self.create_zcounter()
-        zc_2['member_3'] = 40.0
+        zc_2.set_score('member_3', 40.0)
         zc.update(zc_2)
         self.assertEqual(zc['member_3'], 40.0)
