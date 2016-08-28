@@ -10,11 +10,11 @@ from __future__ import division, print_function, unicode_literals
 from .base import RedisCollection
 
 
-class ZCounter(RedisCollection):
+class SortedSetCounter(RedisCollection):
     def __init__(self, *args, **kwargs):
         data = args[0] if args else kwargs.pop('data', None)
 
-        super(ZCounter, self).__init__(**kwargs)
+        super(SortedSetCounter, self).__init__(**kwargs)
 
         if data:
             self.update(data)
