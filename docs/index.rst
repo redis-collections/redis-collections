@@ -29,7 +29,7 @@ With the library installed, import one the collections and use it to store some 
     >>> d.items()
     [('answer', 42)]
 
-In Redis you will see can see a ``hash`` structure under key ``fe267c1dde5d4f648e7bac836a0168fe``.
+In Redis you'll see a ``hash`` structure under key ``fe267c1dde5d4f648e7bac836a0168fe``.
 That structure stores a field and value that corresponds to ``{'answer': 42}`` (the key and value are pickled, because Redis can store only strings).
 
 In Python you'll find that the collections can do most everything their Python counterparts can:
@@ -73,7 +73,7 @@ Redis Connection
 
 By default, collections use a new Redis connection with its default values.
 This requires no configuration, but is inefficient if you plan to use multiple collections.
-To share a connection with multiple collections, create one (with ``redis.StrictRedis``) and pass it using the ``redis`` keyword when creating the collections:
+To share a connection among multiple collections, create one (with ``redis.StrictRedis``) and pass it using the ``redis`` keyword when creating the collections:
 
     >>> from redis import StrictRedis
     >>> conn = StrictRedis()
@@ -124,14 +124,30 @@ You may also use a ``with`` block to automatically call the ``sync`` method.
 
 The ``writeback`` option is automatically enabled for ``DefaultDict`` objects.
 
-Subclass customization
-----------------------
+Hashing dictionary keys and set elements
+----------------------------------------
 
-Collections use :func:`uuid.uuid4` for generating unique keys.
-If you are not satisfied with that function's `collision probability <http://stackoverflow.com/a/786541/325365>`_ you may sublclass a collection and override its :func:`_create_key` method.
+Python `takes care <https://docs.python.org/3/library/stdtypes.html#hashing-of-numeric-types>`_ to make sure that equal numeric values, such as ``1.0`` and ``1``, have the same hash value. If you add ``1.0`` to a ``set`` or a ``dict``, you will not be able to add ``1``, as an equal value is already stored.
 
-If you don't like how  :mod:`pickle` does serialization, you may override the ``_pickle`` and ``_unpickle`` methods of the collection classes.
-Using other serializers may limit the objects you can store or retrieve.
+The Redis-backed ``Dict`` and ``Set`` classes in this library attempt to follow this behavior, but there are some differences. For the standard Python collections, you get back the first value you stored:
+
+    >>> python_dict = {}
+    >>> python_dict[1.0] = 'one'  # 1.0 stored first
+    >>> python_dict[1] = 'One'  # 1 stored second
+    >>> list(python_dict.keys())  # 1.0 is retrieved
+    [1.0]
+
+For the Redis-backed collections, you'll get back the integer:
+
+    >>> redis_dict = Dict()
+    >>> redis_dict[1.0] = 'one'  # 1.0 stored first
+    >>> redis_dict[1] = 'One'  # 1 stored second
+    >>> list(redis_dict.keys())  # 1 is retrieved
+    [1]
+
+This behavior applies to ``complex``, ``float``, ``Decimal``, and ``Fraction`` values that have an integer equivalent. It doesn't apply to values that don't have an integer equivalent (such as ``1.1`` or ``complex(1, 1)``).
+
+On Python 2 only, ``unicode`` types are converted to ``str`` types (with UTF-8 encoding) before being sent to Redis. ``str`` types are decoded to ``unicode`` types after being retrieved from Redis (if possible).
 
 Security considerations
 -----------------------
@@ -141,6 +157,15 @@ Collections use :mod:`pickle`, which means you should never retrieve data from a
 For example: suppose you maintain a web application that has user profiles.
 Users can submit their name, birthday, and a brief biography; and ultimately this is information stored in a Redis hash.
 *Do not* attach a ``redis_collection.Dict`` instance to that hash key - a user could construct a string that gives them the ability to execute arbitrary code with your Python process's privileges.
+
+Subclass customization
+----------------------
+
+Collections use :func:`uuid.uuid4` for generating unique keys.
+If you are not satisfied with that function's `collision probability <http://stackoverflow.com/a/786541/325365>`_ you may sublclass a collection and override its :func:`_create_key` method.
+
+If you don't like how  :mod:`pickle` does serialization, you may override the ``_pickle`` and ``_unpickle`` methods of the collection classes.
+Using other serializers may limit the objects you can store or retrieve.
 
 Philosophy
 ----------
