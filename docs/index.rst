@@ -147,7 +147,7 @@ For the Redis-backed collections, you'll get back the integer:
 
 This behavior applies to ``complex``, ``float``, ``Decimal``, and ``Fraction`` values that have an integer equivalent. It doesn't apply to values that don't have an integer equivalent (such as ``1.1`` or ``complex(1, 1)``).
 
-On Python 2 only, ``unicode`` types are converted to ``str`` types (with UTF-8 encoding) before being sent to Redis. ``str`` types are decoded to ``unicode`` types (again with 
+On Python 2 only, ``unicode`` types are converted to ``str`` types (with UTF-8 encoding) before being sent to Redis. ``str`` types are decoded to ``unicode`` types after being retrieved from Redis (if possible).
 
 Security considerations
 -----------------------
