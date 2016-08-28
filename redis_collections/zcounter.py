@@ -136,11 +136,11 @@ class ZCounter(RedisCollection):
 
         return other
 
-    def count_between(self, start=None, stop=None):
-        start = float('-inf') if start is None else float(start)
-        stop = float('inf') if stop is None else float(stop)
+    def count_between(self, min_score=None, max_score=None):
+        min_score = float('-inf') if min_score is None else float(min_score)
+        max_score = float('inf') if max_score is None else float(max_score)
 
-        return self.redis.zcount(self.key, start, stop)
+        return self.redis.zcount(self.key, min_score, max_score)
 
     def get(self, member, default=None):
         try:
@@ -166,22 +166,73 @@ class ZCounter(RedisCollection):
 
         return rank
 
-    def items(self, start=None, stop=None, reverse=False, pipe=None):
+    def items_by_rank(
+        self, min_rank=None, max_rank=None, reverse=False, pipe=None
+    ):
         pipe = self.redis if pipe is None else pipe
 
-        start = float('-inf') if start is None else float(start)
-        stop = float('inf') if stop is None else float(stop)
+        min_rank = 0 if min_rank is None else min_rank
+        max_rank = -1 if max_rank is None else max_rank
 
         if reverse:
-            results = pipe.zrevrangebyscore(
-                self.key, stop, start, withscores=True
+            results = pipe.zrevrange(
+                self.key, max_rank, min_rank, withscores=True
             )
         else:
-            results = pipe.zrangebyscore(
-                self.key, start, stop, withscores=True
+            results = pipe.zrange(
+                self.key, min_rank, max_rank, withscores=True
             )
 
         return [(self._unpickle(member), score) for member, score in results]
+
+    def items_by_score(self, min_score, max_score, reverse=False, pipe=None):
+        pipe = self.redis if pipe is None else pipe
+
+        min_score = float('-inf') if min_score is None else float(min_score)
+        max_score = float('inf') if max_score is None else float(max_score)
+
+        if reverse:
+            results = pipe.zrevrangebyscore(
+                self.key, max_score, min_score, withscores=True
+            )
+        else:
+            results = pipe.zrangebyscore(
+                self.key, min_score, max_score, withscores=True
+            )
+
+        return [(self._unpickle(member), score) for member, score in results]
+
+    def items(
+        self,
+        min_rank=None,
+        max_rank=None,
+        min_score=None,
+        max_score=None,
+        reverse=False,
+        pipe=None,
+    ):
+        pipe = self.redis if pipe is None else pipe
+
+        no_ranks = (min_rank is None) and (max_rank is None)
+        no_scores = (min_score is None) and (max_score is None)
+
+        if no_ranks and no_scores:
+            ret = self.items_by_score(min_score, max_score, reverse, pipe)
+        elif no_ranks and (not no_scores):
+            ret = self.items_by_score(min_score, max_score, reverse, pipe)
+        elif (not no_ranks) and no_scores:
+            ret = self.items_by_rank(min_rank, max_rank, reverse, pipe)
+        else:
+            results = self.items_by_rank(min_rank, max_rank, reverse, pipe)
+            ret = []
+            for member, score in results:
+                if (min_score is not None) and (score < min_score):
+                    continue
+                if (max_score is not None) and (score > max_score):
+                    continue
+                ret.append((member, score))
+
+        return ret
 
     def update(self, other):
         def update_trans(pipe):

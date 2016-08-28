@@ -193,24 +193,25 @@ class ZCounterTestCase(RedisTestCase):
         self.assertEqual(zc.index('member_1', reverse=True), 2)
 
     def test_items(self):
-        items = [('0', 1.0), ('1', 2.0), ('2', 4.0), ('3', 8.0)]
+        items = [
+            ('0', 1), ('1', 2), ('2', 4), ('3', 8), ('4', 16), ('5', 32)
+        ]
         zc = self.create_zcounter(items)
 
-        self.assertEqual(zc.items(), items)
-        self.assertEqual(zc.items(2.0), items[1:])
-        self.assertEqual(zc.items(2.0, 4.0), items[1:3])
-        self.assertEqual(zc.items(4.0), items[2:])
-        self.assertEqual(zc.items(0.0, 0.9), [])
-        self.assertEqual(zc.items(8.1), [])
-        self.assertEqual(zc.items(4.0, 2.0), [])
+        self.assertEqual(zc.items(), items[:])
 
-        self.assertEqual(zc.items(reverse=True), items[::-1])
-        self.assertEqual(zc.items(2.0, reverse=True), items[1:][::-1])
-        self.assertEqual(zc.items(2.0, 4.0, reverse=True), items[1:3][::-1])
-        self.assertEqual(zc.items(4.0, reverse=True), items[2:][::-1])
-        self.assertEqual(zc.items(0.0, 0.9, reverse=True), [])
-        self.assertEqual(zc.items(8.1, reverse=True), [])
-        self.assertEqual(zc.items(4.0, 2.0, reverse=True), [])
+        self.assertEqual(zc.items(min_rank=1), items[1:])
+        self.assertEqual(zc.items(min_rank=1, max_rank=-2), items[1:-1])
+        self.assertEqual(zc.items(max_rank=-2), items[:-1])
+
+        self.assertEqual(zc.items(min_score=4), items[2:])
+        self.assertEqual(zc.items(min_score=4, max_score=16), items[2:-1])
+        self.assertEqual(zc.items(max_score=4), items[:3])
+
+        self.assertEqual(zc.items(min_rank=1, min_score=4), items[2:])
+        self.assertEqual(zc.items(min_rank=3, min_score=4), items[3:])
+        self.assertEqual(zc.items(max_rank=4, min_score=4), items[2:5])
+        self.assertEqual(zc.items(1, 4, 4, 8), items[2:4])
 
     def test_update(self):
         zc = self.create_zcounter()
