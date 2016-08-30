@@ -25,6 +25,7 @@ deploy:
     python: "2.7"
     tags: true
     repo: "honzajavorek/redis-collections"
+    distributions: "sdist bdist_wheel"
 
 notifications:
   email: false
