@@ -46,7 +46,7 @@ setup(
     author=meta['author'],
     author_email='mail@honzajavorek.cz',
     url='https://github.com/honzajavorek/redis-collections',
-    license=io.open('LICENSE', encoding='utf-8').read(),
+    license='ISC',
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
     install_requires=['redis>=2.7.2', 'six>=1.10.0'],
