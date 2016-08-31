@@ -51,6 +51,7 @@ setup(
     include_package_data=True,
     install_requires=['redis>=2.7.2', 'six>=1.10.0'],
     zip_safe=False,
+    keywords='redis persistence',
     classifiers=(
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
