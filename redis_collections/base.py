@@ -45,6 +45,9 @@ class RedisCollection(object):
         #: Redis client instance. :class:`StrictRedis` object with default
         #: connection settings is used if not set by :func:`__init__`.
         self.redis = redis or self._create_redis()
+        self.redis_version = tuple(
+            int(x) for x in self.redis.info()['redis_version'].split('.')
+        )
 
         #: Redis key of the collection.
         self.key = key or self._create_key()
