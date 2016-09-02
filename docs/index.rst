@@ -185,6 +185,11 @@ Philosophy
 *   Behavior of **nested Redis Collections** containing other Redis Collections is **undefined**.
     It is not recommended to create such structures. Use collection of keys instead.
 
+*   Redis Collections will take advantage of features in new versions of Redis, but will provide backports for older versions of Redis.
+
+    The earliest supported version of Redis is the one that ships with the oldest supported LTS release of Ubuntu Linux
+    (see `packages.ubuntu.com <http://packages.ubuntu.com/redis-server>`_).
+
 API Documentation
 -----------------
 
