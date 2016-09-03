@@ -10,6 +10,7 @@ from __future__ import division, print_function, unicode_literals
 import collections
 from functools import reduce
 import operator
+import random
 
 import six
 
@@ -150,16 +151,27 @@ class Set(RedisCollection, collections.MutableSet):
         :rtype: :class:`list`
 
         .. note::
-            Argument *k* is supported only for Redis of version 2.6 and higher.
             This method is not available on the Python :class:`set`.
+            When Redis version < 2.6 is being used the whole set is stored
+            in memory and the sample is computed in Python.
         """
+        # k == 0: no work to do
         if k == 0:
-            return []
-
-        if k == 1:
+            results = []
+        # k == 1: same behavior on all versions of Redis
+        elif k == 1:
             results = [self.redis.srandmember(self.key)]
-        else:
+        # k != 1, Redis version >= 2.6: compute in Redis
+        elif self.redis_version >= (2, 6, 0):
             results = self.redis.srandmember(self.key, k)
+        # positive k, Redis version < 2.6: sample without replacement
+        elif k > 1:
+            seq = list(self.__iter__())
+            return random.sample(seq, min(k, len(seq)))
+        # negative k, Redis version < 2.6: sample with replacement
+        else:
+            seq = list(self.__iter__())
+            return [random.choice(seq) for __ in six.moves.xrange(abs(k))]
 
         return [self._unpickle(x) for x in results]
 

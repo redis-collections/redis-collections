@@ -364,12 +364,22 @@ class SetTest(RedisTestCase):
         self.assertEqual(s.random_sample(0), [])
         self.assertEqual(s.random_sample(), ['a'])
 
-        redis_version = self.redis.info()['redis_version']
-        redis_version = [int(x) for x in redis_version.split('.')]
-        major_ver, minor_ver, _ = redis_version
-        if (major_ver > 2) or (major_ver >= 2 and minor_ver >= 6):
-            s = self.create_set('ab')
+        s = self.create_set('ab')
+        for redis_version in [(2, 6, 0), (2, 4, 0)]:
+            # Test both the Redis implementation and Python implementation
+            if s.redis_version >= (2, 6, 0):
+                s.redis_version = redis_version
+
             self.assertEqual(sorted(s.random_sample(2)), ['a', 'b'])
+            self.assertEqual(sorted(s.random_sample(3)), ['a', 'b'])
+
+            # Negative k samples with replacement. With two items this should
+            # eventually break.
+            while True:
+                actual = sorted(s.random_sample(-2))
+                expected = ['a', 'b']
+                if actual == expected:
+                    break
 
     def test_add_unicode(self):
         for init in (self.create_set, set):
