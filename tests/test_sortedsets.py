@@ -146,25 +146,6 @@ class SortedSetCounterTestCase(RedisTestCase):
         # No error for removing non-existient member
         ssc.discard_member('member_1')
 
-    def test_get(self):
-        ssc = self.create_sortedset([('member_1', 1), ('member_2', 2.0)])
-
-        self.assertEqual(ssc.get_score('member_1'), 1)
-        self.assertEqual(ssc.get_score('member_2'), 2.0)
-        self.assertEqual(ssc.get_score('member_3', 0), 0)
-        self.assertEqual(ssc.get_score('member_4'), None)
-
-    def test_increment_score(self):
-        ssc = self.create_sortedset()
-
-        ssc.increment_score('member_1')
-        self.assertEqual(ssc.get_score('member_1'), 1.0)
-
-        ssc.increment_score('member_1', 1.0)
-        self.assertEqual(ssc.get_score('member_1'), 2.0)
-
-        self.assertRaises(ValueError, ssc.increment_score, 'member_1', '!')
-
     def test_get_rank(self):
         items = [('member_1', 1), ('member_2', 2.0), ('member_3', 30.0)]
         ssc = self.create_sortedset(items)
@@ -178,6 +159,34 @@ class SortedSetCounterTestCase(RedisTestCase):
         self.assertEqual(ssc.get_rank('member_3', reverse=True), 0)
         self.assertEqual(ssc.get_rank('member_2', reverse=True), 1)
         self.assertEqual(ssc.get_rank('member_1', reverse=True), 2)
+
+    def test_get_score(self):
+        ssc = self.create_sortedset([('member_1', 1), ('member_2', 2.0)])
+
+        self.assertEqual(ssc.get_score('member_1'), 1)
+        self.assertEqual(ssc.get_score('member_2'), 2.0)
+        self.assertEqual(ssc.get_score('member_3', 0), 0)
+        self.assertEqual(ssc.get_score('member_4'), None)
+
+    def test_get_or_set_score(self):
+        ssc = self.create_sortedset([('0', 0), ('1', 1)])
+
+        self.assertEqual(ssc.get_or_set_score('0', 100), 0)
+        self.assertEqual(ssc.get_score('0'), 0)
+
+        self.assertEqual(ssc.get_or_set_score('2', 2), 2)
+        self.assertEqual(ssc.get_score('2', 2), 2)
+
+    def test_increment_score(self):
+        ssc = self.create_sortedset()
+
+        self.assertEqual(ssc.increment_score('member_1'), 1.0)
+        self.assertEqual(ssc.get_score('member_1'), 1.0)
+
+        self.assertEqual(ssc.increment_score('member_1', 1.0), 2.0)
+        self.assertEqual(ssc.get_score('member_1'), 2.0)
+
+        self.assertRaises(ValueError, ssc.increment_score, 'member_1', '!')
 
     def test_items(self):
         items = [

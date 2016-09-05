@@ -11,7 +11,60 @@ from .base import RedisCollection
 
 
 class SortedSetCounter(RedisCollection):
+    """
+    :class:`SortedSetCounter` is a collection based on the Redis
+    `Sorted Set <http://redis.io/topics/data-types#sorted-sets>`_ type.
+    Instance map a unique set of ``member`` objects to floating point ``score``
+    values.
+
+        >>> ssc = SortedSetCounter([('earth', 300), ('mercury', 100)])
+        >>> ssc.set_score('venus', 200)
+        >>> ssc.get_score('venus')
+        200.0
+
+    When retrieving members they are returned in order by score:
+        >>> ssc.items()
+        [('mercury', 100.0), ('venus', 200.0), ('earth', 300.0)]
+
+    Ranges of items by rank can be computed and returned efficiently, as can
+    ranges by score:
+        >>> ssc.items(min_rank=200.0)
+        [('venus', 200.0), ('earth', 300.0)]
+        >>> ssc.items(min_score=99, max_score=299)
+        [('mercury', 100.0), ('venus', 200.0)]
+
+    .. warning::
+        The API for :class:`SortedSetCounter` does not attempt to match an
+        existing Python collection's.
+
+        - Unlike :class:`Dict` or :class:`Set` objects, equal numeric types are
+          considered distinct when used as members. For example, a collection
+          can contain both ``1`` and ``1.0``.
+
+        - Unlike :class:`Counter` or :class:`collections.Counter` objects, only
+          :class:`float` scores can be stored.
+    """
+
     def __init__(self, *args, **kwargs):
+        """
+        :param data: Initial data.
+        :type data: iterable or mapping
+        :param redis: Redis client instance. If not provided, default Redis
+                      connection is used.
+        :type redis: :class:`redis.StrictRedis`
+        :param key: Redis key of the collection. Collections with the same key
+                    point to the same data. If not provided, default random
+                    string is generated.
+        :type key: str
+        :param writeback: If ``True`` keep a local cache of changes for storing
+                          modifications to mutable values. Changes will be
+                          written to Redis after calling the ``sync`` method.
+        :type writeback: bool
+
+        .. warning::
+            As mentioned, :class:`Dict` does not support following
+            initialization syntax: ``d = Dict(a=1, b=2)``
+        """
         data = args[0] if args else kwargs.pop('data', None)
 
         super(SortedSetCounter, self).__init__(**kwargs)
@@ -32,17 +85,22 @@ class SortedSetCounter(RedisCollection):
     # Magic methods
 
     def __contains__(self, member, pipe=None):
+        """Return ``True`` if *key* is present, else ``False``."""
         pipe = self.redis if pipe is None else pipe
         score = pipe.zscore(self.key, self._pickle(member))
 
         return score is not None
 
     def __iter__(self, pipe=None):
+        """
+        Return an iterator of ``(member, score)`` tuples from the collection.
+        """
         pipe = self.redis if pipe is None else pipe
 
         return iter(self._data(pipe))
 
     def __len__(self, pipe=None):
+        """Return the number of members in the collection."""
         pipe = self.redis if pipe is None else pipe
 
         return pipe.zcard(self.key)
@@ -59,6 +117,10 @@ class SortedSetCounter(RedisCollection):
         return other
 
     def count_between(self, min_score=None, max_score=None):
+        """
+        Returns the number of members whose score is between *min_score* and
+        *max_score* (inclusive).
+        """
         min_score = float('-inf') if min_score is None else float(min_score)
         max_score = float('inf') if max_score is None else float(max_score)
 
@@ -87,6 +149,11 @@ class SortedSetCounter(RedisCollection):
         min_score=None,
         max_score=None,
     ):
+        """
+        Remove members whose ranking is between *min_rank* and *max_rank*
+        OR whose score is between *min_score* and *max_score* (both ranges
+        inclusive). If no bounds are specified, no members will be removed.
+        """
         no_ranks = (min_rank is None) and (max_rank is None)
         no_scores = (min_score is None) and (max_score is None)
 
@@ -109,10 +176,17 @@ class SortedSetCounter(RedisCollection):
             pipe.execute()
 
     def discard_member(self, member, pipe=None):
+        """
+        Remove *member* from the collection, unconditionally.
+        """
         pipe = self.redis if pipe is None else pipe
         pipe.zrem(self.key, self._pickle(member))
 
     def get_score(self, member, default=None, pipe=None):
+        """
+        Return the score of *member*, or *default* if it is not in the
+        collection.
+        """
         pipe = self.redis if pipe is None else pipe
         score = pipe.zscore(self.key, self._pickle(member))
 
@@ -121,7 +195,32 @@ class SortedSetCounter(RedisCollection):
 
         return score
 
+    def get_or_set_score(self, member, default=0):
+        """
+        If *member* is in the collection, return its value. If not, store it
+        with a score of *default* and return *default*. *default* defaults to
+        0.
+        """
+        default = float(default)
+
+        def get_or_set_score_trans(pipe):
+            pickled_member = self._pickle(member)
+            score = pipe.zscore(self.key, pickled_member)
+
+            if score is None:
+                pipe.zadd(self.key, default, self._pickle(member))
+                return default
+
+            return score
+
+        return self._transaction(get_or_set_score_trans)
+
     def get_rank(self, member, reverse=False, pipe=None):
+        """
+        Return the rank of *member* in the collection.
+        By default, the member with the lowest score has rank 0.
+        If *reverse* is ``True``, the member with the highest score has rank 0.
+        """
         pipe = self.redis if pipe is None else pipe
         method = getattr(pipe, 'zrevrank' if reverse else 'zrank')
         rank = method(self.key, self._pickle(member))
@@ -129,7 +228,13 @@ class SortedSetCounter(RedisCollection):
         return rank
 
     def increment_score(self, member, amount=1):
-        self.redis.zincrby(self.key, self._pickle(member), float(amount))
+        """
+        Adjust the score of *member* by *amount*. If *member* is not in the
+        collection it will be stored with a score of *amount*.
+        """
+        return self.redis.zincrby(
+            self.key, self._pickle(member), float(amount)
+        )
 
     def items_by_rank(
         self, min_rank=None, max_rank=None, reverse=False, pipe=None
@@ -178,6 +283,12 @@ class SortedSetCounter(RedisCollection):
         reverse=False,
         pipe=None,
     ):
+        """
+        Return a list of ``(member, score)`` tuples whose ranking is between
+        *min_rank* and *max_rank* AND whose score is between *min_score* and
+        *max_score* (both ranges inclusive). If no bounds are specified, all
+        items will be returned.
+        """
         pipe = self.redis if pipe is None else pipe
 
         no_ranks = (min_rank is None) and (max_rank is None)
@@ -206,10 +317,18 @@ class SortedSetCounter(RedisCollection):
         return ret
 
     def set_score(self, member, score, pipe=None):
+        """
+        Set the score of *member* to *score*.
+        """
         pipe = self.redis if pipe is None else pipe
         pipe.zadd(self.key, float(score), self._pickle(member))
 
     def update(self, other):
+        """
+        Update the collection with items from *other*. Accepts other
+        :class:`SortedSetCounter` instances, dictionaries mapping members to
+        numeric scores, or sequences of ``(member, score)`` tuples.
+        """
         def update_trans(pipe):
             other_items = method(pipe=pipe) if use_redis else method()
 
