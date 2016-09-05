@@ -23,11 +23,13 @@ class SortedSetCounter(RedisCollection):
         200.0
 
     When retrieving members they are returned in order by score:
+
         >>> ssc.items()
         [('mercury', 100.0), ('venus', 200.0), ('earth', 300.0)]
 
     Ranges of items by rank can be computed and returned efficiently, as can
     ranges by score:
+
         >>> ssc.items(min_rank=200.0)
         [('venus', 200.0), ('earth', 300.0)]
         >>> ssc.items(min_score=99, max_score=299)
