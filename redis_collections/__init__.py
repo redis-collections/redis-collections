@@ -12,6 +12,7 @@ from .base import RedisCollection  # NOQA
 from .dicts import DefaultDict, Dict, Counter  # NOQA
 from .lists import Deque, List  # NOQA
 from .sets import Set  # NOQA
+from .sortedsets import SortedSetCounter  # NOQA
 
 __all__ = [
     'Counter',
@@ -21,4 +22,5 @@ __all__ = [
     'List',
     'RedisCollection',
     'Set',
+    'SortedSetCounter',
 ]

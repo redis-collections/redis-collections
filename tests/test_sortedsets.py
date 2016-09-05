@@ -1,6 +1,6 @@
 from __future__ import print_function, unicode_literals
 
-from redis_collections.sortedsets import SortedSetCounter
+from redis_collections import SortedSetCounter
 
 from .base import RedisTestCase
 
