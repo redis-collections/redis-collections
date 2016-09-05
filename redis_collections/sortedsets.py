@@ -58,14 +58,6 @@ class SortedSetCounter(RedisCollection):
                     point to the same data. If not provided, default random
                     string is generated.
         :type key: str
-        :param writeback: If ``True`` keep a local cache of changes for storing
-                          modifications to mutable values. Changes will be
-                          written to Redis after calling the ``sync`` method.
-        :type writeback: bool
-
-        .. warning::
-            As mentioned, :class:`Dict` does not support following
-            initialization syntax: ``d = Dict(a=1, b=2)``
         """
         data = args[0] if args else kwargs.pop('data', None)
 
