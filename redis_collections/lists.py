@@ -40,7 +40,7 @@ class List(RedisCollection, collections.MutableSequence):
         :param writeback: If ``True`` keep a local cache of changes for storing
                           modifications to mutable values. Changes will be
                           written to Redis after calling the ``sync`` method.
-        :type key: bool
+        :type writeback: bool
         """
         data = args[0] if args else kwargs.pop('data', None)
         writeback = kwargs.pop('writeback', False)

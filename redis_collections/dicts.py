@@ -58,7 +58,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         :param writeback: If ``True`` keep a local cache of changes for storing
                           modifications to mutable values. Changes will be
                           written to Redis after calling the ``sync`` method.
-        :type key: bool
+        :type writeback: bool
 
         .. warning::
             As mentioned, :class:`Dict` does not support following
