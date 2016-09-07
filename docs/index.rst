@@ -232,6 +232,12 @@ Redis Collections are composed of only several classes. All items listed below a
     :members:
     :special-members:
 
+.. automodule:: redis_collections.sortedsets
+
+.. autoclass:: SortedSetCounter
+    :members:
+    :special-members:
+
 Changelog
 ---------
 

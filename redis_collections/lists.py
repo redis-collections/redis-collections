@@ -40,7 +40,7 @@ class List(RedisCollection, collections.MutableSequence):
         :param writeback: If ``True`` keep a local cache of changes for storing
                           modifications to mutable values. Changes will be
                           written to Redis after calling the ``sync`` method.
-        :type key: bool
+        :type writeback: bool
         """
         data = args[0] if args else kwargs.pop('data', None)
         writeback = kwargs.pop('writeback', False)
@@ -52,49 +52,6 @@ class List(RedisCollection, collections.MutableSequence):
 
         if data:
             self.extend(data)
-
-    def _normalize_index(self, index, pipe=None):
-        """Convert negative indexes into their positive equivalents."""
-        pipe = self.redis if pipe is None else pipe
-        len_self = pipe.llen(self.key)
-        positive_index = index if index >= 0 else len_self + index
-
-        return len_self, positive_index
-
-    def _normalize_slice(self, index, pipe=None):
-        """Given a :obj:`slice` *index*, return a 4-tuple
-        ``(start, stop, step, fowrward)``. The first three items can be used
-        with the ``range`` function to retrieve the values associated with the
-        slice; the last item indicates the direction.
-        """
-        if index.step == 0:
-            raise ValueError
-        pipe = self.redis if pipe is None else pipe
-
-        len_self = pipe.llen(self.key)
-
-        step = index.step or 1
-        forward = step > 0
-        step = abs(step)
-
-        if index.start is None:
-            start = 0 if forward else len_self - 1
-        elif index.start < 0:
-            start = max(len_self + index.start, 0)
-        else:
-            start = min(index.start, len_self)
-
-        if index.stop is None:
-            stop = len_self if forward else -1
-        elif index.stop < 0:
-            stop = max(len_self + index.stop, 0)
-        else:
-            stop = min(index.stop, len_self)
-
-        if not forward:
-            start, stop = min(stop + 1, len_self), min(start + 1, len_self)
-
-        return start, stop, step, forward, len_self
 
     def _pop_left(self):
         """Retrieve a value from the 0 index, remove it, and return it."""
@@ -522,7 +479,7 @@ class List(RedisCollection, collections.MutableSequence):
             if self.writeback:
                 self._sync_helper(pipe)
 
-            n = pipe.llen(self.key)
+            n = self.__len__(pipe)
             for i in six.moves.xrange(n // 2):
                 left = pipe.lindex(self.key, i)
                 right = pipe.lindex(self.key, n - i - 1)

@@ -21,7 +21,7 @@ Installation
 Example
 -------
 
-Redis Collections are a simple, pythonic way how to access Redis structures:
+Redis Collections provide a simple, Pythonic way how access Redis structures:
 
 .. code:: python
 
