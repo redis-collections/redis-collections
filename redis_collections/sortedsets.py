@@ -14,8 +14,8 @@ class SortedSetCounter(RedisCollection):
     """
     :class:`SortedSetCounter` is a collection based on the Redis
     `Sorted Set <http://redis.io/topics/data-types#sorted-sets>`_ type.
-    Instance map a unique set of ``member`` objects to floating point ``score``
-    values.
+    Instances map a unique set of ``member`` objects to floating point
+    ``score`` values.
 
         >>> ssc = SortedSetCounter([('earth', 300), ('mercury', 100)])
         >>> ssc.set_score('venus', 200)
