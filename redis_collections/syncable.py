@@ -26,9 +26,6 @@ be loaded.
     >>> E = SyncableDict(key='f4a78a6faacb4d8e97829f9888ac6740')
     >>> E
     {'one': 1, 'two': 2}
-
-
-
 """
 from __future__ import division, print_function, unicode_literals
 
