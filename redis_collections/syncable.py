@@ -12,7 +12,7 @@ executes, or call the :func:`sync` method explicitly.
 
     >>> with SyncableDict() as D:
     ...     D['one'] = 1
-    ... 
+    ...
     >>> D  # Contents are available locally and are stored in Redis
     {'one': 1}
     >>> D['two'] = 2  # Changes are available locally, but not in Redis...
@@ -59,7 +59,7 @@ class SyncableDict(_SyncableBase, dict):
     <https://docs.python.org/3/library/stdtypes.html#mapping-types-dict>`_ for
     details.
     """
-    
+
     def __init__(self, **kwargs):
         self.persistence = Dict(**kwargs)
 
@@ -76,8 +76,8 @@ class SyncableCounter(_SyncableBase, collections.Counter):
     Redis.
 
     See Python's `Counter documentation
-    <https://docs.python.org/3/library/collections.html#collections.Counter>`_ for
-    details.    
+    <https://docs.python.org/3/library/collections.html#collections.Counter>`_
+    for details.
     """
 
     def __init__(self, **kwargs):
