@@ -146,3 +146,81 @@ class SyncableSet(_SyncableBase, set):
     def sync(self):
         self.persistence.clear()
         self.persistence.update(self)
+
+
+class LRUDict(_SyncableBase, collections.MutableMapping):
+    def __init__(self, maxsize=None, **kwargs):
+        self.maxsize = maxsize
+        self.cache = collections.OrderedDict()
+        self.persistence = Dict(**kwargs)
+
+        super(LRUDict, self).__init__()
+        self.update(self.persistence)
+
+    def __contains__(self, key):
+        return (key in self.cache) or (key in self.persistence)
+
+    def __delitem__(self, key):
+        # Remove the given key from the local cache and the Redis cache
+        for D in (self.cache, self.persistence):
+            try:
+                del self.cache[key]
+            except KeyError:
+                pass
+
+    def __getitem__(self, key):
+        # If the item is in the local cache, grab its value and re-insert it
+        # as the rightmost (i.e. most recently used) item.
+        # Otherwise, try to get out of Redis and then insert it as the
+        # rightmost item.
+        try:
+            value = self.cache.pop(key)
+        except KeyError:
+            value = self.persistence[key]
+
+        self[key] = value
+        return value
+
+    def __iter__(self):
+        local_keys = set(self.cache.keys())
+        persistence_keys = set(self.persistence.keys())
+
+        return iter(local_keys | persistence_keys)
+
+    def __len__(self):
+        return sum(1 for k in self)
+
+    def __setitem__(self, key, value):
+        # If the key is in the local cache, remove it and re-insert it with
+        # the new value as the rightmost (i.e. most recently used) item.
+        # Otherwise, we'll add it to the local cache. If the local cache
+        # is full we'll remove the leftmost (i.e. least recently used) item
+        # and insert the new values as the rightmost item.
+        try:
+            self.cache.pop(key)
+        except KeyError:
+            if len(self.cache) >= self.maxsize:
+                old_key, old_value = self.cache.popitem(last=False)
+                self.persistence[old_key] = old_value
+
+        self.cache[key] = value
+
+    def clear(self):
+        self.cache.clear()
+        self.persistence.clear()
+
+    def copy(self, key=None):
+        other = self.__class__(maxsize=self.maxsize, redis=self.redis, key=key)
+        other.update(self)
+
+        return other
+
+    @classmethod
+    def fromkeys(cls, seq, value=None, **kwargs):
+        other = cls(**kwargs)
+        other.update(((key, value) for key in seq))
+
+        return other
+
+    def sync(self):
+        self.persistence.update(self)

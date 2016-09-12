@@ -13,13 +13,14 @@ from .dicts import DefaultDict, Dict, Counter  # NOQA
 from .lists import Deque, List  # NOQA
 from .sets import Set  # NOQA
 from .sortedsets import SortedSetCounter  # NOQA
-from .syncable import (
+from .syncable import (  # NOQA
     SyncableDict,
     SyncableCounter,
     SyncableDefaultDict,
     SyncableList,
     SyncableSet,
-)  # NOQA
+    LRUDict,
+)
 
 __all__ = [
     'Counter',
