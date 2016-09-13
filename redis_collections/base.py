@@ -10,10 +10,9 @@ from decimal import Decimal
 from fractions import Fraction
 import uuid
 
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle as pickle  # NOQA
+# We use pickle instead of cPickle on Python 2 intentionally, see
+# http://bugs.python.org/issue5518
+import pickle
 
 import redis
 import six
