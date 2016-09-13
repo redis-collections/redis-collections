@@ -13,6 +13,13 @@ from .dicts import DefaultDict, Dict, Counter  # NOQA
 from .lists import Deque, List  # NOQA
 from .sets import Set  # NOQA
 from .sortedsets import SortedSetCounter  # NOQA
+from .syncable import (
+    SyncableDict,
+    SyncableCounter,
+    SyncableDefaultDict,
+    SyncableList,
+    SyncableSet,
+)  # NOQA
 
 __all__ = [
     'Counter',
@@ -23,4 +30,9 @@ __all__ = [
     'RedisCollection',
     'Set',
     'SortedSetCounter',
+    'SyncableDict',
+    'SyncableCounter',
+    'SyncableDefaultDict',
+    'SyncableList',
+    'SyncableSet',
 ]
