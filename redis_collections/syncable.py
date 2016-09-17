@@ -153,8 +153,35 @@ class SyncableSet(_SyncableBase, set):
 
 
 class LRUDict(_SyncableBase, collections.MutableMapping):
+    """
+    :class:`dict`-like class that stores recently-used items in memory
+    and automatically pushes older items to Redis.
+    Useful for constraining a Python process's memory footprint when a Redis
+    server with lots of memory is available.
+
+    >>> D = LRUDict(maxsize=2)
+    >>> D['a'] = 1  # 'a' is stored locally
+    >>> D['b'] = 2  # 'b' is stored locally
+    >>> D['c'] = 2  # 'a' is pushed to Redis and 'c' is stored locally
+    >>> assert D['a'] == 1  # 'a' is retrieved from Redis and replaces 'b'
+    >>> assert D['b'] == 2  # 'b' is retrieved from Redis and replaces 'c'
+    >>> D['b'] = -2
+    >>> D.sync()  # All items are copied to Redis
+    """
+
     def __init__(self, maxsize=None, **kwargs):
-        self.maxsize = maxsize
+        """
+        :param maxsize: The number of items to keep in memory.
+        :type maxsize: integer
+        :param redis: Redis client instance. If not provided, default Redis
+                      connection is used.
+        :type redis: :class:`redis.StrictRedis`
+        :param key: Redis key of the collection. Collections with the same key
+                    point to the same data. If not provided, a random
+                    string is generated.
+        :type key: str
+        """
+        self.maxsize = None if (maxsize is None) else int(maxsize)
         self.cache = collections.OrderedDict()
         self.persistence = Dict(**kwargs)
 
@@ -210,10 +237,18 @@ class LRUDict(_SyncableBase, collections.MutableMapping):
         self.cache[key] = value
 
     def clear(self):
+        """
+        Removes all items from both the local cache and the collection's Redis
+        key.
+        """
         self.cache.clear()
         self.persistence.clear()
 
     def copy(self, key=None):
+        """
+        Creates another collection with the same items and maxsize with
+        the given *key*.
+        """
         other = self.__class__(
             maxsize=self.maxsize, redis=self.persistence.redis, key=key
         )
@@ -223,12 +258,21 @@ class LRUDict(_SyncableBase, collections.MutableMapping):
 
     @classmethod
     def fromkeys(cls, seq, value=None, **kwargs):
+        """
+        Create a new collection with keys from *seq* and values set to
+        *value*. The keyword arguments are passed to the persistent ``Dict``.
+        """
         other = cls(**kwargs)
         other.update(((key, value) for key in seq))
 
         return other
 
     def sync(self, clear_cache=False):
+        """
+        Copy items from the local cache to the persistent Dict.
+        If *clear_cache* is ``True``, clear out the local cache after
+        pushing its items to Redis.
+        """
         self.persistence.update(self)
 
         if clear_cache:
