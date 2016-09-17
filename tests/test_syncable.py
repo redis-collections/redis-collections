@@ -326,6 +326,7 @@ class LRUDictTest(RedisTestCase):
 
         # sync with clear_cache should clear the local cache
         lru_dict['b'] = -2
+        lru_dict.sync(clear_cache=True)
         self.assertEqual(lru_dict.persistence['b'], -2)
         self.assertEqual(len(lru_dict.cache), 0)
 
