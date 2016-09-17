@@ -167,6 +167,10 @@ If you are not satisfied with that function's `collision probability <http://sta
 If you don't like how  :mod:`pickle` does serialization, you may override the ``_pickle`` and ``_unpickle`` methods of the collection classes.
 Using other serializers may limit the objects you can store or retrieve.
 
+.. note::
+    On Python 2, the :mod:`pickle` module is used instead of the :mod:`cPickle` module.
+    This is intentional - see `issue #83 <https://github.com/honzajavorek/redis-collections/issues/83>`_.
+
 Philosophy
 ----------
 
