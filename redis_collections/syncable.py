@@ -38,6 +38,10 @@ from .sets import Set
 
 class _SyncableBase(object):
     @property
+    def redis(self):
+        return self.persistence.redis
+
+    @property
     def key(self):
         return self.persistence.key
 
@@ -164,7 +168,7 @@ class LRUDict(_SyncableBase, collections.MutableMapping):
         # Remove the given key from the local cache and the Redis cache
         for D in (self.cache, self.persistence):
             try:
-                del self.cache[key]
+                del D[key]
             except KeyError:
                 pass
 
@@ -176,7 +180,7 @@ class LRUDict(_SyncableBase, collections.MutableMapping):
         try:
             value = self.cache.pop(key)
         except KeyError:
-            value = self.persistence[key]
+            value = self.persistence.pop(key)
 
         self[key] = value
         return value
@@ -199,7 +203,7 @@ class LRUDict(_SyncableBase, collections.MutableMapping):
         try:
             self.cache.pop(key)
         except KeyError:
-            if len(self.cache) >= self.maxsize:
+            if (self.maxsize is not None) and len(self.cache) >= self.maxsize:
                 old_key, old_value = self.cache.popitem(last=False)
                 self.persistence[old_key] = old_value
 
@@ -210,7 +214,9 @@ class LRUDict(_SyncableBase, collections.MutableMapping):
         self.persistence.clear()
 
     def copy(self, key=None):
-        other = self.__class__(maxsize=self.maxsize, redis=self.redis, key=key)
+        other = self.__class__(
+            maxsize=self.maxsize, redis=self.persistence.redis, key=key
+        )
         other.update(self)
 
         return other
@@ -222,5 +228,8 @@ class LRUDict(_SyncableBase, collections.MutableMapping):
 
         return other
 
-    def sync(self):
+    def sync(self, clear_cache=False):
         self.persistence.update(self)
+
+        if clear_cache:
+            self.cache.clear()
