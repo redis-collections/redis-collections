@@ -10,10 +10,9 @@ from decimal import Decimal
 from fractions import Fraction
 import uuid
 
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle as pickle  # NOQA
+# We use pickle instead of cPickle on Python 2 intentionally, see
+# http://bugs.python.org/issue5518
+import pickle
 
 import redis
 import six
@@ -45,6 +44,9 @@ class RedisCollection(object):
         #: Redis client instance. :class:`StrictRedis` object with default
         #: connection settings is used if not set by :func:`__init__`.
         self.redis = redis or self._create_redis()
+        self.redis_version = tuple(
+            int(x) for x in self.redis.info()['redis_version'].split('.')
+        )
 
         #: Redis key of the collection.
         self.key = key or self._create_key()
