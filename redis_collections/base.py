@@ -8,12 +8,8 @@ from __future__ import division, print_function, unicode_literals
 import abc
 from decimal import Decimal
 from fractions import Fraction
+import pickle
 import uuid
-
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle as pickle  # NOQA
 
 import redis
 import six
