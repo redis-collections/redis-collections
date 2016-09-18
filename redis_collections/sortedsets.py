@@ -54,8 +54,8 @@ class SortedSetCounter(RedisCollection):
         :param redis: Redis client instance. If not provided, default Redis
                       connection is used.
         :type redis: :class:`redis.StrictRedis`
-        :param key: Redis key of the collection. Collections with the same key
-                    point to the same data. If not provided, default random
+        :param key: Redis key for the collection. Collections with the same key
+                    point to the same data. If not provided, a random
                     string is generated.
         :type key: str
         """
@@ -79,7 +79,7 @@ class SortedSetCounter(RedisCollection):
     # Magic methods
 
     def __contains__(self, member, pipe=None):
-        """Return ``True`` if *key* is present, else ``False``."""
+        """Return ``True`` if *member* is present, else ``False``."""
         pipe = self.redis if pipe is None else pipe
         score = pipe.zscore(self.key, self._pickle(member))
 

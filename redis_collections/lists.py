@@ -33,8 +33,8 @@ class List(RedisCollection, collections.MutableSequence):
         :param redis: Redis client instance. If not provided, default Redis
                       connection is used.
         :type redis: :class:`redis.StrictRedis`
-        :param key: Redis key of the collection. Collections with the same key
-                    point to the same data. If not provided, default random
+        :param key: Redis key for the collection. Collections with the same key
+                    point to the same data. If not provided, a random
                     string is generated.
         :type key: str
         :param writeback: If ``True`` keep a local cache of changes for storing
@@ -635,8 +635,8 @@ class Deque(List):
         :param redis: Redis client instance. If not provided, default Redis
                       connection is used.
         :type redis: :class:`redis.StrictRedis`
-        :param key: Redis key of the collection. Collections with the same key
-                    point to the same data. If not provided, default random
+        :param key: Redis key for the collection. Collections with the same key
+                    point to the same data. If not provided, a random
                     string is generated.
         :type key: str
         :param writeback: If ``True`` keep a local cache of changes for storing
