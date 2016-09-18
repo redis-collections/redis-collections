@@ -51,7 +51,7 @@ class Set(RedisCollection, collections.MutableSet):
             self.update(data)
 
     def _data(self, pipe=None):
-        pipe = pipe or self.redis
+        pipe = self.redis if pipe is None else pipe
         return (self._unpickle(x) for x in pipe.smembers(self.key))
 
     def _repr_data(self):
@@ -62,17 +62,17 @@ class Set(RedisCollection, collections.MutableSet):
 
     def __contains__(self, value, pipe=None):
         """Test for membership of *value* in the set."""
-        pipe = pipe or self.redis
+        pipe = self.redis if pipe is None else pipe
         return bool(pipe.sismember(self.key, self._pickle(value)))
 
     def __iter__(self, pipe=None):
         """Return an iterator over elements of the set."""
-        pipe = pipe or self.redis
+        pipe = self.redis if pipe is None else pipe
         return self._data(pipe)
 
     def __len__(self, pipe=None):
         """Return cardinality of the set."""
-        pipe = pipe or self.redis
+        pipe = self.redis if pipe is None else pipe
         return pipe.scard(self.key)
 
     # Named methods

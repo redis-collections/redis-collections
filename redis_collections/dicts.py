@@ -76,12 +76,12 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def __len__(self, pipe=None):
         """Return the number of items in the dictionary."""
-        pipe = pipe or self.redis
+        pipe = self.redis if pipe is None else pipe
         return pipe.hlen(self.key)
 
     def __iter__(self, pipe=None):
         """Return an iterator over the keys of the dictionary."""
-        pipe = pipe or self.redis
+        pipe = self.redis if pipe is None else pipe
         for k, v in six.iteritems(self._data(pipe)):
             yield k
 
@@ -172,7 +172,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         Returns a Python dictionary with the same values as this object
         (without checking the local cache).
         """
-        pipe = pipe or self.redis
+        pipe = self.redis if pipe is None else pipe
         items = six.iteritems(pipe.hgetall(self.key))
 
         return {self._unpickle(k): self._unpickle(v) for k, v in items}
@@ -183,7 +183,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def iteritems(self, pipe=None):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
-        pipe = pipe or self.redis
+        pipe = self.redis if pipe is None else pipe
         for k, v in six.iteritems(self._data(pipe)):
             yield k, self.cache.get(k, v)
 
