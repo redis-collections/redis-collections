@@ -150,7 +150,7 @@ class RedisCollection(object):
         :type pipe: :class:`redis.client.StrictPipeline` or
                     :class:`redis.client.StrictRedis`
         """
-        redis = pipe or self.redis
+        redis = self.redis if pipe is None else pipe
         redis.delete(self.key)
 
     def _same_redis(self, other, cls=None):
