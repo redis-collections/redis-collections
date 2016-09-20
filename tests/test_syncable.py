@@ -35,6 +35,14 @@ class SyncableTest(RedisTestCase):
         dict_1.sync()
         self.assertEqual(dict_1.persistence['a'], 1)
 
+        # Deleting a key should remove it in Redis after sync
+        dict_1['A'] = 'one'
+        dict_1.sync()
+
+        del dict_1['A']
+        dict_1.sync()
+        self.assertNotIn('A', dict_1.persistence)
+
         # Using a with block should automatically synchronize
         key_1 = dict_1.key
         with self.create_collection(SyncableDict, key=key_1) as dict_2:
@@ -55,6 +63,14 @@ class SyncableTest(RedisTestCase):
 
         counter_1.sync()
         self.assertEqual(counter_1.persistence['a'], 1)
+
+        # Deleting a key should remove it in Redis after sync
+        counter_1['A'] = 100
+        counter_1.sync()
+
+        del counter_1['A']
+        counter_1.sync()
+        self.assertNotIn('A', counter_1.persistence)
 
         key_1 = counter_1.key
         with self.create_collection(SyncableCounter, key=key_1) as counter_2:
@@ -87,6 +103,14 @@ class SyncableTest(RedisTestCase):
 
         ddict_1.sync()
         self.assertEqual(ddict_1.persistence['a'], 1)
+
+        # Deleting a key should remove it in Redis after sync
+        ddict_1['A'] = 100
+        ddict_1.sync()
+
+        del ddict_1['A']
+        ddict_1.sync()
+        self.assertNotIn('A', ddict_1.persistence)
 
         # The default_factory can be changed between synchronizations
         key_1 = ddict_1.key
