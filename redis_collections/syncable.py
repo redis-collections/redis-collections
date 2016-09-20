@@ -68,6 +68,7 @@ class SyncableDict(_SyncableBase, dict):
         self.update(self.persistence)
 
     def sync(self):
+        self.persistence.clear()
         self.persistence.update(self)
 
 
@@ -109,6 +110,7 @@ class SyncableDefaultDict(_SyncableBase, collections.defaultdict):
         self.update(self.persistence)
 
     def sync(self):
+        self.persistence.clear()
         self.persistence.update(self)
 
 
