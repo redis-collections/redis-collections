@@ -29,7 +29,6 @@ Narrative Documentation
 
    basic-usage.rst
    usage-notes.rst
-   development.rst
 
 API Documentation
 -----------------
