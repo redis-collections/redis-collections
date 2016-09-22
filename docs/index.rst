@@ -16,7 +16,11 @@ including:
 *   Subclasses of several Python types whose instances can automatically or
     manually back up their contents to Redis.
 *   Pythonic wrappers for Redis-specific data types such as `Sorted Sets`.
-    
+
+`redis-collections` builds on
+`redis-py <https://github.com/andymccurdy/redis-py>`_, the well-designed
+Python interface to Redis.
+
 Narrative Documentation
 -----------------------
 
