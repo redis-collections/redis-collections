@@ -163,6 +163,8 @@ understand and use:
 
 .. code-block:: python
 
+    >>> from redis_collections import SortedSetCounter
+
     >>> ssc = SortedSetCounter([('earth', 300), ('mercury', 100)])
     >>> ssc.set_score('venus', 200)
     >>> ssc.get_score('venus')

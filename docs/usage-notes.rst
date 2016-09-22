@@ -29,7 +29,7 @@ stored there previously:
 This should even work across processes, meaning if your Python script
 terminates, you can retrieve its data again from Redis.
 
-Each collection allows you to delete its Redis key with the `clear` method:
+Each collection allows you@ClaudiaKoerner  to delete its Redis key with the `clear` method:
 
 .. code-block:: python
 
@@ -63,7 +63,7 @@ connection as the original object:
     >>> list_02 = list_01.copy()  # result is using the same connection
 
 Operations on two collections backed by different Redis servers will be
-performed in Python::
+performed in Python:
 
 .. code-block:: python
 
@@ -176,30 +176,3 @@ serializers will limit the objects you can store or retrieve.
     On Python 2, the :mod:`pickle` module is used instead of the
     :mod:`cPickle` module. This is intentional - see
     `issue #83 <https://github.com/honzajavorek/redis-collections/issues/83>`_.
-
-
-
-Changelog
----------
-
-**→** :ref:`changelog`
-
-Maintainers
------------
-
-- Bo Bayles (`@bbayles <http://github.com/bbayles>`_)
-- Honza Javorek (`@honzajavorek <http://github.com/honzajavorek>`_)
-
-License: ISC
-------------
-
-© 2013-? Honza Javorek <mail@honzajavorek>
-
-This work is licensed under `ISC license <https://en.wikipedia.org/wiki/ISC_license>`_.
-
-Indices and tables
-------------------
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
