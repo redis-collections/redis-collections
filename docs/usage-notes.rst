@@ -29,7 +29,7 @@ stored there previously:
 This should even work across processes, meaning if your Python script
 terminates, you can retrieve its data again from Redis.
 
-Each collection allows you@ClaudiaKoerner  to delete its Redis key with the `clear` method:
+Each collection allows you to delete its Redis key with the `clear` method:
 
 .. code-block:: python
 
