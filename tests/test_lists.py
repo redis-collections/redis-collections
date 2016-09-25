@@ -46,21 +46,27 @@ class ListTest(RedisTestCase):
         for init in (self.create_list, list):
             L = init(data)
 
-            # Correct type, correct values
+            # Correct type, correct values -> equal
             self.assertTrue(L == list(data))
             self.assertTrue(list(data) == L)
 
-            # Correct type, wrong values
+            self.assertTrue(L == self.create_list(data))
+            self.assertTrue(self.create_list(data) == L)
+
+            # Correct type, wrong values -> not equal
             wrong_data = [0, 1, 2]
             self.assertFalse(L == wrong_data)
             self.assertFalse(wrong_data == L)
 
-            # Correct type, wrong values
+            wrong_data = [0, 1, 2, '4']
+            self.assertFalse(L == wrong_data)
+            self.assertFalse(wrong_data == L)
+
             wrong_data = [0, 1, 2, 3, 4]
             self.assertFalse(L == wrong_data)
             self.assertFalse(wrong_data == L)
 
-            # Wrong type (data is tuple)
+            # Wrong type, correct values -> not equal
             self.assertFalse(L == data)
             self.assertFalse(data == L)
 
