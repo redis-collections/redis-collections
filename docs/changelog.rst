@@ -50,3 +50,13 @@ New features in 0.3.x
 - `Deque <https://github.com/honzajavorek/redis-collections/issues/6>`_ was added.
 
 See the `Github milestone <https://github.com/honzajavorek/redis-collections/milestone/1>`_ for more details.
+
+
+Bug fixes in 0.3.x
+------------------
+
+- 0.3.1 fixes a potential problem with inconsistent hashing in ``Dict`` and ``Set``.
+  See `issue 83 <https://github.com/honzajavorek/redis-collections/issues/83>`_
+
+- 0.3.2 fixes a problem with equality testing for ``List``.
+  Two lists that started out the same but ended differently could compare as ``True``.
