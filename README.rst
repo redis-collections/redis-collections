@@ -9,42 +9,81 @@ Redis Collections
    :target: https://coveralls.io/github/honzajavorek/redis-collections?branch=master
 
 
-Set of basic Python collections backed by Redis.
 
-Installation
-------------
+`redis-collections` is a Python library that provides a high-level
+interface to `Redis <http://redis.io/>`_, the excellent key-value store.
 
-.. code:: shell
+Quickstart
+----------
 
-   pip install redis-collections
+Install the library with ``pip install redis-collections``.
 
-Example
--------
+The standard collections (e.g. ``Dict``, ``List``, ``Set``) behave like their
+Python counterparts:
 
-Redis Collections provide a simple, Pythonic way to access Redis structures:
+.. code-block:: python
 
-.. code:: python
+    >>> from redis_collections import Dict, List, Set
+    
+    >>> D = Dict()
+    >>> D['answer'] = 42
+    >>> D['answer']
+    42
 
-  >>> from redis_collections import Dict
-  >>> d = Dict()
-  >>> d['answer'] = 42
-  >>> d
-  <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'answer': 42}>
-  >>> d.items()
-  [('answer', 42)]
-  >>> d.update({'hasek': 39, 'jagr': 68})
-  >>> d
-  <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'answer': 42, 'jagr': 68, 'hasek': 39}>
-  >>> del d['answer']
-  >>> d
-  <redis_collections.Dict at fe267c1dde5d4f648e7bac836a0168fe {'jagr': 68, 'hasek': 39}>
+The syncable collections in this package provide types whose
+contents are kept in memory. When their ``sync`` method is called those
+contents are written to Redis:
 
-Available collections are ``Dict``, ``List``, ``Set``, ``Counter``, and ``DefaultDict``.
+.. code-block:: python
+
+    >>> from redis_collections import SyncableDict
+    
+    >>> with SyncableDict() as D:
+    ...     D['a'] = 1  # No write to Redis
+    ...     D['a'] += 1  # No read from or write to Redis
+    >>> D['a']  # D.sync() is called at the end of the with block
+    2
+
+Available collections
+---------------------
+
+The library provides the collections described below. Import them from ``redis_collections``:
+
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| Collection          | Redis type | Operations in           | Description                                              |
++=====================+============+=========================+==========================================================+
+| Dict                | Hash       | Redis                   | Emulates Python's ``dict``                               |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| List                | List       | Redis                   | Emulates Python's ``list``                               |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| Set                 | Set        | Redis                   | Emulates Python's ``set``                                |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| Counter             | Hash       | Redis                   | Emulates Python's ``collections.Counter``                |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| DefaultDict         | Hash       | Redis                   | Emulates Python's ``collections.defaultdict``            |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| Deque               | List       | Redis                   | Emulates Python's ``collections.deque``                  |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| LRUDict             | Hash       | Python                  | LRU algorithm pushes items from Python to Redis          |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| SyncableDict        | Hash       | Python                  | ``dict`` subclass that syncs to Redis                    |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| SyncableList        | List       | Python                  | ``list`` subclass that syncs to Redis                    |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| SyncableSet         | Set        | Python                  | ``set`` subclass that syncs to Redis                     |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| SyncableCounter     | Hash       | Python                  | ``collections.Counter`` subclass that syncs to Redis     |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| SyncableDefaultDict | Hash       | Python                  | ``collections.defaultdict`` subclass that syncs to Redis |
++---------------------+------------+-------------------------+----------------------------------------------------------+
+| SortedSetCounter    | Sorted Set | Redis                   | Restricted interface for Redis's Sorted Set              |
++---------------------+------------+-------------------------+----------------------------------------------------------+
 
 Documentation
 -------------
 
-**→** `redis-collections.readthedocs.io <https://redis-collections.readthedocs.io/>`_
+For more information, see
+`redis-collections.readthedocs.io <https://redis-collections.readthedocs.io/>`_
 
 Maintainers
 -----------
