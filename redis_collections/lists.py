@@ -590,7 +590,18 @@ class List(RedisCollection, collections.MutableSequence):
 
         def eq_trans(pipe):
             self_values = self.__iter__(pipe)
-            other_values = other.__iter__(pipe) if use_redis else other
+            self_len = self.__len__(pipe)
+
+            if use_redis:
+                other_values = other.__iter__(pipe)
+                other_len = other.__len__(pipe)
+            else:
+                other_values = other
+                other_len = len(other)
+
+            if self_len != other_len:
+                return False
+
             for v_self, v_other in six.moves.zip(self_values, other_values):
                 if v_self != v_other:
                     return False
