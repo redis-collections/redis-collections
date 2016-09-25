@@ -437,6 +437,12 @@ class SetTest(RedisTestCase):
 
         self.assertIn("{1}", repr(redis_set))
 
+    def test_sync(self):
+        # sync is a no-op for Set, but it shouldn't cause an error
+        redis_set = self.create_set()
+        redis_set.add(1)
+        redis_set.sync()
+
 
 class _Set(Set):
     pass
