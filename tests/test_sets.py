@@ -7,7 +7,7 @@ from fractions import Fraction
 import unittest
 import sys
 
-from redis_collections import Set
+from redis_collections import List, Set
 
 from .base import RedisTestCase
 
@@ -63,10 +63,12 @@ class SetTest(RedisTestCase):
             s_2 = init([4, 5])
             s_3 = {3, 4, 5}
             s_4 = [4, 5]
+            s_5 = List([4, 5], redis=self.redis)
 
             self.assertTrue(s_1.isdisjoint(s_2))
             self.assertFalse(s_1.isdisjoint(s_3))
             self.assertTrue(s_1.isdisjoint(s_4))
+            self.assertTrue(s_1.isdisjoint(s_5))
             self.assertRaises(TypeError, s_1.isdisjoint, None)
 
     def test_eq_le_lt_issubset(self):
@@ -77,6 +79,7 @@ class SetTest(RedisTestCase):
             s_4 = {1, 2}
             s_5 = [1, 2, 3, 4]
             s_6 = self.create_set([1, 2, 3, 4])
+            s_7 = List([1, 2, 3, 4], redis=self.redis)
 
             self.assertTrue(s_1.issubset(s_2))
             self.assertFalse(s_1 == s_2)
@@ -103,6 +106,8 @@ class SetTest(RedisTestCase):
             self.assertTrue(s_2 == s_6)
             self.assertTrue(s_6 == s_6)
 
+            self.assertTrue(s_2.issubset(s_7))
+
     def test_superset(self):
         for init in (self.create_set, set):
             s_1 = init([1, 2, 3, 4])
@@ -111,6 +116,7 @@ class SetTest(RedisTestCase):
             s_4 = {1, 2}
             s_5 = {1, 2, 3, 4}
             s_6 = [1, 2]
+            s_7 = List([1, 2], redis=self.redis)
 
             self.assertTrue(s_1.issuperset(s_2))
             self.assertTrue(s_1 >= s_2)
@@ -131,6 +137,8 @@ class SetTest(RedisTestCase):
             self.assertTrue(s_1.issuperset(s_6))
             if PYTHON_VERSION >= (3, 4):
                 self.assertRaises(TypeError, lambda: s_1 >= s_6)
+
+            self.assertTrue(s_1.issuperset(s_7))
 
             self.assertRaises(TypeError, s_1.issuperset, None)
 
@@ -159,6 +167,7 @@ class SetTest(RedisTestCase):
             s_2 = init([2, 3, 4])
             s_3 = {2, 3, 4}
             s_4 = [2, 3, 4]
+            s_5 = List([2, 3, 4], redis=self.redis)
 
             self.assertEqual(sorted(s_1.intersection(s_2)), [2, 3])
             self.assertEqual(sorted(s_1 & s_2), [2, 3])
@@ -170,6 +179,8 @@ class SetTest(RedisTestCase):
 
             self.assertEqual(sorted(s_1.intersection(s_4)), [2, 3])
             self.assertRaises(TypeError, lambda: s_1 & s_4)
+
+            self.assertEqual(sorted(s_1.intersection(s_5)), [2, 3])
 
     def test_difference(self):
         for init in (self.create_set, set):
@@ -195,6 +206,7 @@ class SetTest(RedisTestCase):
             s_2 = init([3, 4, 5, 6])
             s_3 = {3, 4, 5, 6}
             s_4 = [3, 4, 5, 6]
+            s_5 = List([3, 4, 5, 6], redis=self.redis)
 
             self.assertEqual(
                 sorted(s_1.symmetric_difference(s_2)), [1, 2, 5, 6]
@@ -213,6 +225,10 @@ class SetTest(RedisTestCase):
                 sorted(s_1.symmetric_difference(s_4)), [1, 2, 5, 6]
             )
             self.assertRaises(TypeError, lambda: s_1 ^ s_4)
+
+            self.assertEqual(
+                sorted(s_1.symmetric_difference(s_5)), [1, 2, 5, 6]
+            )
 
     def test_copy(self):
         for init in (self.create_set, set):
