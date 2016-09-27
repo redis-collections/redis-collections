@@ -8,7 +8,7 @@ import unittest
 
 import six
 
-from redis_collections import DefaultDict, Dict, Counter
+from redis_collections import Counter, DefaultDict, Dict, List
 
 from .base import RedisTestCase
 
@@ -240,6 +240,7 @@ class DictTest(RedisTestCase):
         d = self.create_dict()
         d['a'] = 'b'
 
+        # Update from built-in dicts
         d.update({'c': 'd'})
         self.assertEqual(sorted(d.items()), [('a', 'b'), ('c', 'd')])
 
@@ -251,13 +252,23 @@ class DictTest(RedisTestCase):
             sorted(d.items()), [('a', 'b'), ('c', 42), ('x', 38)]
         )
 
+        # Update from list of tuples
         d.update([('a', 'g')])
         self.assertEqual(
             sorted(d.items()), [('a', 'g'), ('c', 42), ('x', 38)]
         )
+
+        # Update from kwargs
         d.update(c=None)
         self.assertEqual(
             sorted(d.items()), [('a', 'g'), ('c', None), ('x', 38)]
+        )
+
+        # Update from another redis_collections class
+        redis_list = List([('a', 'h')], redis=self.redis)
+        d.update(redis_list)
+        self.assertEqual(
+            sorted(d.items()), [('a', 'h'), ('c', None), ('x', 38)]
         )
 
     def test_get_default(self):
@@ -390,6 +401,10 @@ class DictTest(RedisTestCase):
         self.assertNotEqual(redis_cached, data.items())
         self.assertNotEqual(python_dict, data.items())
 
+    def test_marker(self):
+        redis_dict = self.create_dict()
+        self.assertEqual(repr(redis_dict._Dict__marker), '<missing value>')
+
 
 class CounterTest(RedisTestCase):
 
@@ -500,9 +515,15 @@ class CounterTest(RedisTestCase):
             c.update({'a': 2, 'b': 2, 'c': 2})
             self.assertEqual(sorted(c.items()), expected_result)
 
-            # One Counter, one sequence and kwargs
+            # One Counter, one sequence, and kwargs
             c = init('abbccc')
             c.update(['a', 'a', 'b', 'b'], c=2)
+            self.assertEqual(sorted(c.items()), expected_result)
+
+            # One Counter, one redis_collections.List
+            c = init('abbccc')
+            redis_list = List(['a', 'a', 'b', 'b'], redis=self.redis)
+            c.update(redis_list, c=2)
             self.assertEqual(sorted(c.items()), expected_result)
 
         # Writeback enabled
@@ -627,18 +648,19 @@ class CounterTest(RedisTestCase):
         python_counter &= collections.Counter('cdddd')
         self.assertEqual(redis_counter, python_counter)
 
-    if not six.PY2:
-        def test_pos(self):
-            redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
-            python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
+    @unittest.skipIf(six.PY2, 'Test applies to Python 3+ only')
+    def test_pos(self):
+        redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
+        python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
 
-            self.assertEqual(+redis_counter, +python_counter)
+        self.assertEqual(+redis_counter, +python_counter)
 
-        def test_neg(self):
-            redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
-            python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
+    @unittest.skipIf(six.PY2, 'Test applies to Python 3+ only')
+    def test_neg(self):
+        redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
+        python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
 
-            self.assertEqual(-redis_counter, -python_counter)
+        self.assertEqual(-redis_counter, -python_counter)
 
 
 class DefaultDictTest(RedisTestCase):

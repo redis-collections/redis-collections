@@ -38,7 +38,9 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     class __missing_value(object):
         def __repr__(self):
-            return '<missing value>'  # for purposes of generated documentation
+            # Specified here so that the documentation shows a useful string
+            # for methods that take __marker as a keyword argument
+            return '<missing value>'
     __marker = __missing_value()
 
     def __init__(self, *args, **kwargs):
@@ -440,7 +442,7 @@ class Counter(Dict):
             if isinstance(other, Dict):
                 data.update(other.iteritems(pipe))
             elif isinstance(other, RedisCollection):
-                data.update(other.__iter__(pipe))
+                data.update(collections.Counter(other.__iter__(pipe)))
             else:
                 data.update(other)
 
@@ -516,8 +518,6 @@ class Counter(Dict):
                 other_counter = collections.Counter(
                     {k: v for k, v in other.iteritems(pipe=pipe)}
                 )
-            elif isinstance(other, RedisCollection):
-                other_counter = collections.Counter(other.__iter__(pipe))
             else:
                 other_counter = other
 

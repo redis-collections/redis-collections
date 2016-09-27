@@ -241,8 +241,13 @@ class RedisCollection(object):
     def sync(self):
         pass
 
+    @abc.abstractmethod
     def _repr_data(self):
-        return None
+        """
+        Abstract method for subclasses to implement.
+        Return a string appropriate for displaying the contents of the
+        collection. Called by __repr__.
+        """
 
     def __repr__(self):
         cls_name = self.__class__.__name__
