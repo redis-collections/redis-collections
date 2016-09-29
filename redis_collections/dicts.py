@@ -14,8 +14,9 @@ Each collection stores its items in a Redis
     in a collection, be sure to enable ``writeback``.
     See :ref:`Synchronization` for more information.
 
-    When storing numeric types (e.g. :class:`float`) as keys, be aware that these
-    collections behave slightly differently from standard Python dictionaries.
+    When storing numeric types (e.g. :class:`float`) as keys, be aware that
+    these collections behave slightly differently from standard Python
+    dictionaries.
     See :ref:`Hashing` for more information.
 
 """
@@ -401,41 +402,49 @@ class Dict(RedisCollection, collections.MutableMapping):
 
 
 class Counter(Dict):
-    """Mutable **mapping** collection aiming to have the same API as
-    :class:`collections.Counter`. See `Counter
+    """
+    Collection based on the Python standard library's
+    :class:`collections.Counter` type.
+    Items are stored in a Redis hash structure.
+    See Python's `Counter documentation
     <http://docs.python.org/2/library/collections.html#collections.Counter>`_
-    for further details. The Redis implementation is based on the
-    `hash <http://redis.io/commands#hash>`_ type.
+    for usage notes.
 
-    .. warning::
-        Not available in Python 2.6.
-
-    .. warning::
-        Note that this :class:`Counter` does not implement
-        methods :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues`,
-        which are available in Python 2.7's version.
+    The :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues` methods
+    from Python 2.7's Counter type are not implemented.
     """
 
     def __init__(self, *args, **kwargs):
-        """Breakes the original :class:`Counter` API, because there is no
-        support for keyword syntax. The only single way to create
-        :class:`Counter` object is to pass iterable or mapping as the first
-        argument. Iterable is expected to be a sequence of elements,
-        not a sequence of ``(key, value)`` pairs.
+        """
+        Create a new Counter object.
+
+        If the first argument (*data*) is another mapping type, create the new
+        Counter with the counts of the input items as the initial data.
+        Or, If the first argument is an iterable of ``(key, value)`` pairs,
+        create the new Counter with those items as the initial data.
+
+        Unlike Python's standard :class:`collections.Counter` type,
+        initial items cannot be set using keyword arguments.
+        Keyword arguments are passed to the :class:`RedisCollection`
+        constructor.
 
         :param data: Initial data.
         :type data: iterable or mapping
+
         :param redis: Redis client instance. If not provided, default Redis
                       connection is used.
         :type redis: :class:`redis.StrictRedis`
+
         :param key: Redis key for the collection. Collections with the same key
                     point to the same data. If not provided, a random
                     string is generated.
         :type key: str
 
-        .. warning::
-            As mentioned, :class:`Counter` does not support following
-            initialization syntax: ``c = Counter(a=1, b=2)``
+        :param writeback: If ``True``, keep a local cache of changes for
+                          storing modifications to mutable values. Changes will
+                          be written to Redis after calling the ``sync``
+                          method.
+        :type writeback: bool
         """
         super(Counter, self).__init__(*args, **kwargs)
 
