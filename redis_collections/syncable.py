@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 syncable
-~~~~~
+~~~~~~~~
 
 Persistent Python collections that can be written to and read from Redis.
 The collections are kept in memory, so their operations run as fast as their

@@ -97,7 +97,7 @@ pygments_style = 'sphinx'
 
 # This value selects if automatically documented members are sorted
 # alphabetical.
-autodoc_member_order = 'groupwise'
+autodoc_member_order = 'bysource'
 
 
 # -- Options for HTML output ---------------------------------------------------

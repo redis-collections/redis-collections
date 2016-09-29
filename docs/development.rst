@@ -1,4 +1,4 @@
-.. _usage-notes:
+.. development:
 
 Development
 ===========

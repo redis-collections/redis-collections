@@ -71,6 +71,7 @@ performed in Python:
     >>> list_2 = List((4, 5, 6), redis=StrictRedis(port=6380))
     >>> list_1.extend(list_2)
 
+.. _Synchronization:
 
 Synchronization
 ---------------
@@ -94,7 +95,7 @@ flushed to Redis when the ``sync`` method is called:
     >>> D = Dict({'key': [1, 2]}, writeback=True)
     >>> D['key'].append(3)
     >>> D['key']  # Modifications are retrieved from the cache
-    [1, 2, 3]  
+    [1, 2, 3]
     >>> D.sync()  # Flush cache to Redis
 
 You may also use a ``with`` block to automatically call the ``sync`` method.
@@ -107,6 +108,8 @@ You may also use a ``with`` block to automatically call the ``sync`` method.
     [1, 2, 3]
 
 The ``writeback`` option is automatically enabled for ``DefaultDict`` objects.
+
+.. _Hashing:
 
 Hashing dictionary keys and set elements
 ----------------------------------------

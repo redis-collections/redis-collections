@@ -3,7 +3,21 @@
 dicts
 ~~~~~
 
-Collections based on the dict interface.
+The `dicts` module contains standard collections based on Python dictionaries.
+Included collections are :class:`Dict`, :class:`Counter`, and
+:class:`DefaultDict`.
+Each collection stores its items in a Redis
+`hash <http://redis.io/commands#hash>`_ structure.
+
+.. note::
+    If you need to store mutable values like :class:`list`\s or :class:`set`\s
+    in a collection, be sure to enable ``writeback``.
+    See :ref:`Synchronization` for more information.
+
+    When storing numeric types (e.g. :class:`float`) as keys, be aware that these
+    collections behave slightly differently from standard Python dictionaries.
+    See :ref:`Hashing` for more information.
+
 """
 from __future__ import division, print_function, unicode_literals
 
@@ -16,16 +30,15 @@ from .base import RedisCollection
 
 
 class Dict(RedisCollection, collections.MutableMapping):
-    """Mutable **mapping** collection aiming to have the same API as the
-    standard mapping type, dict. See `dict
-    <http://docs.python.org/2/library/stdtypes.html#mapping-types-dict>`_ for
-    further details. The Redis implementation is based on the
-    `hash <http://redis.io/commands#hash>`_ type.
+    """
+    Collection based on the built-in Python :class:`dict` type.
+    Items are stored in a Redis hash structure.
+    See Python's `dict documentation
+    <https://docs.python.org/3/library/stdtypes.html#mapping-types-dict>`_ for
+    usage notes.
 
-    .. warning::
-        In comparing with original :class:`dict` type, :class:`Dict` does not
-        implement methods :func:`viewitems`, :func:`viewkeys`, and
-        :func:`viewvalues`.
+    The :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues` methods
+    from Python 2.7's dictionary type are not implemented.
     """
 
     if six.PY2:
@@ -44,27 +57,36 @@ class Dict(RedisCollection, collections.MutableMapping):
     __marker = __missing_value()
 
     def __init__(self, *args, **kwargs):
-        """Breakes the original :class:`dict` API, because there is no support
-        for keyword syntax. The only single way to create :class:`Dict`
-        object is to pass iterable or mapping as the first argument.
+        """
+        Create a new Dict object.
+
+        If the first argument (*data*) is another mapping type, create the new
+        Dict with its items as the initial data.
+        Or, If the first argument is an iterable of ``(key, value)`` pairs,
+        create the new Dict with those items as the initial data.
+
+        Unlike Python's built-in :class:`dict` type, initial items cannot be
+        set using keyword arguments.
+        Keyword arguments are passed to the :class:`RedisCollection`
+        constructor.
 
         :param data: Initial data.
         :type data: iterable or mapping
+
         :param redis: Redis client instance. If not provided, default Redis
                       connection is used.
         :type redis: :class:`redis.StrictRedis`
+
         :param key: Redis key for the collection. Collections with the same key
                     point to the same data. If not provided, a random
                     string is generated.
         :type key: str
-        :param writeback: If ``True`` keep a local cache of changes for storing
-                          modifications to mutable values. Changes will be
-                          written to Redis after calling the ``sync`` method.
-        :type writeback: bool
 
-        .. warning::
-            As mentioned, :class:`Dict` does not support following
-            initialization syntax: ``d = Dict(a=1, b=2)``
+        :param writeback: If ``True``, keep a local cache of changes for
+                          storing modifications to mutable values. Changes will
+                          be written to Redis after calling the ``sync``
+                          method.
+        :type writeback: bool
         """
         data = args[0] if args else kwargs.pop('data', None)
         writeback = kwargs.pop('writeback', False)
@@ -110,8 +132,14 @@ class Dict(RedisCollection, collections.MutableMapping):
             return self._transaction(eq_trans)
 
     def getmany(self, *keys):
-        """Return the value for *keys*. If particular key is not in the
-        dictionary, return :obj:`None`.
+        """
+        Return a list of values corresponding to the keys in the iterable of
+        *keys*.
+        If a key is not present in the collection, its corresponding value will
+        be :obj:`None`.
+
+        .. note::
+        This method is not implemented by standard Python dictionary classes.
         """
         pickled_keys = (self._pickle_key(k) for k in keys)
         pickled_values = self.redis.hmget(self.key, *pickled_keys)
@@ -127,11 +155,11 @@ class Dict(RedisCollection, collections.MutableMapping):
         """Return the item of dictionary with key *key*. Raises a
         :exc:`KeyError` if key is not in the map.
 
-        If a subclass of :class:`Dict` defines a method :func:`__missing__`, if
-        the key *key* is not present, the ``d[key]`` operation calls that
-        method with the key *key* as argument. The ``d[key]`` operation
-        then returns or raises whatever is returned or raised by
-        the ``__missing__(key)`` call if the key is not present.
+        If a subclass of :class:`Dict` defines a method :func:`__missing__`,
+        and *key* is not present, the ``d[key]`` operation calls that
+        method with the key *key* as argument.
+        The ``d[key]`` operation then returns or raises whatever is returned
+        or raised by the ``__missing__(key)`` call.
         """
         try:
             value = self.cache[key]
