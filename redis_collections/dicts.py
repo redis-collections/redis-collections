@@ -140,7 +140,8 @@ class Dict(RedisCollection, collections.MutableMapping):
         be :obj:`None`.
 
         .. note::
-        This method is not implemented by standard Python dictionary classes.
+            This method is not implemented by standard Python dictionary
+            classes.
         """
         pickled_keys = (self._pickle_key(k) for k in keys)
         pickled_values = self.redis.hmget(self.key, *pickled_keys)
@@ -639,23 +640,30 @@ class Counter(Dict):
 
 
 class DefaultDict(Dict):
-    """Mutable **mapping** collection aiming to have the same API as
-    :class:`collections.defaultdict`. See
-    `defaultdict  <https://docs.python.org/2/library/collections.html>`_ for
-    further details. The Redis implementation is based on the
-    `hash <http://redis.io/commands#hash>`_ type.
+    """
+    Collection based on the Python standard library's
+    :class:`collections.defaultdict` type.
+    Items are stored in a Redis hash structure.
+    See Python's `defaultdict documentation
+    <https://docs.python.org/3/library/collections.html#collections.defaultdict>`_
+    for usage notes.
 
-    .. warning::
-        Note that this :class:`DefaultDict` does not implement
-        methods :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues`,
-        which are available in Python 2.7's version.
+    The :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues` methods
+    from Python 2.7's Counter type are not implemented.
     """
 
     def __init__(self, *args, **kwargs):
-        """Breakes the original :class:`defaultdict` API, because there is no
-        support for keyword syntax. The only single way to create
-        :class:`defaultdict` object is to pass an iterable or mapping as the
-        second argument.
+        """
+        Create a new defaultdict object.
+
+        The first argument provides the initial value for the
+        ``default_factory`` attribute; it defaults to ``None``.
+        All other arguments are passed to the ``Dict`` constructor.
+
+        Unlike Python's standard :class:`collections.defaultdict` type,
+        initial items cannot be set using keyword arguments.
+        Keyword arguments are passed to the :class:`RedisCollection`
+        constructor via the ``Dict`` constructor.
 
         :param default_factory: Used to provide default values for missing
                                 keys.
@@ -669,10 +677,6 @@ class DefaultDict(Dict):
                     point to the same data. If not provided, a random
                     string is generated.
         :type key: str
-
-        .. warning::
-            As mentioned, :class:`DefaultDict` does not support following
-            initialization syntax: ``d = DefaultDict(None, a=1, b=2)``
         """
         kwargs.setdefault('writeback', True)
         if args:

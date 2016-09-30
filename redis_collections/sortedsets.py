@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 sortedsets
-~~~~~
+~~~~~~~~~~
 
 Collections based on the Redis Sorted Sets data type
 """
