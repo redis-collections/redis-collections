@@ -3,7 +3,11 @@
 sets
 ~~~~~
 
-Collections based on the set interface.
+The `sets` module contains a standard collection, :class:`Set`, which is based
+on Python's built-in set type.
+Its elements are stored in a Redis `set <http://redis.io/commands#set>`_
+structure.
+
 """
 from __future__ import division, print_function, unicode_literals
 
@@ -19,11 +23,10 @@ from .base import RedisCollection
 
 class Set(RedisCollection, collections.MutableSet):
     """
-    Mutable **set** collection aiming to have the same API as the standard
-    set type. See Python's `set documentation
-    <http://docs.python.org/2/library/stdtypes.html#set>`_ for
-    further details. The Redis implementation is based on the
-    `set type <http://redis.io/commands#set>`_.
+    Collection based on the built-in Python :class:`set` type.
+    Items are stored in a Redis hash structure.
+    See Python's `set documentation
+    <https://docs.python.org/3/library/stdtypes.html#set>`_ for usage notes.
     """
 
     if six.PY2:
@@ -34,6 +37,11 @@ class Set(RedisCollection, collections.MutableSet):
 
     def __init__(self, *args, **kwargs):
         """
+        Create a new Set object.
+
+        If the first argument (*data*) is an iterable object, create the new
+        Set with its elements as the initial data.
+
         :param data: Initial data.
         :type data: iterable
         :param redis: Redis client instance. If not provided, default Redis
@@ -143,7 +151,7 @@ class Set(RedisCollection, collections.MutableSet):
 
     def random_sample(self, k=1):
         """
-        Return a *k* length list of unique elements chosen from the set.
+        Return a *k* length list of unique elements chosen from the Set.
         Elements are not removed. Similar to :func:`random.sample` function
         from standard library.
 
