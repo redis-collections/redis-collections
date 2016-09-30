@@ -640,17 +640,35 @@ class List(RedisCollection, collections.MutableSequence):
 
 
 class Deque(List):
-    """A Redis-backed version of Python's :class:`collections.deque`.
+    """
+    Collection based on the Python standard library's
+    :class:`collections.deque` type.
+    Items are stored in a Redis hash structure.
     See Python's `deque documentation
     <https://docs.python.org/3/library/collections.html#collections.deque>`_
-    for more details. The Redis implementation is based on the `list type
-    <http://redis.io/commands#list>`_.
-    """
+    for usage notes.
 
+    Dequq inherits from List, so see its API documentation for
+    information on other methods.
+    """
     _python_cls = collections.deque
 
     def __init__(self, *args, **kwargs):
         """
+        Create a new Deque object.
+
+        If the first argument (*data*) is an iterable object, create the new
+        Deque with its values as the initial data.
+
+        If the second argument (*maxlen*) is an integer, create the Deque with
+        the given maximum length.
+        If the second argument is not given or is ``None``, create the Deque
+        without a maximum length.
+
+        If the Deque is full (the number of values stored is equal to the
+        maximum length), adding new items to one side will cause a
+        corresponding number of items to be removed from the other side.
+
         :param data: Initial data.
         :type data: iterable
         :param maxlen: Maximum size.
@@ -761,8 +779,9 @@ class Deque(List):
 
     def copy(self, key=None):
         """
-        Return a new :obj:`Deque` with the specified *key*. The new collection
-        will have the same values and maxlen as this collection.
+        Return a new collection with the same items as this one.
+        If *key* is specified, create the new collection with the given
+        Redis key.
         """
         other = self.__class__(
             self.__iter__(),
@@ -811,8 +830,9 @@ class Deque(List):
 
     def insert(self, index, value):
         """
-        Insert *value* into the collection at *index*. If the insertion would
-        the collection to grow beyond ``maxlen``, raise ``IndexError``.
+        Insert *value* into the collection at *index*.
+        If the insertion would the collection to grow beyond ``maxlen``,
+        raise ``IndexError``.
         """
         def insert_trans(pipe):
             len_self = self.__len__(pipe)
@@ -840,8 +860,8 @@ class Deque(List):
 
     def rotate(self, n=1):
         """
-        Rotate the deque n steps to the right. If n is negative, rotate to the
-        left.
+        Rotate the deque n steps to the right.
+        If n is negative, rotate to the left.
         """
         # No work to do for a 0-step rotate
         if n == 0:

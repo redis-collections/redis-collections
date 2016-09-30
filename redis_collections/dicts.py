@@ -665,7 +665,7 @@ class DefaultDict(Dict):
 
     def __init__(self, *args, **kwargs):
         """
-        Create a new defaultdict object.
+        Create a new DefaultDict object.
 
         The first argument provides the initial value for the
         ``default_factory`` attribute; it defaults to ``None``.
