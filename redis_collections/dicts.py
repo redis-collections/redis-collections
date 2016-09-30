@@ -367,6 +367,11 @@ class Dict(RedisCollection, collections.MutableMapping):
             self._update_helper(kwargs)
 
     def copy(self, key=None):
+        """
+        Return a new collection with the same items as this one.
+        If *key* is specified, create the new collection with the given
+        Redis key.
+        """
         other = self.__class__(redis=self.redis, key=key)
         other.update(self)
 
@@ -410,6 +415,9 @@ class Counter(Dict):
     See Python's `Counter documentation
     <http://docs.python.org/2/library/collections.html#collections.Counter>`_
     for usage notes.
+
+    Counter inherits from Dict, so see its API documentation for information
+    on other methods.
 
     The :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues` methods
     from Python 2.7's Counter type are not implemented.
@@ -648,6 +656,9 @@ class DefaultDict(Dict):
     <https://docs.python.org/3/library/collections.html#collections.defaultdict>`_
     for usage notes.
 
+    DefaultDict inherits from Dict, so see its API documentation for
+    information on other methods.
+
     The :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues` methods
     from Python 2.7's Counter type are not implemented.
     """
@@ -702,6 +713,11 @@ class DefaultDict(Dict):
         return value
 
     def copy(self, key=None):
+        """
+        Return a new collection with the same items as this one.
+        If *key* is specified, create the new collection with the given
+        Redis key.
+        """
         other = self.__class__(self.default_factory, redis=self.redis, key=key)
         other.update(self)
 
