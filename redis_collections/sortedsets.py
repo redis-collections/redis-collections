@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 sortedsets
-~~~~~
+~~~~~~~~~~
 
-Collections based on the Redis Sorted Sets data type
+The `sortedsets` module contains a collection, :class:`SortedSetCounter`,
+which provides an interface to Redis's
+`Sorted Set <http://redis.io/commands#set>`_ type.
 """
 from __future__ import division, print_function, unicode_literals
 
@@ -49,6 +51,11 @@ class SortedSetCounter(RedisCollection):
 
     def __init__(self, *args, **kwargs):
         """
+        Create a new SortedSetCounter object.
+
+        If the first argument (*data*) is an iterable object, create the new
+        SortedSetCounter with its elements as the initial data.
+
         :param data: Initial data.
         :type data: iterable or mapping
         :param redis: Redis client instance. If not provided, default Redis

@@ -3,7 +3,15 @@
 lists
 ~~~~~
 
-Collections based on the list interface.
+The `lists` module contains standard collections based on Python lists.
+Included collections are :class:`List` and :class:`Deque`.
+Each collection stores its values in a Redis
+`list <http://redis.io/commands#list>`_ structure.
+
+.. note::
+    If you need to store mutable values like :class:`list`\s or :class:`set`\s
+    in a collection, be sure to enable ``writeback``.
+    See :ref:`Synchronization` for more information.
 """
 from __future__ import division, print_function, unicode_literals
 
@@ -18,16 +26,21 @@ from .base import RedisCollection
 
 
 class List(RedisCollection, collections.MutableSequence):
-    """Mutable **sequence** collection aiming to have the same API as the
-    standard sequence type, :class:`list`. See Python's `list documentation
-    <http://docs.python.org/2/library/functions.html#list>`_ for
-    further details. The Redis implementation is based on the
-    `list type <http://redis.io/commands#list>`_.
+    """
+    Collection based on the built-in Python :class:`list` type.
+    Items are stored in a Redis list structure.
+    See Python's `list documentation
+    <https://docs.python.org/3/library/stdtypes.html#list>`_ for usage notes.
     """
     _python_cls = list
 
     def __init__(self, *args, **kwargs):
         """
+        Create a new List object.
+
+        If the first argument (*data*) is an iterable object, create the new
+        List with its values as the initial data.
+
         :param data: Initial data.
         :type data: iterable
         :param redis: Redis client instance. If not provided, default Redis
@@ -54,7 +67,7 @@ class List(RedisCollection, collections.MutableSequence):
             self.extend(data)
 
     def _pop_left(self):
-        """Retrieve a value from the 0 index, remove it, and return it."""
+        # Retrieve a value from the 0 index, remove it, and return it.
         pickled_value = self.redis.lpop(self.key)
         if pickled_value is None:
             raise IndexError
@@ -68,7 +81,7 @@ class List(RedisCollection, collections.MutableSequence):
         return value
 
     def _pop_right(self):
-        """Retrieve a value from the -1 index, remove it, and return it."""
+        # Retrieve a value from the -1 index, remove it, and return it.
         if not self.writeback:
             pickled_value = self.redis.rpop(self.key)
             if pickled_value is None:
@@ -91,7 +104,7 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(pop_right_trans)
 
     def _pop_middle(self, index):
-        """Retrieve the value at *index*, remove it, and return it."""
+        # Retrieve the value at *index*, remove it, and return it.
         def pop_middle_trans(pipe):
             len_self, cache_index = self._normalize_index(index, pipe)
             if (cache_index < 0) or (cache_index >= len_self):
@@ -119,7 +132,7 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(pop_middle_trans)
 
     def _del_slice(self, index):
-        """Delete the values associated with :obj:`slice` *index*."""
+        # Delete the values associated with the slice object *index*
         def del_slice_trans(pipe):
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
@@ -159,7 +172,7 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(del_slice_trans)
 
     def __delitem__(self, index):
-        """Delete the item at **index**."""
+        """Delete the item at *index*."""
         if isinstance(index, slice):
             return self._del_slice(index)
 
@@ -171,9 +184,9 @@ class List(RedisCollection, collections.MutableSequence):
             self._pop_middle(index)
 
     def _get_slice(self, index):
-        """
-        Return the values specified by :obj:`slice` *index* as a :obj:`list`.
-        """
+        # Return the values specified by the slice object *index* as a Python
+        # list
+
         def get_slice_trans(pipe):
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
@@ -259,10 +272,8 @@ class List(RedisCollection, collections.MutableSequence):
         return reversed(list(self.__iter__()))
 
     def _set_slice(self, index, value):
-        """
-        Set the values for the indexes associated with :obj:`slice` *index*
-        to the contents of the iterable *value*.
-        """
+        # Set the values for the indexes associated with the slice object
+        # *index* to the contents of the iterable *value*
         def set_slice_trans(pipe):
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
@@ -343,8 +354,9 @@ class List(RedisCollection, collections.MutableSequence):
 
     def copy(self, key=None):
         """
-        Return a new :obj:`List` with the specified *key*. The new collection
-        will have the same values as this collection.
+        Return a new collection with the same items as this one.
+        If *key* is specified, create the new collection with the given
+        Redis key.
         """
         other = self.__class__(
             redis=self.redis, key=key, writeback=self.writeback
@@ -402,7 +414,7 @@ class List(RedisCollection, collections.MutableSequence):
         return self._transaction(index_trans)
 
     def _insert_left(self, value, pipe=None):
-        """Insert *value* at index 0."""
+        # Insert *value* at index 0.
         pipe = self.redis if pipe is None else pipe
         pipe.lpush(self.key, self._pickle(value))
         if self.writeback:
@@ -410,7 +422,7 @@ class List(RedisCollection, collections.MutableSequence):
             self.cache[0] = value
 
     def _insert_middle(self, index, value, pipe=None):
-        """Insert *value* at *index*."""
+        # Insert *value* at *index*.
         pipe = self.redis if pipe is None else pipe
 
         # First, retrieve everything from the index to the end.
@@ -628,17 +640,35 @@ class List(RedisCollection, collections.MutableSequence):
 
 
 class Deque(List):
-    """A Redis-backed version of Python's :class:`collections.deque`.
+    """
+    Collection based on the Python standard library's
+    :class:`collections.deque` type.
+    Items are stored in a Redis hash structure.
     See Python's `deque documentation
     <https://docs.python.org/3/library/collections.html#collections.deque>`_
-    for more details. The Redis implementation is based on the `list type
-    <http://redis.io/commands#list>`_.
-    """
+    for usage notes.
 
+    Dequq inherits from List, so see its API documentation for
+    information on other methods.
+    """
     _python_cls = collections.deque
 
     def __init__(self, *args, **kwargs):
         """
+        Create a new Deque object.
+
+        If the first argument (*data*) is an iterable object, create the new
+        Deque with its values as the initial data.
+
+        If the second argument (*maxlen*) is an integer, create the Deque with
+        the given maximum length.
+        If the second argument is not given or is ``None``, create the Deque
+        without a maximum length.
+
+        If the Deque is full (the number of values stored is equal to the
+        maximum length), adding new items to one side will cause a
+        corresponding number of items to be removed from the other side.
+
         :param data: Initial data.
         :type data: iterable
         :param maxlen: Maximum size.
@@ -749,8 +779,9 @@ class Deque(List):
 
     def copy(self, key=None):
         """
-        Return a new :obj:`Deque` with the specified *key*. The new collection
-        will have the same values and maxlen as this collection.
+        Return a new collection with the same items as this one.
+        If *key* is specified, create the new collection with the given
+        Redis key.
         """
         other = self.__class__(
             self.__iter__(),
@@ -799,8 +830,9 @@ class Deque(List):
 
     def insert(self, index, value):
         """
-        Insert *value* into the collection at *index*. If the insertion would
-        the collection to grow beyond ``maxlen``, raise ``IndexError``.
+        Insert *value* into the collection at *index*.
+        If the insertion would the collection to grow beyond ``maxlen``,
+        raise ``IndexError``.
         """
         def insert_trans(pipe):
             len_self = self.__len__(pipe)
@@ -816,20 +848,20 @@ class Deque(List):
 
     def pop(self):
         """
-        Remove and return an element from the right side of the collection.
+        Remove and return an value from the right side of the collection.
         """
         return self._pop_right()
 
     def popleft(self):
         """
-        Remove and return an element from the right side of the collection.
+        Remove and return an value from the right side of the collection.
         """
         return self._pop_left()
 
     def rotate(self, n=1):
         """
-        Rotate the deque n steps to the right. If n is negative, rotate to the
-        left.
+        Rotate the deque n steps to the right.
+        If n is negative, rotate to the left.
         """
         # No work to do for a 0-step rotate
         if n == 0:
