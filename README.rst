@@ -28,7 +28,7 @@ Python counterparts:
 .. code-block:: python
 
     >>> from redis_collections import Dict, List, Set
-    
+
     >>> D = Dict()
     >>> D['answer'] = 42
     >>> D['answer']
@@ -60,7 +60,7 @@ contents are written to Redis:
 .. code-block:: python
 
     >>> from redis_collections import SyncableDict
-    
+
     >>> with SyncableDict() as D:
     ...     D['a'] = 1  # No write to Redis
     ...     D['a'] += 1  # No read from or write to Redis
@@ -77,6 +77,8 @@ contents are written to Redis:
 | ``SyncableSet``         | ``set``                     | Syncs to a Redis Set  |
 +-------------------------+-----------------------------+-----------------------+
 | ``SyncableCounter``     | ``collections.Counter``     | Syncs to a Redis Hash |
++-------------------------+-----------------------------+-----------------------+
+| ``SyncableDeque``       | ``collections.deque``       | Syncs to a Redis List |
 +-------------------------+-----------------------------+-----------------------+
 | ``SyncableDefaultDict`` | ``collections.defaultdict`` | Syncs to a Redis Hash |
 +-------------------------+-----------------------------+-----------------------+
@@ -95,7 +97,7 @@ It pushes older items to Redis:
     >>> D['a'] = 1
     >>> D['b'] = 2
     >>> D['c'] = 2  # 'a' is pushed to Redis and 'c' is stored locally
-    >>> D['a']  # 'b' is pushed to Redis and 'a' is retrieved for local storage 
+    >>> D['a']  # 'b' is pushed to Redis and 'a' is retrieved for local storage
     1
     >>> D.sync()  # All items are copied to Redis
 
