@@ -586,6 +586,14 @@ class DequeTest(RedisTestCase):
             self.assertEqual(list(Q), list('abcd'))
             self.assertIsNone(Q.maxlen)
 
+            Q = init(iterable='abcd')
+            self.assertEqual(list(Q), list('abcd'))
+            self.assertIsNone(Q.maxlen)
+
+            Q = init(maxlen=4)
+            self.assertEqual(list(Q), [])
+            self.assertEqual(Q.maxlen, 4)
+
             self.assertRaises(TypeError, init, 'abcd', Ellipsis)
 
             self.assertRaises(ValueError, init, 'abcd', -4)

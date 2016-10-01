@@ -653,12 +653,12 @@ class Deque(List):
     """
     _python_cls = collections.deque
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, iterable=None, maxlen=None, **kwargs):
         """
         Create a new Deque object.
 
-        If the first argument (*data*) is an iterable object, create the new
-        Deque with its values as the initial data.
+        If the first argument (*iterable*) is an iterable object, create the
+        new Deque with its values as the initial data.
 
         If the second argument (*maxlen*) is an integer, create the Deque with
         the given maximum length.
@@ -669,7 +669,7 @@ class Deque(List):
         maximum length), adding new items to one side will cause a
         corresponding number of items to be removed from the other side.
 
-        :param data: Initial data.
+        :param iterable: Initial data.
         :type data: iterable
         :param maxlen: Maximum size.
         :type maxlen: int
@@ -689,14 +689,8 @@ class Deque(List):
             The ``maxlen`` of the collection can't be enforced when multiple
             processes are accessing its Redis collection.
         """
-        if len(args) > 2:
-            msg = '{} takes at most 2 positional arguments ({} given)'
-            raise TypeError(msg.format(self.__class__, len(args)))
-        elif len(args) == 2:
-            maxlen = args[1]
-            args = args[:1]
-        else:
-            maxlen = None
+        if iterable is not None:
+            kwargs['data'] = iterable
 
         if (maxlen is not None) and not isinstance(maxlen, six.integer_types):
             raise TypeError('an integer is required')
@@ -705,7 +699,7 @@ class Deque(List):
             raise ValueError('maxlen must be non-negative')
 
         self.maxlen = maxlen
-        super(Deque, self).__init__(*args, **kwargs)
+        super(Deque, self).__init__(**kwargs)
 
     # Magic methods
 
