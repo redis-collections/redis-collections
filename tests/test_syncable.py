@@ -9,6 +9,7 @@ from redis_collections import (
     LRUDict,
     SyncableDict,
     SyncableCounter,
+    SyncableDeque,
     SyncableDefaultDict,
     SyncableList,
     SyncableSet,
@@ -139,6 +140,31 @@ class SyncableTest(RedisTestCase):
         self.assertEqual(list_2.persistence, ['a', 'b'])
 
         self.assertNotEqual(list_1, list_2)
+
+    def test_deque(self):
+        deque_1 = self.create_collection(SyncableDeque, [], 2)
+
+        # Overflow the deque
+        deque_1.append('a')
+        deque_1.append('b')
+        deque_1.append('c')
+        self.assertEqual(deque_1, collections.deque(['b', 'c']))
+        self.assertEqual(deque_1.persistence, collections.deque([]))
+
+        # Sync and confirm contents are in Redis
+        deque_1.sync()
+        self.assertEqual(deque_1.persistence, collections.deque(['b', 'c']))
+
+        # Associate a new deque with an existing one in Redis.
+        # Modify the new one, make sure the old one isn't modified.
+        kwargs = {'key': deque_1.key, 'maxlen': 2}
+        with self.create_collection(SyncableDeque, **kwargs) as deque_2:
+            self.assertEqual(deque_2, collections.deque(['b', 'c']))
+
+            deque_2.append('a')
+
+        self.assertEqual(deque_2.persistence, collections.deque(['c', 'a']))
+        self.assertNotEqual(deque_1, deque_2)
 
     def test_set(self):
         set_1 = self.create_collection(SyncableSet)

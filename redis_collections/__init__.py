@@ -17,6 +17,7 @@ from .syncable import (  # NOQA
     LRUDict,
     SyncableDict,
     SyncableCounter,
+    SyncableDeque,
     SyncableDefaultDict,
     SyncableList,
     SyncableSet,
@@ -35,6 +36,7 @@ __all__ = [
     'SyncableDict',
     'SyncableCounter',
     'SyncableDefaultDict',
+    'SyncableDeque',
     'SyncableList',
     'SyncableSet',
 ]
