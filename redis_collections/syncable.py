@@ -32,7 +32,7 @@ from __future__ import division, print_function, unicode_literals
 import collections
 
 from .dicts import Counter, DefaultDict, Dict
-from .lists import List
+from .lists import Deque, List
 from .sets import Set
 
 
@@ -127,6 +127,26 @@ class SyncableList(_SyncableBase, list):
         self.persistence = List(**kwargs)
 
         super(SyncableList, self).__init__()
+        self.extend(self.persistence)
+
+    def sync(self):
+        self.persistence.clear()
+        self.persistence.extend(self)
+
+
+class SyncableDeque(_SyncableBase, collections.deque):
+    """
+    :class:`deque` subclass whose contents can be synced to Redis.
+
+    See Python's `deque documentation
+    <https://docs.python.org/3/library/collections.html#collections.deque>`_
+    for details.
+    """
+
+    def __init__(self, iterable=None, maxlen=None, **kwargs):
+        self.persistence = Deque(iterable=iterable, maxlen=maxlen, **kwargs)
+
+        super(SyncableDeque, self).__init__(maxlen=self.persistence.maxlen)
         self.extend(self.persistence)
 
     def sync(self):
