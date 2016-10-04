@@ -85,7 +85,7 @@ See the API Documentation for more details.
 
 Also:
 
-- The non-standard``Set.random_sample`` method now works for Redis servers
+- The non-standard ``Set.random_sample`` method now works for Redis servers
   running Redis < 2.6.0.
   See `PR #80 <https://github.com/honzajavorek/redis-collections/pull/80>`_ for
   details.
