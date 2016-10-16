@@ -2,6 +2,8 @@ from __future__ import print_function, unicode_literals
 
 from redis_collections import SortedSetCounter
 
+import six
+
 from .base import RedisTestCase
 
 
@@ -215,6 +217,19 @@ class SortedSetCounterTestCase(RedisTestCase):
         self.assertEqual(ssc.items(max_rank=4, min_score=4), items[2:5])
         self.assertEqual(ssc.items(1, 4, 4, 8), items[2:4])
         self.assertEqual(ssc.items(1, 4, 4, 8, reverse=True), items[3:1:-1])
+
+    def test_scan_items(self):
+        ssc = self.create_sortedset()
+
+        expected_dict = {}
+        for i in six.moves.range(1000):
+            expected_dict[i] = i * 100.0
+            ssc.set_score(i, i * 100.0)
+
+        items = list(ssc.scan_items())
+        self.assertTrue(len(items) >= 1000)
+
+        self.assertTrue(dict(items), expected_dict)
 
     def test_update(self):
         ssc = self.create_sortedset([('member_1', 0.0)])
