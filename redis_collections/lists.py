@@ -20,7 +20,9 @@ import itertools
 import uuid
 
 import six
+import six.moves
 from redis import ResponseError
+from typing import List as List_, Iterator, Mapping
 
 from .base import RedisCollection
 
@@ -61,7 +63,7 @@ class List(RedisCollection, collections.MutableSequence):
 
         self.__marker = uuid.uuid4().hex
         self.writeback = writeback
-        self.cache = {}
+        self.cache = {}  # type: Mapping
 
         if data:
             self.extend(data)
@@ -195,13 +197,15 @@ class List(RedisCollection, collections.MutableSequence):
             if start == stop:
                 return []
 
-            ret = []
+            return_values = []
             redis_values = pipe.lrange(self.key, start, max(stop - 1, 0))
             for i, v in enumerate(redis_values, start):
-                ret.append(self.cache.get(i, self._unpickle(v)))
+                return_values.append(self.cache.get(i, self._unpickle(v)))
+
+            ret = iter(return_values)
 
             if not forward:
-                ret = reversed(ret)
+                ret = reversed(return_values)
 
             if step != 1:
                 ret = itertools.islice(ret, None, None, step)
@@ -295,15 +299,17 @@ class List(RedisCollection, collections.MutableSequence):
             # of the slice, clear the collection, then re-insert the items
             # with the new values in the middle.
             else:
+                left_values = []  # type: List_
                 if start == 0:
-                    left_values = []
+                    pass
                 else:
                     left_values = pipe.lrange(self.key, 0, start - 1)
 
                 middle_values = (self._pickle(v) for v in value)
 
+                right_values = []  # type: List_
                 if stop == len_self:
-                    right_values = []
+                    pass
                 else:
                     right_values = pipe.lrange(self.key, stop, -1)
 

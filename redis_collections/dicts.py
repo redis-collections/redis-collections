@@ -26,6 +26,8 @@ import collections
 import operator
 
 import six
+import six.moves
+from typing import Any, Dict as Dict_, Union
 
 from .base import RedisCollection
 
@@ -95,7 +97,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         super(Dict, self).__init__(**kwargs)
 
         self.writeback = writeback
-        self.cache = {}
+        self.cache = {}  # type: Dict_
 
         if data:
             self.update(data)
@@ -128,7 +130,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
         if self._same_redis(other, RedisCollection):
             use_redis = True
-            return self._transaction(eq_trans, other.key)
+            return self._transaction(eq_trans, other.key)  # type: ignore
         else:
             use_redis = False
             return self._transaction(eq_trans)
@@ -324,8 +326,7 @@ class Dict(RedisCollection, collections.MutableMapping):
 
     def _update_helper(self, other, use_redis=False):
         def _update_helper_trans(pipe):
-            data = {}
-
+            data = {}  # type: Dict_
             if isinstance(other, Dict):
                 data.update(other.iteritems(pipe))
             elif isinstance(other, RedisCollection):
@@ -502,7 +503,7 @@ class Counter(Dict):
 
     def _update_helper(self, other, op, use_redis=False):
         def _update_helper_trans(pipe):
-            data = {}
+            data = {}  # type: Dict_
 
             if isinstance(other, Dict):
                 data.update(other.iteritems(pipe))

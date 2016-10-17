@@ -11,17 +11,25 @@ structure.
 """
 from __future__ import division, print_function, unicode_literals
 
-import collections
+try:
+    from collections.abc import MutableSet as abc_MutableSet, Set as abc_Set
+except ImportError:
+    from collections import (  # type: ignore
+        MutableSet as abc_MutableSet,
+        Set as abc_Set,
+    )
+
 from functools import reduce
 import operator
 import random
 
 import six
+import six.moves
 
 from .base import RedisCollection
 
 
-class Set(RedisCollection, collections.MutableSet):
+class Set(RedisCollection, abc_MutableSet):
     """
     Collection based on the built-in Python :class:`set` type.
     Items are stored in a Redis hash structure.
@@ -163,9 +171,11 @@ class Set(RedisCollection, collections.MutableSet):
             When Redis version < 2.6 is being used the whole set is stored
             in memory and the sample is computed in Python.
         """
+        results = []  # type: List
+
         # k == 0: no work to do
         if k == 0:
-            results = []
+            pass
         # k == 1: same behavior on all versions of Redis
         elif k == 1:
             results = [self.redis.srandmember(self.key)]
@@ -214,7 +224,7 @@ class Set(RedisCollection, collections.MutableSet):
     # Comparison and set operation helpers
 
     def _ge_helper(self, other, op, check_type=False):
-        if check_type and not isinstance(other, collections.Set):
+        if check_type and not isinstance(other, abc_Set):
             raise TypeError
 
         def ge_trans_pure(pipe):
@@ -241,7 +251,7 @@ class Set(RedisCollection, collections.MutableSet):
         return self._transaction(ge_trans_mixed)
 
     def _le_helper(self, other, op, check_type=False):
-        if check_type and not isinstance(other, collections.Set):
+        if check_type and not isinstance(other, abc_Set):
             raise TypeError
 
         def le_trans_pure(pipe):
@@ -272,7 +282,7 @@ class Set(RedisCollection, collections.MutableSet):
     ):
         if (
             check_type and
-            not all(isinstance(x, collections.Set) for x in others)
+            not all(isinstance(x, abc_Set) for x in others)
         ):
                 raise TypeError
 
@@ -322,13 +332,13 @@ class Set(RedisCollection, collections.MutableSet):
         return self._transaction(op_update_trans_mixed, *other_keys)
 
     def _rop_helper(self, other, op):
-        if not isinstance(other, collections.Set):
+        if not isinstance(other, abc_Set):
             raise TypeError
 
         return op(set(other), set(self.__iter__()))
 
     def _xor_helper(self, other, update=False, check_type=False):
-        if check_type and not isinstance(other, collections.Set):
+        if check_type and not isinstance(other, abc_Set):
             raise TypeError
 
         def xor_trans_pure(pipe):

@@ -31,6 +31,8 @@ from __future__ import division, print_function, unicode_literals
 
 import collections
 
+from typing import Mapping
+
 from .dicts import Counter, DefaultDict, Dict
 from .lists import Deque, List
 from .sets import Set
@@ -204,7 +206,7 @@ class LRUDict(_SyncableBase, collections.MutableMapping):
         :type key: str
         """
         self.maxsize = None if (maxsize is None) else int(maxsize)
-        self.cache = collections.OrderedDict()
+        self.cache = collections.OrderedDict()  # type: Mapping
         self.persistence = Dict(**kwargs)
 
         super(LRUDict, self).__init__()

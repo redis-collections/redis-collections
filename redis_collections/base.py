@@ -17,7 +17,11 @@ import pickle
 import redis
 import six
 
-NUMERIC_TYPES = six.integer_types + (float, Decimal, Fraction, complex)
+from typing import Tuple
+
+NUMERIC_TYPES = (
+    (float, Decimal, Fraction, complex) + six.integer_types
+)  # type: Tuple[type, ...]
 
 
 @six.add_metaclass(abc.ABCMeta)

@@ -13,6 +13,9 @@ sdist
 develop-eggs
 .installed.cfg
 
+# Cache
+.mypy_cache
+
 # Installer logs
 pip-log.txt
 
