@@ -405,6 +405,19 @@ class DictTest(RedisTestCase):
         redis_dict = self.create_dict()
         self.assertEqual(repr(redis_dict._Dict__marker), '<missing value>')
 
+    def test_scan_items(self):
+        redis_dict = self.create_dict()
+
+        expected_dict = {}
+        for i in six.moves.range(1000):
+            expected_dict[i] = i * 100.0
+            redis_dict[i] = i * 100.0
+
+        items = list(redis_dict.scan_items())
+        self.assertTrue(len(items) >= 1000)
+
+        self.assertTrue(dict(items), expected_dict)
+
 
 class CounterTest(RedisTestCase):
 

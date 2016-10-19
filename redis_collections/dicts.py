@@ -47,6 +47,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         _unpickle_key = RedisCollection._unpickle_2
     else:
         _pickle_key = RedisCollection._pickle_3
+        _unpickle_key = RedisCollection._unpickle
 
     _pickle_value = RedisCollection._pickle_3
 
@@ -207,7 +208,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         pipe = self.redis if pipe is None else pipe
         items = six.iteritems(pipe.hgetall(self.key))
 
-        return {self._unpickle(k): self._unpickle(v) for k, v in items}
+        return {self._unpickle_key(k): self._unpickle(v) for k, v in items}
 
     def items(self, pipe=None):
         """Return a copy of the dictionary's list of ``(key, value)`` pairs."""
@@ -288,7 +289,9 @@ class Dict(RedisCollection, collections.MutableMapping):
             pipe.hdel(self.key, pickled_key)
             pickled_value, __ = pipe.execute()
 
-            return self._unpickle(pickled_key), self._unpickle(pickled_value)
+            return (
+                self._unpickle_key(pickled_key), self._unpickle(pickled_value)
+            )
 
         key, value = self._transaction(popitem_trans)
 
@@ -395,6 +398,22 @@ class Dict(RedisCollection, collections.MutableMapping):
         """
         values = ((key, value) for key in seq)
         return cls(values, **kwargs)
+
+    def scan_items(self):
+        """
+        Yield each of the ``(key, value)`` pairs from the collection, without
+        pulling them all into memory.
+
+        .. warning::
+            This method is not available on the dictionary collections provided
+            by Python.
+
+            This method may return the same (key, value) pair multiple times.
+            See the `Redis SCAN documentation
+            <http://redis.io/commands/scan#scan-guarantees>`_ for details.
+        """
+        for k, v in self.redis.hscan_iter(self.key):
+            yield self._unpickle_key(k), self._unpickle(v)
 
     def _repr_data(self):
         items = ('{}: {}'.format(repr(k), repr(v)) for k, v in self.items())
