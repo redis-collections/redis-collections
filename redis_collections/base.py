@@ -44,20 +44,10 @@ class RedisCollection(object):
         #: Redis client instance. :class:`StrictRedis` object with default
         #: connection settings is used if not set by :func:`__init__`.
         self.redis = redis or self._create_redis()
+        self._redis_version = None
+
         #: Redis key of the collection.
         self.key = key or self._create_key()
-
-    _redis_versions = {}
-
-    @property
-    def redis_version(self):
-        """Cache REDIS server version after initial query, for all devired types
-        """
-        if self.redis not in RedisCollection._redis_versions:
-            RedisCollection._redis_versions[self.redis] = tuple(
-                int(x) for x in self.redis.info()['redis_version'].split('.')
-            )
-        return RedisCollection._redis_versions[self.redis]
 
     def _create_redis(self):
         """
@@ -160,6 +150,16 @@ class RedisCollection(object):
         """
         redis = self.redis if pipe is None else pipe
         redis.delete(self.key)
+
+    @property
+    def redis_version(self):
+        # Set the Redis version if it's not already set.
+        if self._redis_version is None:
+            self._redis_version = tuple(
+                int(x) for x in self.redis.info()['redis_version'].split('.')
+            )
+
+        return self._redis_version
 
     def _same_redis(self, other, cls=None):
         cls = cls or self.__class__

@@ -386,7 +386,7 @@ class SetTest(RedisTestCase):
         for redis_version in [(2, 6, 0), (2, 4, 0)]:
             # Test both the Redis implementation and Python implementation
             if s.redis_version >= (2, 6, 0):
-                s.redis_version = redis_version
+                s._redis_version = redis_version
 
             self.assertEqual(sorted(s.random_sample(2)), ['a', 'b'])
             self.assertEqual(sorted(s.random_sample(3)), ['a', 'b'])
