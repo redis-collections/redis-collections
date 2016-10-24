@@ -67,6 +67,16 @@ New features
 0.4.x
 ^^^^^
 
+0.4.1 includes:
+
+- Redis-specific ``scan_`` methods on ``Dict`` (and its subclassess), ``Set``,
+  and ``SortedSetCounter``. See
+  `PR #97 <https://github.com/honzajavorek/redis-collections/pull/97>`_ for
+  details.
+
+- Collections no longer query Redis at instantiation - thanks @ArminGruner.
+
+
 0.4.0 introduced several new collections:
 
 - ``LRUDict`` is a dict-like collection that holds a limited number of items
