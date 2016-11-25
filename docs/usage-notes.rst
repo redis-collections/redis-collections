@@ -43,8 +43,9 @@ Each collection allows you to delete its Redis key with the `clear` method:
     is used.
     It's not recommended to retrieve objects created by one version of Python
     with another version.
-    However, If you must do that, set the ``pickle_protocol`` keyword argument
-    to ``2`` or lower when declaring a collection.
+    If you attempt to do that, be sure to set the ``pickle_protocol`` keyword
+    argument to a version that both Python versions support when
+    declaring a collection.
 
 
 Redis connection
