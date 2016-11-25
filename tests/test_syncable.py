@@ -380,5 +380,6 @@ class LRUDictTest(RedisTestCase):
         self.assertEqual(lru_dict.persistence['b'], -2)
         self.assertEqual(len(lru_dict.cache), 0)
 
+
 if __name__ == '__main__':
     unittest.main()
