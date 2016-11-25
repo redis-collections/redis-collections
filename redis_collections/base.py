@@ -53,7 +53,6 @@ class RedisCollection(object):
 
         self.pickle_protocol = pickle_protocol
 
-
     def _create_redis(self):
         """
         Creates a new Redis connection when none is specified during
