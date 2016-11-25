@@ -36,6 +36,16 @@ Each collection allows you to delete its Redis key with the `clear` method:
     >>> D.clear()
     >>> list(D.items())
 
+.. note::
+    Stored objects are serialized with Python-standard pickling.
+    By default, the `highest protocol version
+    <https://docs.python.org/3/library/pickle.html#pickle.HIGHEST_PROTOCOL>`_
+    is used.
+    It's not recommended to retrieve objects created by one version of Python
+    with another version.
+    However, If you must do that, set the ``pickle_protocol`` keyword argument
+    to ``2`` or lower when declaring a collection.
+
 
 Redis connection
 ----------------
@@ -172,8 +182,8 @@ If you are not satisfied with that function's
 sublclass a collection and override its :func:`_create_key` method.
 
 If you don't like how  :mod:`pickle` does serialization, you may override the
-``_pickle`` and ``_unpickle`` methods of the collection classes. Using other
-serializers will limit the objects you can store or retrieve.
+``_pickle*`` and ``_unpickle*`` methods on the collection classes.
+Using other serializers will limit the objects you can store or retrieve.
 
 .. note::
     On Python 2, the :mod:`pickle` module is used instead of the

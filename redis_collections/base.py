@@ -30,7 +30,9 @@ class RedisCollection(object):
                     'due to limitations in Redis command set.')
 
     @abc.abstractmethod
-    def __init__(self, redis=None, key=None):
+    def __init__(
+        self, redis=None, key=None, pickle_protocol=pickle.HIGHEST_PROTOCOL
+    ):
         """
         :param data: Initial data.
         :param redis: Redis client instance. If not provided, a new Redis
@@ -40,14 +42,17 @@ class RedisCollection(object):
                     Collections with the same key point to the same data.
                     If not provided a random key is generated.
         :type key: str
+        :param pickle_protocol: The version number of the pickle protocol to
+                                use. The default is the highest version
+                                supported by the current Python process.
+        :type key: str
         """
-        #: Redis client instance. :class:`StrictRedis` object with default
-        #: connection settings is used if not set by :func:`__init__`.
-        self.redis = redis or self._create_redis()
-        self._redis_version = None
-
-        #: Redis key of the collection.
+        self.redis = self._create_redis() if redis is None else redis
+        self._redis_version = None  # Determined if needed and cached
         self.key = key or self._create_key()
+
+        self.pickle_protocol = pickle_protocol
+
 
     def _create_redis(self):
         """
@@ -90,7 +95,7 @@ class RedisCollection(object):
         :type data: anything serializable
         :rtype: bytes
         """
-        return pickle.dumps(data)
+        return pickle.dumps(data, protocol=self.pickle_protocol)
 
     def _pickle_2(self, data):
         # On Python 2 some values of the str and unicode types have the same
@@ -117,7 +122,7 @@ class RedisCollection(object):
             if data == int_data:
                 data = int_data
 
-        return pickle.dumps(data)
+        return pickle.dumps(data, protocol=self.pickle_protocol)
 
     def _unpickle(self, pickled_data):
         """Convert *pickled_data* to a Python object and return it.
