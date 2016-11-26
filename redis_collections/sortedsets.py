@@ -12,7 +12,101 @@ from __future__ import division, print_function, unicode_literals
 from .base import RedisCollection
 
 
-class SortedSetCounter(RedisCollection):
+class SortedSetBase(RedisCollection):
+    def _data(self, pipe=None):
+        pipe = self.redis if pipe is None else pipe
+        items = pipe.zrange(self.key, 0, -1, withscores=True)
+
+        return [(self._unpickle(member), score) for member, score in items]
+
+    def _repr_data(self):
+        items = ('{}: {}'.format(repr(k), repr(v)) for k, v in self.items())
+        return '{{{}}}'.format(', '.join(items))
+
+    # Magic methods
+
+    def __contains__(self, member, pipe=None):
+        """Return ``True`` if *member* is present, else ``False``."""
+        pipe = self.redis if pipe is None else pipe
+        score = pipe.zscore(self.key, self._pickle(member))
+
+        return score is not None
+
+    def __iter__(self, pipe=None):
+        """
+        Return an iterator of ``(member, score)`` tuples from the collection.
+        """
+        pipe = self.redis if pipe is None else pipe
+
+        return iter(self._data(pipe))
+
+    def __len__(self, pipe=None):
+        """Return the number of members in the collection."""
+        pipe = self.redis if pipe is None else pipe
+
+        return pipe.zcard(self.key)
+
+    # Named methods
+
+    def clear(self, pipe=None):
+        self._clear(pipe=pipe)
+
+    def copy(self, key=None):
+        other = self.__class__(redis=self.redis, key=key)
+        other.update(self)
+
+        return other
+
+    def discard_member(self, member, pipe=None):
+        """
+        Remove *member* from the collection, unconditionally.
+        """
+        pipe = self.redis if pipe is None else pipe
+        pipe.zrem(self.key, self._pickle(member))
+
+    def scan_items(self):
+        """
+        Yield each of the ``(member, score)`` tuples from the collection,
+        without pulling them all into memory.
+
+        .. warning::
+            This method may return the same (member, score) tuple multiple
+            times.
+            See the `Redis SCAN documentation
+            <http://redis.io/commands/scan#scan-guarantees>`_ for details.
+        """
+        for m, s in self.redis.zscan_iter(self.key):
+            yield self._unpickle(m), s
+
+    def update(self, other):
+        """
+        Update the collection with items from *other*. Accepts other
+        :class:`SortedSetBase` instances, dictionaries mapping members to
+        numeric scores, or sequences of ``(member, score)`` tuples.
+        """
+        def update_trans(pipe):
+            other_items = method(pipe=pipe) if use_redis else method()
+
+            pipe.multi()
+            for member, score in other_items:
+                pipe.zadd(self.key, float(score), self._pickle(member))
+
+        watches = []
+        if self._same_redis(other, RedisCollection):
+            use_redis = True
+            watches.append(other.key)
+        else:
+            use_redis = False
+
+        if hasattr(other, 'items'):
+            method = other.items
+        elif hasattr(other, '__iter__'):
+            method = other.__iter__
+
+        self._transaction(update_trans, *watches)
+
+
+class SortedSetCounter(SortedSetBase):
     """
     :class:`SortedSetCounter` is a collection based on the Redis
     `Sorted Set <http://redis.io/topics/data-types#sorted-sets>`_ type.
@@ -73,50 +167,6 @@ class SortedSetCounter(RedisCollection):
         if data:
             self.update(data)
 
-    def _data(self, pipe=None):
-        pipe = self.redis if pipe is None else pipe
-        items = pipe.zrange(self.key, 0, -1, withscores=True)
-
-        return [(self._unpickle(member), score) for member, score in items]
-
-    def _repr_data(self):
-        items = ('{}: {}'.format(repr(k), repr(v)) for k, v in self.items())
-        return '{{{}}}'.format(', '.join(items))
-
-    # Magic methods
-
-    def __contains__(self, member, pipe=None):
-        """Return ``True`` if *member* is present, else ``False``."""
-        pipe = self.redis if pipe is None else pipe
-        score = pipe.zscore(self.key, self._pickle(member))
-
-        return score is not None
-
-    def __iter__(self, pipe=None):
-        """
-        Return an iterator of ``(member, score)`` tuples from the collection.
-        """
-        pipe = self.redis if pipe is None else pipe
-
-        return iter(self._data(pipe))
-
-    def __len__(self, pipe=None):
-        """Return the number of members in the collection."""
-        pipe = self.redis if pipe is None else pipe
-
-        return pipe.zcard(self.key)
-
-    # Named methods
-
-    def clear(self, pipe=None):
-        self._clear(pipe=pipe)
-
-    def copy(self, key=None):
-        other = self.__class__(redis=self.redis, key=key)
-        other.update(self)
-
-        return other
-
     def count_between(self, min_score=None, max_score=None):
         """
         Returns the number of members whose score is between *min_score* and
@@ -175,13 +225,6 @@ class SortedSetCounter(RedisCollection):
             self.discard_by_score(min_score, max_score, pipe)
             self.discard_by_rank(min_rank, max_rank, pipe)
             pipe.execute()
-
-    def discard_member(self, member, pipe=None):
-        """
-        Remove *member* from the collection, unconditionally.
-        """
-        pipe = self.redis if pipe is None else pipe
-        pipe.zrem(self.key, self._pickle(member))
 
     def get_score(self, member, default=None, pipe=None):
         """
@@ -317,20 +360,6 @@ class SortedSetCounter(RedisCollection):
 
         return ret
 
-    def scan_items(self):
-        """
-        Yield each of the ``(member, score)`` tuples from the collection,
-        without pulling them all into memory.
-
-        .. warning::
-            This method may return the same (member, score) tuple multiple
-            times.
-            See the `Redis SCAN documentation
-            <http://redis.io/commands/scan#scan-guarantees>`_ for details.
-        """
-        for m, s in self.redis.zscan_iter(self.key):
-            yield self._unpickle(m), s
-
     def set_score(self, member, score, pipe=None):
         """
         Set the score of *member* to *score*.
@@ -338,35 +367,8 @@ class SortedSetCounter(RedisCollection):
         pipe = self.redis if pipe is None else pipe
         pipe.zadd(self.key, float(score), self._pickle(member))
 
-    def update(self, other):
-        """
-        Update the collection with items from *other*. Accepts other
-        :class:`SortedSetCounter` instances, dictionaries mapping members to
-        numeric scores, or sequences of ``(member, score)`` tuples.
-        """
-        def update_trans(pipe):
-            other_items = method(pipe=pipe) if use_redis else method()
 
-            pipe.multi()
-            for member, score in other_items:
-                pipe.zadd(self.key, float(score), self._pickle(member))
-
-        watches = []
-        if self._same_redis(other, RedisCollection):
-            use_redis = True
-            watches.append(other.key)
-        else:
-            use_redis = False
-
-        if hasattr(other, 'items'):
-            method = other.items
-        elif hasattr(other, '__iter__'):
-            method = other.__iter__
-
-        self._transaction(update_trans, *watches)
-
-
-class GeoDB(RedisCollection):
+class GeoDB(SortedSetBase):
 
     def __init__(self, *args, **kwargs):
         data = args[0] if args else kwargs.pop('data', None)
@@ -376,27 +378,23 @@ class GeoDB(RedisCollection):
         if data:
             self.update(data)
 
-    def _data(self, pipe=None):
-        raise NotImplementedError
-
-    def _repr_data(self):
-        raise NotImplementedError
-
     def add(self, member, longitude, latitude):
-        self.redis.geoadd(self.key, longitude, latitude, member)
+        self.redis.geoadd(self.key, longitude, latitude, self._pickle(member))
 
     def distance_between(self, member_1, member_2, unit='km'):
-        return self.redis.geodist(self.key, member_1, member_2, unit=unit)
+        return self.redis.geodist(
+            self.key, self._pickle(member_1), self._pickle(member_2), unit=unit
+        )
 
     def get_hash(self, member):
         try:
-            return self.redis.geohash(self.key, member)[0]
+            return self.redis.geohash(self.key, self._pickle(member))[0]
         except AttributeError:
             return None
 
     def get_position(self, member):
         try:
-            return self.redis.geopos(self.key, member)[0]
+            return self.redis.geopos(self.key, self._pickle(member))[0]
         except AttributeError:
             return None
 
@@ -429,7 +427,7 @@ class GeoDB(RedisCollection):
         # Make the query
         if member is not None:
             response = self.redis.georadiusbymember(
-                self.key, member, radius, **kwargs
+                self.key, self._pickle(member), radius, **kwargs
             )
         elif (longitude is not None) and (latitude is not None):
             print(kwargs)
@@ -446,7 +444,7 @@ class GeoDB(RedisCollection):
         for item in response:
             ret.append(
                 {
-                    'member': item[0],
+                    'member': self._unpickle(item[0]),
                     'distance': item[1],
                     'unit': unit,
                     'longitude': item[2][0],
@@ -455,6 +453,3 @@ class GeoDB(RedisCollection):
             )
 
         return ret
-
-    def update(self, other):
-        raise NotImplementedError
