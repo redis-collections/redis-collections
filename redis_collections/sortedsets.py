@@ -364,3 +364,97 @@ class SortedSetCounter(RedisCollection):
             method = other.__iter__
 
         self._transaction(update_trans, *watches)
+
+
+class GeoDB(RedisCollection):
+
+    def __init__(self, *args, **kwargs):
+        data = args[0] if args else kwargs.pop('data', None)
+
+        super(GeoDB, self).__init__(**kwargs)
+
+        if data:
+            self.update(data)
+
+    def _data(self, pipe=None):
+        raise NotImplementedError
+
+    def _repr_data(self):
+        raise NotImplementedError
+
+    def add(self, member, longitude, latitude):
+        self.redis.geoadd(self.key, longitude, latitude, member)
+
+    def distance_between(self, member_1, member_2, unit='km'):
+        return self.redis.geodist(self.key, member_1, member_2, unit=unit)
+
+    def get_hash(self, member):
+        try:
+            return self.redis.geohash(self.key, member)[0]
+        except AttributeError:
+            return None
+
+    def get_position(self, member):
+        try:
+            return self.redis.geopos(self.key, member)[0]
+        except AttributeError:
+            return None
+
+    def get_within_radius(self, *args, **kwargs):
+        # Interpret arguments: either specify coordinates and a radius as
+        # positional arguments...
+        if len(args) == 3:
+            longitude, latitude, radius = args
+            member = None
+        # ...or specify a member and a radius as position arguments...
+        elif len(args) == 2:
+            member, radius = args
+            longitude = None
+            latitude = None
+        # ...or coordinates/member and a radius as keyword arguments
+        else:
+            member = kwargs.pop('member', None)
+            longitude = kwargs.pop('longitude', None)
+            latitude = kwargs.pop('latitude', None)
+            radius = kwargs.pop('radius')
+
+        # The remaining keyword arguments will be passed to the georadius*
+        # command, with some overrides
+        kwargs['withdist'] = True
+        kwargs['withcoord'] = True
+        kwargs['withhash'] = False
+        kwargs.setdefault('sort', 'ASC')
+        unit = kwargs.setdefault('unit', 'km')
+
+        # Make the query
+        if member is not None:
+            response = self.redis.georadiusbymember(
+                self.key, member, radius, **kwargs
+            )
+        elif (longitude is not None) and (latitude is not None):
+            print(kwargs)
+            response = self.redis.georadius(
+                self.key, longitude, latitude, radius, **kwargs
+            )
+        else:
+            raise ValueError(
+                'Must specify member or both longitude and latitude'
+            )
+
+        # Assemble the result
+        ret = []
+        for item in response:
+            ret.append(
+                {
+                    'member': item[0],
+                    'distance': item[1],
+                    'unit': unit,
+                    'longitude': item[2][0],
+                    'latitude': item[2][1],
+                }
+            )
+
+        return ret
+
+    def update(self, other):
+        raise NotImplementedError
