@@ -3,9 +3,11 @@
 sortedsets
 ~~~~~~~~~~
 
-The `sortedsets` module contains a collection, :class:`SortedSetCounter`,
-which provides an interface to Redis's
-`Sorted Set <http://redis.io/commands#set>`_ type.
+The `sortedsets` module contains collections based on the
+Redis `Sorted Set <https://redis.io/commands#sorted_set>`_ type.
+
+Included collections are :class:`SortedSetCounter` and :class:`GeoDB`.
+
 """
 from __future__ import division, print_function, unicode_literals
 
@@ -378,65 +380,49 @@ class GeoDB(SortedSetBase):
         if data:
             self.update(data)
 
-    def add(self, member, longitude, latitude):
-        self.redis.geoadd(self.key, longitude, latitude, self._pickle(member))
+    def add(self, place, latitude, longitude):
+        self.redis.geoadd(self.key, longitude, latitude, self._pickle(place))
 
-    def distance_between(self, member_1, member_2, unit='km'):
+    def distance_between(self, place_1, place_2, unit='km'):
         return self.redis.geodist(
-            self.key, self._pickle(member_1), self._pickle(member_2), unit=unit
+            self.key, self._pickle(place_1), self._pickle(place_2), unit=unit
         )
 
-    def get_hash(self, member):
+    def get_hash(self, place):
         try:
-            return self.redis.geohash(self.key, self._pickle(member))[0]
-        except AttributeError:
+            return self.redis.geohash(self.key, self._pickle(place))[0]
+        except (AttributeError, TypeError):
             return None
 
-    def get_position(self, member):
+    def get_position(self, place):
         try:
-            return self.redis.geopos(self.key, self._pickle(member))[0]
-        except AttributeError:
+            response = self.redis.geopos(self.key, self._pickle(place))[0]
+        except (AttributeError, TypeError):
             return None
 
-    def get_within_radius(self, *args, **kwargs):
-        # Interpret arguments: either specify coordinates and a radius as
-        # positional arguments...
-        if len(args) == 3:
-            longitude, latitude, radius = args
-            member = None
-        # ...or specify a member and a radius as position arguments...
-        elif len(args) == 2:
-            member, radius = args
-            longitude = None
-            latitude = None
-        # ...or coordinates/member and a radius as keyword arguments
-        else:
-            member = kwargs.pop('member', None)
-            longitude = kwargs.pop('longitude', None)
-            latitude = kwargs.pop('latitude', None)
-            radius = kwargs.pop('radius')
+        return {'latitude': response[1], 'longitude': response[0]}
 
-        # The remaining keyword arguments will be passed to the georadius*
-        # command, with some overrides
+    def get_within_radius(
+        self, place=None, latitude=None, longitude=None, radius=0, **kwargs
+    ):
         kwargs['withdist'] = True
         kwargs['withcoord'] = True
         kwargs['withhash'] = False
-        kwargs.setdefault('sort', 'ASC')
+        kwargs.setdefault('sort', b'ASC')
         unit = kwargs.setdefault('unit', 'km')
 
         # Make the query
-        if member is not None:
+        if place is not None:
             response = self.redis.georadiusbymember(
-                self.key, self._pickle(member), radius, **kwargs
+                self.key, self._pickle(place), radius, **kwargs
             )
-        elif (longitude is not None) and (latitude is not None):
-            print(kwargs)
+        elif (latitude is not None) and (longitude is not None):
             response = self.redis.georadius(
                 self.key, longitude, latitude, radius, **kwargs
             )
         else:
             raise ValueError(
-                'Must specify member or both longitude and latitude'
+                'Must specify place, or both longitude and latitude'
             )
 
         # Assemble the result
@@ -444,11 +430,11 @@ class GeoDB(SortedSetBase):
         for item in response:
             ret.append(
                 {
-                    'member': self._unpickle(item[0]),
+                    'place': self._unpickle(item[0]),
                     'distance': item[1],
                     'unit': unit,
-                    'longitude': item[2][0],
                     'latitude': item[2][1],
+                    'longitude': item[2][0],
                 }
             )
 

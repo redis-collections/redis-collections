@@ -12,7 +12,7 @@ from .base import RedisCollection  # NOQA
 from .dicts import DefaultDict, Dict, Counter  # NOQA
 from .lists import Deque, List  # NOQA
 from .sets import Set  # NOQA
-from .sortedsets import SortedSetCounter  # NOQA
+from .sortedsets import GeoDB, SortedSetCounter  # NOQA
 from .syncable import (  # NOQA
     LRUDict,
     SyncableDict,
@@ -28,6 +28,7 @@ __all__ = [
     'DefaultDict',
     'Deque',
     'Dict',
+    'GeoDB',
     'List',
     'LRUDict',
     'RedisCollection',
