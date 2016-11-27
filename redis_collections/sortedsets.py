@@ -128,7 +128,7 @@ class SortedSetCounter(SortedSetBase):
     Ranges of items by rank can be computed and returned efficiently, as can
     ranges by score:
 
-        >>> ssc.items(min_rank=200.0)
+        >>> ssc.items(min_rank=1)
         [('venus', 200.0), ('earth', 300.0)]
         >>> ssc.items(min_score=99, max_score=299)
         [('mercury', 100.0), ('venus', 200.0)]
@@ -380,6 +380,16 @@ class SortedSetCounter(SortedSetBase):
 
 
 class GeoDB(SortedSetBase):
+    """
+    :class:`GeoDB` is a collection based on the Redis
+    `Geo <https://redis.io/commands/#geo>`_ type.
+    Instances map a unique set of ``place`` objects (specified by their
+    latitude and longitude) to a
+    `Geohash <https://en.wikipedia.org/wiki/Geohash>`_.
+
+    This allows for quick approximations of distances between places, and
+    for quick searching within a given radius.
+    """
 
     def __init__(self, *args, **kwargs):
         data = args[0] if args else kwargs.pop('data', None)
@@ -390,20 +400,44 @@ class GeoDB(SortedSetBase):
             self.update(data)
 
     def add(self, place, latitude, longitude):
+        """
+        Set the position of *place* to the location specified by
+        *latitude* and *longitude*.
+
+        *place* can be any pickle-able Python object.
+        """
         self.redis.geoadd(self.key, longitude, latitude, self._pickle(place))
 
     def distance_between(self, place_1, place_2, unit='km'):
+        """
+        Return the great-circle distance between *place_1* and *place_2*,
+        in the *unit* specified.
+
+        The default unit is ``'km'``, but ``'m'``, ``'mi'``, and ``'ft'`` can
+        also be specified.
+        """
         return self.redis.geodist(
             self.key, self._pickle(place_1), self._pickle(place_2), unit=unit
         )
 
     def get_hash(self, place):
+        """
+        Return the Geohash of *place*.
+        If it's not present in the collection, ``None`` will be returned
+        instead.
+        """
         try:
             return self.redis.geohash(self.key, self._pickle(place))[0]
         except (AttributeError, TypeError):
             return None
 
     def get_position(self, place):
+        """
+        Return a dict with the coordinates *place*. The dict's keys are
+        ``'latitude'`` and ``'longitude'``.
+        If it's not present in the collection, ``None`` will be returned
+        instead.
+        """
         try:
             response = self.redis.geopos(self.key, self._pickle(place))[0]
         except (AttributeError, TypeError):
@@ -414,6 +448,24 @@ class GeoDB(SortedSetBase):
     def get_within_radius(
         self, place=None, latitude=None, longitude=None, radius=0, **kwargs
     ):
+        """
+        Return descriptions of the places stored in the collection that are
+        within the circle specified by the given location and radius.
+        A list of dicts will be returned.
+
+        The center of the circle can be specified by the identifier of another
+        place in the collection with the *place* keyword argument.
+        Or, it can be specified by using both the *latitude* and *longitude*
+        keyword arguments.
+
+        By default the *radius* is given in kilometers, but you may also set
+        the *unit* keyword argument to ``'m'``, ``'mi'``, or ``'ft'``.
+
+        Limit the number of results returned with the *count* keyword argument.
+
+        Change the sorted order by setting the *sort* keyword argument to
+        ``b'DESC'``.
+        """
         kwargs['withdist'] = True
         kwargs['withcoord'] = True
         kwargs['withhash'] = False
