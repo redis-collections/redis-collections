@@ -399,14 +399,18 @@ class GeoDB(SortedSetBase):
         if data:
             self.update(data)
 
-    def add(self, place, latitude, longitude):
-        """
-        Set the position of *place* to the location specified by
-        *latitude* and *longitude*.
+    def __iter__(self):
+        # Larger than the circumference of the spherical earth, in km
+        everything_radius = 50000
 
-        *place* can be any pickle-able Python object.
-        """
-        self.redis.geoadd(self.key, longitude, latitude, self._pickle(place))
+        for item in self.places_within_radius(
+            latitude=0, longitude=0, radius=everything_radius
+        ):
+            yield {
+                'place': item['place'],
+                'latitude': item['latitude'],
+                'longitude': item['longitude'],
+            }
 
     def distance_between(self, place_1, place_2, unit='km'):
         """
@@ -416,12 +420,11 @@ class GeoDB(SortedSetBase):
         The default unit is ``'km'``, but ``'m'``, ``'mi'``, and ``'ft'`` can
         also be specified.
         """
+        pickled_place_1 = self._pickle(place_1)
+        pickled_place_2 = self._pickle(place_2)
         try:
             return self.redis.geodist(
-                self.key,
-                self._pickle(place_1),
-                self._pickle(place_2),
-                unit=unit
+                self.key, pickled_place_1, pickled_place_2, unit=unit
             )
         except TypeError:
             return None
@@ -432,20 +435,22 @@ class GeoDB(SortedSetBase):
         If it's not present in the collection, ``None`` will be returned
         instead.
         """
+        pickled_place = self._pickle(place)
         try:
-            return self.redis.geohash(self.key, self._pickle(place))[0]
+            return self.redis.geohash(self.key, pickled_place)[0]
         except (AttributeError, TypeError):
             return None
 
-    def get_position(self, place):
+    def get_location(self, place):
         """
         Return a dict with the coordinates *place*. The dict's keys are
         ``'latitude'`` and ``'longitude'``.
         If it's not present in the collection, ``None`` will be returned
         instead.
         """
+        pickled_place = self._pickle(place)
         try:
-            response = self.redis.geopos(self.key, self._pickle(place))[0]
+            response = self.redis.geopos(self.key, pickled_place)[0]
         except (AttributeError, TypeError):
             return None
 
@@ -489,7 +494,7 @@ class GeoDB(SortedSetBase):
             )
         else:
             raise ValueError(
-                'Must specify place, or both longitude and latitude'
+                'Must specify place, or both latitude and longitude'
             )
 
         # Assemble the result
@@ -506,3 +511,64 @@ class GeoDB(SortedSetBase):
             )
 
         return ret
+
+    def set_location(self, place, latitude, longitude, pipe=None):
+        """
+        Set the location of *place* to the location specified by
+        *latitude* and *longitude*.
+
+        *place* can be any pickle-able Python object.
+        """
+        pipe = self.redis if pipe is None else pipe
+        pipe.geoadd(self.key, longitude, latitude, self._pickle(place))
+
+    def update(self, other):
+        """
+        Update the collection with items from *other*. Accepts other
+        :class:`GeoDB` instances, dictionaries mapping places to
+        ``{'latitude': latitude, 'longitude': longitude}`` dicts,
+        or sequences of ``(place, latitude, longitude)`` tuples.
+        """
+        # other is another Sorted Set
+        def update_sortedset_trans(pipe):
+            items = other._data(pipe=pipe) if use_redis else other._data()
+
+            pipe.multi()
+            for member, score in items:
+                pipe.zadd(self.key, score, self._pickle(member))
+
+        # other is dict-like
+        def update_mapping_trans(pipe):
+            items = other.items(pipe=pipe) if use_redis else other.items()
+
+            pipe.multi()
+            for place, value in items:
+                self.set_location(
+                    place, value['latitude'], value['longitude'], pipe=pipe
+                )
+
+        # other is a list of tuples
+        def update_tuples_trans(pipe):
+            items = (
+                other.__iter__(pipe=pipe) if use_redis else other.__iter__()
+            )
+
+            pipe.multi()
+            for place, latitude, longitude in items:
+                self.set_location(place, latitude, longitude, pipe=pipe)
+
+        watches = []
+        if self._same_redis(other, RedisCollection):
+            use_redis = True
+            watches.append(other.key)
+        else:
+            use_redis = False
+
+        if isinstance(other, SortedSetBase):
+            func = update_sortedset_trans
+        elif hasattr(other, 'items'):
+            func = update_mapping_trans
+        elif hasattr(other, '__iter__'):
+            func = update_tuples_trans
+
+        self._transaction(func, *watches)
