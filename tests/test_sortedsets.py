@@ -1,6 +1,8 @@
 from __future__ import print_function, unicode_literals
 
-from redis_collections import SortedSetCounter
+from unittest import TestCase
+
+from redis_collections import GeoDB, SortedSetCounter
 
 import six
 
@@ -246,3 +248,93 @@ class SortedSetCounterTestCase(RedisTestCase):
         zc_2.set_score('member_3', 40.0)
         ssc.update(zc_2)
         self.assertEqual(ssc.get_score('member_3'), 40.0)
+
+
+class GeoDBTestCase(TestCase):
+    def setUp(self):
+        # Hack for 2016-11-27: released version of redis doesn't support
+        # GEO commands yet, but a custom version of redislite does.
+        from redislite import StrictRedis
+        db = 15
+        self.redis = StrictRedis(db=db)
+        if self.redis.dbsize():
+            raise EnvironmentError(
+                'Redis database number {} is not empty'.format(db)
+            )
+
+    def tearDown(self):
+        self.redis.flushdb()
+
+    def create_geodb(self, *args, **kwargs):
+        kwargs['redis'] = self.redis
+        return GeoDB(*args, **kwargs)
+
+    def test_add(self):
+        geodb = self.create_geodb()
+        geodb.add('St. Louis', 38.6270, -90.1994)
+        actual = list(geodb)
+        expected = [('St. Louis', 1406182639924471.0)]
+        self.assertEqual(actual, expected)
+
+    def test_distance_between(self):
+        geodb = self.create_geodb()
+        geodb.add('St. Louis', 38.6270, -90.1994)
+        geodb.add('Bahia', -11.4099, -41.2809)
+        geodb.add('Berlin', 52.5200, 13.4050)
+        geodb.add('Sydney', -33.8562, 151.2153)
+
+        for place_1, place_2, expected, unit in [
+            ('St. Louis', 'Bahia', 7528, 'km'),
+            ('Bahia', 'St. Louis', 4677, 'mi'),
+            ('St. Louis', 'Berlin', 24611784, 'ft'),
+            ('St. Louis', 'Sydney', 14588620, 'm'),
+        ]:
+            actual = geodb.distance_between(place_1, place_2, unit=unit)
+            self.assertAlmostEqual(actual, expected, delta=1)
+
+        # Missing item returns None
+        self.assertIsNone(geodb.distance_between('St. Louis', 'y'))
+        self.assertIsNone(geodb.distance_between('x', 'St. Louis'))
+        self.assertIsNone(geodb.distance_between('x', 'y'))
+
+    def test_get_hash(self):
+        geodb = self.create_geodb()
+        geodb.add('St. Louis', 38.6270, -90.1994)
+        self.assertEqual(geodb.get_hash('St. Louis'), '9yzgeryf9d0')
+
+    def test_get_position(self):
+        geodb = self.create_geodb()
+        geodb.add('St. Louis', 38.6270, -90.1994)
+
+        response = geodb.get_position('St. Louis')
+        self.assertAlmostEqual(response['latitude'], 38.6270, places=4)
+        self.assertAlmostEqual(response['longitude'], -90.1994, places=4)
+
+        self.assertIsNone(geodb.get_position('x'))
+
+    def test_places_within_radius(self):
+        geodb = self.create_geodb()
+        geodb.add('St. Louis', 38.6270, -90.1994)
+        geodb.add('Bahia', -11.4099, -41.2809)
+        geodb.add('Berlin', 52.5200, 13.4050)
+        geodb.add('Sydney', -33.8562, 151.2153)
+
+        # By default the results are sorted from nearest to farthest
+        response = geodb.places_within_radius(place='St. Louis', radius=7530)
+        self.assertEqual(response[1]['place'], 'Berlin')
+        self.assertAlmostEqual(response[1]['latitude'], 52.5200, places=4)
+        self.assertAlmostEqual(response[1]['longitude'], 13.4050, places=4)
+        self.assertAlmostEqual(response[1]['distance'], 7501, delta=1)
+        self.assertEqual(response[1]['unit'], 'km')
+
+        # Test latitude & longitude, units
+        response = geodb.places_within_radius(
+            latitude=38.6, longitude=-90.2, radius=100, unit='mi',
+        )
+        self.assertEqual(response[0]['place'], 'St. Louis')
+
+        # Test sort descending
+        response = geodb.places_within_radius(
+            place='St. Louis', radius=7530, sort=b'DESC'
+        )
+        self.assertEqual(response[0]['place'], 'Bahia')

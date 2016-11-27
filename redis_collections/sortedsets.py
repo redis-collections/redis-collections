@@ -416,9 +416,15 @@ class GeoDB(SortedSetBase):
         The default unit is ``'km'``, but ``'m'``, ``'mi'``, and ``'ft'`` can
         also be specified.
         """
-        return self.redis.geodist(
-            self.key, self._pickle(place_1), self._pickle(place_2), unit=unit
-        )
+        try:
+            return self.redis.geodist(
+                self.key,
+                self._pickle(place_1),
+                self._pickle(place_2),
+                unit=unit
+            )
+        except TypeError:
+            return None
 
     def get_hash(self, place):
         """
@@ -445,7 +451,7 @@ class GeoDB(SortedSetBase):
 
         return {'latitude': response[1], 'longitude': response[0]}
 
-    def get_within_radius(
+    def places_within_radius(
         self, place=None, latitude=None, longitude=None, radius=0, **kwargs
     ):
         """
