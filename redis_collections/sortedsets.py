@@ -133,7 +133,16 @@ class SortedSetCounter(SortedSetBase):
         >>> ssc.items(min_score=99, max_score=299)
         [('mercury', 100.0), ('venus', 200.0)]
 
-    .. warning::
+    Collections support the ``in`` operator, and can be iterated over:
+
+        >>> 'mercury' in ssc
+        True
+        >>> list(ssc)
+         [('mercury', 100.0), ('venus', 200.0), ('earth', 300.0)]
+        >>> len(ssc)
+        3
+
+    .. note::
         The API for :class:`SortedSetCounter` does not attempt to match an
         existing Python collection's.
 
