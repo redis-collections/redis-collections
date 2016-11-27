@@ -170,8 +170,9 @@ class RedisCollection(object):
         other_kwargs = other.redis.connection_pool.connection_kwargs
 
         return (
-            self_kwargs['host'] == other_kwargs['host'] and
-            self_kwargs['port'] == other_kwargs['port'] and
+            self_kwargs.get('host') == other_kwargs.get('host') and
+            self_kwargs.get('port') == other_kwargs.get('port') and
+            self_kwargs.get('path') == other_kwargs.get('path') and
             self_kwargs.get('db', 0) == other_kwargs.get('db', 0)
         )
 
