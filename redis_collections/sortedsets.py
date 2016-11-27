@@ -128,7 +128,7 @@ class SortedSetCounter(SortedSetBase):
     Ranges of items by rank can be computed and returned efficiently, as can
     ranges by score:
 
-        >>> ssc.items(min_rank=1)
+        >>> ssc.items(min_rank=1)  # 'mercury' has rank 0
         [('venus', 200.0), ('earth', 300.0)]
         >>> ssc.items(min_score=99, max_score=299)
         [('mercury', 100.0), ('venus', 200.0)]
