@@ -67,6 +67,11 @@ New features
 0.4.x
 ^^^^^
 
+0.4.2 includes:
+
+- Fixed support for using a Redis server listening on a Unix domain socket
+  instead of a network socket.
+
 0.4.1 includes:
 
 - Redis-specific ``scan_`` methods on ``Dict`` (and its subclassess), ``Set``,
