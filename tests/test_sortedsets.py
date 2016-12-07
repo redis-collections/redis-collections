@@ -269,6 +269,17 @@ class GeoDBTestCase(TestCase):
         kwargs['redis'] = self.redis
         return GeoDB(*args, **kwargs)
 
+    def test_getitem(self):
+        geodb = self.create_geodb()
+        geodb.set_location('St. Louis', 38.6270, -90.1994)
+
+        actual = geodb['St. Louis']
+        self.assertAlmostEqual(actual['latitude'], 38.6270, places=4)
+        self.assertAlmostEqual(actual['longitude'], -90.1994, places=4)
+
+        with self.assertRaises(KeyError):
+            geodb['Bahia']
+
     def test_iter(self):
         geodb = self.create_geodb()
         geodb.set_location('St. Louis', 38.6270, -90.1994)

@@ -412,6 +412,18 @@ class GeoDB(SortedSetBase):
                 'longitude': item['longitude'],
             }
 
+    def __getitem__(self, place):
+        ret = self.get_location(place)
+        if ret is None:
+            raise KeyError(place)
+
+        return ret
+
+    def __setitem__(self, place, location):
+        return self.set_location(
+            place, location['latitude'], location['longitude']
+        )
+
     def distance_between(self, place_1, place_2, unit='km'):
         """
         Return the great-circle distance between *place_1* and *place_2*,
