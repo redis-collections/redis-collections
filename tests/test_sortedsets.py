@@ -277,6 +277,14 @@ class GeoDBTestCase(TestCase):
         self.assertAlmostEqual(actual['latitude'], 38.6270, places=4)
         self.assertAlmostEqual(actual['longitude'], -90.1994, places=4)
 
+    def test_setitem(self):
+        geodb = self.create_geodb()
+        geodb['St. Louis'] = {'latitude': 38.6270, 'longitude': -90.1994}
+
+        actual = geodb['St. Louis']
+        self.assertAlmostEqual(actual['latitude'], 38.6270, places=4)
+        self.assertAlmostEqual(actual['longitude'], -90.1994, places=4)
+
         with self.assertRaises(KeyError):
             geodb['Bahia']
 
