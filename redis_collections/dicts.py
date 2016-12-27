@@ -333,16 +333,20 @@ class Dict(RedisCollection, collections.MutableMapping):
             else:
                 data.update(other)
 
+            if not data:
+                return
+
             if self.writeback:
                 self.cache.update(data)
 
-            pickled_data = {}
-            while data:
-                k, v = data.popitem()
-                pickled_data[self._pickle_key(k)] = self._pickle_value(v)
+            def _yield_pickled(data):
+                while data:
+                    k, v = data.popitem()
+                    yield self._pickle_key(k)
+                    yield self._pickle_value(v)
 
-            if pickled_data:
-                pipe.hmset(self.key, pickled_data)
+            pickled_items = _yield_pickled(data)
+            pipe.execute_command('HMSET', self.key, *pickled_items)
 
         if use_redis:
             self._transaction(_update_helper_trans, other.key)
