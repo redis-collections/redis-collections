@@ -39,4 +39,7 @@ __all__ = [
     'SyncableDeque',
     'SyncableList',
     'SyncableSet',
+    'RedisCollectionsFactory'
 ]
+
+from .factory import RedisCollectionsFactory

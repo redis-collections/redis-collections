@@ -115,6 +115,25 @@ The ``SortedSetCounter`` provides access to the Redis
     >>> ssc.items()
     [('mercury', 100.0), ('venus', 200.0), ('earth', 300.0)]
 
+
+
+RedisCollectionsFactory
+^^^^^^^^^^^^^^^^^^^^^^^
+
+``RedisCollectionsFactory`` exposes redis-py API along with all redis-collections types
+
+The redis-collections type no longer need to have the `redis` upon initialization.
+
+However, the `key` is now required.
+
+   >>> from redis_collections import RedisCollectionsFactory
+
+   >>> col = RedisCollectionsFactory.from_url("redis://")
+   >>> my_dict = col.Dict("my_dict", {})
+   >>> my_list = col.List("my_list", [])
+
+
+
 Documentation
 -------------
 
