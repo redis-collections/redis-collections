@@ -614,7 +614,7 @@ class Counter(Dict):
                 pipe.hmset(self.key, pickled_data)
 
         if other is None:
-            result = self._transaction(op_trans, None)
+            result = self._transaction(op_trans)
         elif self._same_redis(other, RedisCollection):
             result = self._transaction(op_trans, other.key)
         elif isinstance(other, collections.Counter):

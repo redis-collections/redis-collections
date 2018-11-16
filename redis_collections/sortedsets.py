@@ -209,7 +209,7 @@ class SortedSetCounter(RedisCollection):
             score = pipe.zscore(self.key, pickled_member)
 
             if score is None:
-                pipe.zadd(self.key, default, self._pickle(member))
+                pipe.zadd(self.key, {self._pickle(member): default})
                 return default
 
             return score
@@ -234,7 +234,7 @@ class SortedSetCounter(RedisCollection):
         collection it will be stored with a score of *amount*.
         """
         return self.redis.zincrby(
-            self.key, self._pickle(member), float(amount)
+            self.key, float(amount), self._pickle(member)
         )
 
     def items_by_rank(
@@ -336,7 +336,7 @@ class SortedSetCounter(RedisCollection):
         Set the score of *member* to *score*.
         """
         pipe = self.redis if pipe is None else pipe
-        pipe.zadd(self.key, float(score), self._pickle(member))
+        pipe.zadd(self.key, {self._pickle(member): float(score)})
 
     def update(self, other):
         """
@@ -349,7 +349,7 @@ class SortedSetCounter(RedisCollection):
 
             pipe.multi()
             for member, score in other_items:
-                pipe.zadd(self.key, float(score), self._pickle(member))
+                pipe.zadd(self.key, {self._pickle(member): float(score)})
 
         watches = []
         if self._same_redis(other, RedisCollection):
