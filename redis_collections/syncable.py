@@ -29,6 +29,11 @@ be loaded.
 """
 from __future__ import division, print_function, unicode_literals
 
+try:
+    import collections.abc as collections_abc
+except ImportError:
+    import collections as collections_abc
+
 import collections
 
 from .dicts import Counter, DefaultDict, Dict
@@ -174,7 +179,7 @@ class SyncableSet(_SyncableBase, set):
         self.persistence.update(self)
 
 
-class LRUDict(_SyncableBase, collections.MutableMapping):
+class LRUDict(_SyncableBase, collections_abc.MutableMapping):
     """
     :class:`dict`-like class that stores recently-used items in memory
     and automatically pushes older items to Redis.
