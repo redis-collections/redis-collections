@@ -23,6 +23,12 @@ After 1.0 is released:
 Breaking changes
 ----------------
 
+0.5.x
+^^^^^
+
+The 3.0.x release of `redis-py` is now required. Since it's not
+backward-compatible with older versions, this library had to change as well.
+
 0.4.x
 ^^^^^
 
