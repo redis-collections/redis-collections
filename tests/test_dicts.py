@@ -57,13 +57,15 @@ class DictTest(RedisTestCase):
         python_dict = dict(init_seq)
         six.assertCountEqual(self, redis_dict.items(), python_dict.items())
 
-        init_dict = {
-            'a': 1,
-            b'a': 2,
-            u'a': 3,
-            1: 'one',
-            1.0: 'one point zero',
-        }
+        init_dict = dict(
+            [
+                ('a', 1),
+                (b'a', 2),
+                (u'a', 3),
+                (1, 'one'),
+                (1.0, 'one point zero'),
+            ]
+        )
         redis_dict = self.create_dict(init_dict)
         python_dict = dict(init_dict)
         six.assertCountEqual(self, redis_dict.items(), python_dict.items())
