@@ -15,6 +15,11 @@ Each collection stores its values in a Redis
 """
 from __future__ import division, print_function, unicode_literals
 
+try:
+    import collections.abc as collections_abc
+except ImportError:
+    import collections as collections_abc
+
 import collections
 import itertools
 import uuid
@@ -25,7 +30,7 @@ from redis import ResponseError
 from .base import RedisCollection
 
 
-class List(RedisCollection, collections.MutableSequence):
+class List(RedisCollection, collections_abc.MutableSequence):
     """
     Collection based on the built-in Python :class:`list` type.
     Items are stored in a Redis list structure.
