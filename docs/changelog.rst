@@ -29,6 +29,8 @@ Breaking changes
 The 3.0.x release of `redis-py` is now required. Since it's not
 backward-compatible with older versions, this library had to change as well.
 
+In addition, Python 3.3 is no longer supported.
+
 0.4.x
 ^^^^^
 
