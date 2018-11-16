@@ -11,7 +11,11 @@ structure.
 """
 from __future__ import division, print_function, unicode_literals
 
-import collections
+try:
+    import collections.abc as collections_abc
+except ImportError:
+    import collections as collections_abc
+
 from functools import reduce
 import operator
 import random
@@ -21,7 +25,7 @@ import six
 from .base import RedisCollection
 
 
-class Set(RedisCollection, collections.MutableSet):
+class Set(RedisCollection, collections_abc.MutableSet):
     """
     Collection based on the built-in Python :class:`set` type.
     Items are stored in a Redis hash structure.
@@ -214,7 +218,7 @@ class Set(RedisCollection, collections.MutableSet):
     # Comparison and set operation helpers
 
     def _ge_helper(self, other, op, check_type=False):
-        if check_type and not isinstance(other, collections.Set):
+        if check_type and not isinstance(other, collections_abc.Set):
             raise TypeError
 
         def ge_trans_pure(pipe):
@@ -241,7 +245,7 @@ class Set(RedisCollection, collections.MutableSet):
         return self._transaction(ge_trans_mixed)
 
     def _le_helper(self, other, op, check_type=False):
-        if check_type and not isinstance(other, collections.Set):
+        if check_type and not isinstance(other, collections_abc.Set):
             raise TypeError
 
         def le_trans_pure(pipe):
@@ -272,7 +276,7 @@ class Set(RedisCollection, collections.MutableSet):
     ):
         if (
             check_type and
-            not all(isinstance(x, collections.Set) for x in others)
+            not all(isinstance(x, collections_abc.Set) for x in others)
         ):
                 raise TypeError
 
@@ -322,13 +326,13 @@ class Set(RedisCollection, collections.MutableSet):
         return self._transaction(op_update_trans_mixed, *other_keys)
 
     def _rop_helper(self, other, op):
-        if not isinstance(other, collections.Set):
+        if not isinstance(other, collections_abc.Set):
             raise TypeError
 
         return op(set(other), set(self.__iter__()))
 
     def _xor_helper(self, other, update=False, check_type=False):
-        if check_type and not isinstance(other, collections.Set):
+        if check_type and not isinstance(other, collections_abc.Set):
             raise TypeError
 
         def xor_trans_pure(pipe):
