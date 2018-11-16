@@ -94,7 +94,7 @@ class DictTest(RedisTestCase):
 
     def test_del(self):
         redis_dict = self.create_dict([('a', 1), (b'a', 2), (2, 'b')])
-        python_dict = {'a': 1, b'a': 2, 2: 'b'}
+        python_dict = dict([('a', 1), (b'a', 2), (2, 'b')])
 
         for key in ('a', 2):
             del redis_dict[key]
