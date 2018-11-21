@@ -250,21 +250,7 @@ class SortedSetCounterTestCase(RedisTestCase):
         self.assertEqual(ssc.get_score('member_3'), 40.0)
 
 
-class GeoDBTestCase(TestCase):
-    def setUp(self):
-        # Hack for 2016-11-27: released version of redis doesn't support
-        # GEO commands yet, but a custom version of redislite does.
-        from redislite import StrictRedis
-        db = 15
-        self.redis = StrictRedis(db=db)
-        if self.redis.dbsize():
-            raise EnvironmentError(
-                'Redis database number {} is not empty'.format(db)
-            )
-
-    def tearDown(self):
-        self.redis.flushdb()
-
+class GeoDBTestCase(RedisTestCase):
     def create_geodb(self, *args, **kwargs):
         kwargs['redis'] = self.redis
         return GeoDB(*args, **kwargs)
@@ -362,7 +348,7 @@ class GeoDBTestCase(TestCase):
 
         # Test sort descending
         response = geodb.places_within_radius(
-            place='St. Louis', radius=7530, sort=b'DESC'
+            place='St. Louis', radius=7530, sort='DESC'
         )
         self.assertEqual(response[0]['place'], 'Bahia')
 

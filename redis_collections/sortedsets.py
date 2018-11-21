@@ -462,11 +462,11 @@ class GeoDB(SortedSetBase):
         """
         pickled_place = self._pickle(place)
         try:
-            response = self.redis.geopos(self.key, pickled_place)[0]
+            longitude, latitude = self.redis.geopos(self.key, pickled_place)[0]
         except (AttributeError, TypeError):
             return None
 
-        return {'latitude': response[1], 'longitude': response[0]}
+        return {'latitude': latitude, 'longitude': longitude}
 
     def places_within_radius(
         self, place=None, latitude=None, longitude=None, radius=0, **kwargs
@@ -492,7 +492,7 @@ class GeoDB(SortedSetBase):
         kwargs['withdist'] = True
         kwargs['withcoord'] = True
         kwargs['withhash'] = False
-        kwargs.setdefault('sort', b'ASC')
+        kwargs.setdefault('sort', 'ASC')
         unit = kwargs.setdefault('unit', 'km')
 
         # Make the query
