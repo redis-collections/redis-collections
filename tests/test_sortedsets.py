@@ -1,7 +1,5 @@
 from __future__ import print_function, unicode_literals
 
-from unittest import TestCase
-
 from redis_collections import GeoDB, SortedSetCounter
 
 import six
