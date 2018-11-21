@@ -11,8 +11,8 @@ Versioning
 A 1.0 release is planned. Before that happens:
 
 - Releases with significant new features or breaking changes will be tagged as
-  0.5.x, 0.6.x, etc.
-- Bug fix releases will be tagged as 0.4.x
+  0.6.x, 0.7.x, etc.
+- Bug fix releases will be tagged as 0.5.x
 
 After 1.0 is released:
 
@@ -22,6 +22,14 @@ After 1.0 is released:
 
 Breaking changes
 ----------------
+
+0.5.x
+^^^^^
+
+The 3.0.x release of `redis-py` is now required. Since it's not
+backward-compatible with older versions, this library had to change as well.
+
+In addition, Python 3.3 is no longer supported.
 
 0.4.x
 ^^^^^

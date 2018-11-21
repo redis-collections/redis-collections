@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
+r"""
 dicts
 ~~~~~
 
@@ -22,6 +22,11 @@ Each collection stores its items in a Redis
 """
 from __future__ import division, print_function, unicode_literals
 
+try:
+    import collections.abc as collections_abc
+except ImportError:
+    import collections as collections_abc
+
 import collections
 import operator
 
@@ -30,7 +35,7 @@ import six
 from .base import RedisCollection
 
 
-class Dict(RedisCollection, collections.MutableMapping):
+class Dict(RedisCollection, collections_abc.MutableMapping):
     """
     Collection based on the built-in Python :class:`dict` type.
     Items are stored in a Redis hash structure.
@@ -117,7 +122,7 @@ class Dict(RedisCollection, collections.MutableMapping):
         return bool(self.redis.hexists(self.key, pickled_key))
 
     def __eq__(self, other):
-        if not isinstance(other, collections.Mapping):
+        if not isinstance(other, collections_abc.Mapping):
             return False
 
         def eq_trans(pipe):
@@ -333,15 +338,16 @@ class Dict(RedisCollection, collections.MutableMapping):
             else:
                 data.update(other)
 
+            if self.writeback:
+                self.cache.update(data)
+
             pickled_data = {}
-            for k, v in six.iteritems(data):
+            while data:
+                k, v = data.popitem()
                 pickled_data[self._pickle_key(k)] = self._pickle_value(v)
 
             if pickled_data:
                 pipe.hmset(self.key, pickled_data)
-
-            if self.writeback:
-                self.cache.update(data)
 
         if use_redis:
             self._transaction(_update_helper_trans, other.key)
@@ -613,7 +619,7 @@ class Counter(Dict):
                 pipe.hmset(self.key, pickled_data)
 
         if other is None:
-            result = self._transaction(op_trans, None)
+            result = self._transaction(op_trans)
         elif self._same_redis(other, RedisCollection):
             result = self._transaction(op_trans, other.key)
         elif isinstance(other, collections.Counter):
