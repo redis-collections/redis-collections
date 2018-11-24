@@ -49,7 +49,7 @@ setup(
     license='ISC',
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
-    install_requires=['redis>=3.0.1,<4.0.0'],
+    install_requires=['redis>=3.0.1,<4.0.0', 'six>=1.0.0,<2.0.0'],
     zip_safe=False,
     keywords=['redis', 'persistence'],
     classifiers=(
