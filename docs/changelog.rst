@@ -26,10 +26,20 @@ Breaking changes
 0.5.x
 ^^^^^
 
-The 3.0.x release of `redis-py` is now required. Since it's not
-backward-compatible with older versions, this library had to change as well.
+- The 3.0.x release of `redis-py` is now required. Since it's not
+  backward-compatible with older versions, this library had to change as well.
 
-In addition, Python 3.3 is no longer supported.
+- Data is now pickled using the highest protocol version supported by Python.
+
+  You can specify the ``pickle_protocol`` with a keyword argument - see
+  :ref:`usage-notes`.
+
+  To connect to a collection created with an older version of this package,
+  set ``pickle_protocol=None``.
+
+  See also `PR #101 <https://github.com/honzajavorek/redis-collections/pull/101>`_.
+
+- Python 3.3 is no longer supported.
 
 0.4.x
 ^^^^^
