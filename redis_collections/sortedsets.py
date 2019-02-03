@@ -3,76 +3,18 @@
 sortedsets
 ~~~~~~~~~~
 
-The `sortedsets` module contains a collection, :class:`SortedSetCounter`,
-which provides an interface to Redis's
-`Sorted Set <http://redis.io/commands#set>`_ type.
+The `sortedsets` module contains collections based on the
+Redis `Sorted Set <https://redis.io/commands#sorted_set>`_ type.
+
+Included collections are :class:`SortedSetCounter` and :class:`GeoDB`.
+
 """
 from __future__ import division, print_function, unicode_literals
 
 from .base import RedisCollection
 
 
-class SortedSetCounter(RedisCollection):
-    """
-    :class:`SortedSetCounter` is a collection based on the Redis
-    `Sorted Set <http://redis.io/topics/data-types#sorted-sets>`_ type.
-    Instances map a unique set of ``member`` objects to floating point
-    ``score`` values.
-
-        >>> ssc = SortedSetCounter([('earth', 300), ('mercury', 100)])
-        >>> ssc.set_score('venus', 200)
-        >>> ssc.get_score('venus')
-        200.0
-
-    When retrieving members they are returned in order by score:
-
-        >>> ssc.items()
-        [('mercury', 100.0), ('venus', 200.0), ('earth', 300.0)]
-
-    Ranges of items by rank can be computed and returned efficiently, as can
-    ranges by score:
-
-        >>> ssc.items(min_rank=1)  # 'mercury' has rank 0
-        [('venus', 200.0), ('earth', 300.0)]
-        >>> ssc.items(min_score=99, max_score=299)
-        [('mercury', 100.0), ('venus', 200.0)]
-
-    .. warning::
-        The API for :class:`SortedSetCounter` does not attempt to match an
-        existing Python collection's.
-
-        - Unlike :class:`Dict` or :class:`Set` objects, equal numeric types are
-          considered distinct when used as members. For example, a collection
-          can contain both ``1`` and ``1.0``.
-
-        - Unlike :class:`Counter` or :class:`collections.Counter` objects, only
-          :class:`float` scores can be stored.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Create a new SortedSetCounter object.
-
-        If the first argument (*data*) is an iterable object, create the new
-        SortedSetCounter with its elements as the initial data.
-
-        :param data: Initial data.
-        :type data: iterable or mapping
-        :param redis: Redis client instance. If not provided, default Redis
-                      connection is used.
-        :type redis: :class:`redis.StrictRedis`
-        :param key: Redis key for the collection. Collections with the same key
-                    point to the same data. If not provided, a random
-                    string is generated.
-        :type key: str
-        """
-        data = args[0] if args else kwargs.pop('data', None)
-
-        super(SortedSetCounter, self).__init__(**kwargs)
-
-        if data:
-            self.update(data)
-
+class SortedSetBase(RedisCollection):
     def _data(self, pipe=None):
         pipe = self.redis if pipe is None else pipe
         items = pipe.zrange(self.key, 0, -1, withscores=True)
@@ -116,6 +58,125 @@ class SortedSetCounter(RedisCollection):
         other.update(self)
 
         return other
+
+    def discard_member(self, member, pipe=None):
+        """
+        Remove *member* from the collection, unconditionally.
+        """
+        pipe = self.redis if pipe is None else pipe
+        pipe.zrem(self.key, self._pickle(member))
+
+    def scan_items(self):
+        """
+        Yield each of the ``(member, score)`` tuples from the collection,
+        without pulling them all into memory.
+
+        .. warning::
+            This method may return the same (member, score) tuple multiple
+            times.
+            See the `Redis SCAN documentation
+            <http://redis.io/commands/scan#scan-guarantees>`_ for details.
+        """
+        for m, s in self.redis.zscan_iter(self.key):
+            yield self._unpickle(m), s
+
+    def update(self, other):
+        """
+        Update the collection with items from *other*. Accepts other
+        :class:`SortedSetBase` instances, dictionaries mapping members to
+        numeric scores, or sequences of ``(member, score)`` tuples.
+        """
+        def update_trans(pipe):
+            other_items = method(pipe=pipe) if use_redis else method()
+
+            pipe.multi()
+            for member, score in other_items:
+                pipe.zadd(self.key, {self._pickle(member): float(score)})
+
+        watches = []
+        if self._same_redis(other, RedisCollection):
+            use_redis = True
+            watches.append(other.key)
+        else:
+            use_redis = False
+
+        if hasattr(other, 'items'):
+            method = other.items
+        elif hasattr(other, '__iter__'):
+            method = other.__iter__
+
+        self._transaction(update_trans, *watches)
+
+
+class SortedSetCounter(SortedSetBase):
+    """
+    :class:`SortedSetCounter` is a collection based on the Redis
+    `Sorted Set <http://redis.io/topics/data-types#sorted-sets>`_ type.
+    Instances map a unique set of ``member`` objects to floating point
+    ``score`` values.
+
+        >>> ssc = SortedSetCounter([('earth', 300), ('mercury', 100)])
+        >>> ssc.set_score('venus', 200)
+        >>> ssc.get_score('venus')
+        200.0
+
+    When retrieving members they are returned in order by score:
+
+        >>> ssc.items()
+        [('mercury', 100.0), ('venus', 200.0), ('earth', 300.0)]
+
+    Ranges of items by rank can be computed and returned efficiently, as can
+    ranges by score:
+
+        >>> ssc.items(min_rank=1)  # 'mercury' has rank 0
+        [('venus', 200.0), ('earth', 300.0)]
+        >>> ssc.items(min_score=99, max_score=299)
+        [('mercury', 100.0), ('venus', 200.0)]
+
+    Collections support the ``in`` operator, and can be iterated over:
+
+        >>> 'mercury' in ssc
+        True
+        >>> list(ssc)
+         [('mercury', 100.0), ('venus', 200.0), ('earth', 300.0)]
+        >>> len(ssc)
+        3
+
+    .. note::
+        The API for :class:`SortedSetCounter` does not attempt to match an
+        existing Python collection's.
+
+        - Unlike :class:`Dict` or :class:`Set` objects, equal numeric types are
+          considered distinct when used as members. For example, a collection
+          can contain both ``1`` and ``1.0``.
+
+        - Unlike :class:`Counter` or :class:`collections.Counter` objects, only
+          :class:`float` scores can be stored.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Create a new SortedSetCounter object.
+
+        If the first argument (*data*) is an iterable object, create the new
+        SortedSetCounter with its elements as the initial data.
+
+        :param data: Initial data.
+        :type data: iterable or mapping
+        :param redis: Redis client instance. If not provided, default Redis
+                      connection is used.
+        :type redis: :class:`redis.StrictRedis`
+        :param key: Redis key for the collection. Collections with the same key
+                    point to the same data. If not provided, a random
+                    string is generated.
+        :type key: str
+        """
+        data = args[0] if args else kwargs.pop('data', None)
+
+        super(SortedSetCounter, self).__init__(**kwargs)
+
+        if data:
+            self.update(data)
 
     def count_between(self, min_score=None, max_score=None):
         """
@@ -175,13 +236,6 @@ class SortedSetCounter(RedisCollection):
             self.discard_by_score(min_score, max_score, pipe)
             self.discard_by_rank(min_rank, max_rank, pipe)
             pipe.execute()
-
-    def discard_member(self, member, pipe=None):
-        """
-        Remove *member* from the collection, unconditionally.
-        """
-        pipe = self.redis if pipe is None else pipe
-        pipe.zrem(self.key, self._pickle(member))
 
     def get_score(self, member, default=None, pipe=None):
         """
@@ -317,20 +371,6 @@ class SortedSetCounter(RedisCollection):
 
         return ret
 
-    def scan_items(self):
-        """
-        Yield each of the ``(member, score)`` tuples from the collection,
-        without pulling them all into memory.
-
-        .. warning::
-            This method may return the same (member, score) tuple multiple
-            times.
-            See the `Redis SCAN documentation
-            <http://redis.io/commands/scan#scan-guarantees>`_ for details.
-        """
-        for m, s in self.redis.zscan_iter(self.key):
-            yield self._unpickle(m), s
-
     def set_score(self, member, score, pipe=None):
         """
         Set the score of *member* to *score*.
@@ -338,18 +378,196 @@ class SortedSetCounter(RedisCollection):
         pipe = self.redis if pipe is None else pipe
         pipe.zadd(self.key, {self._pickle(member): float(score)})
 
+
+class GeoDB(SortedSetBase):
+    """
+    :class:`GeoDB` is a collection based on the Redis
+    `Geo <https://redis.io/commands/#geo>`_ type.
+    Instances map a unique set of ``place`` objects (specified by their
+    latitude and longitude) to a
+    `Geohash <https://en.wikipedia.org/wiki/Geohash>`_.
+
+    This allows for quick approximations of distances between places, and
+    for quick searching within a given radius.
+    """
+
+    def __init__(self, *args, **kwargs):
+        data = args[0] if args else kwargs.pop('data', None)
+
+        super(GeoDB, self).__init__(**kwargs)
+
+        if data:
+            self.update(data)
+
+    def __iter__(self):
+        # Larger than the circumference of the spherical earth, in km
+        everything_radius = 50000
+
+        for item in self.places_within_radius(
+            latitude=0, longitude=0, radius=everything_radius
+        ):
+            yield {
+                'place': item['place'],
+                'latitude': item['latitude'],
+                'longitude': item['longitude'],
+            }
+
+    def __getitem__(self, place):
+        ret = self.get_location(place)
+        if ret is None:
+            raise KeyError(place)
+
+        return ret
+
+    def __setitem__(self, place, location):
+        return self.set_location(
+            place, location['latitude'], location['longitude']
+        )
+
+    def distance_between(self, place_1, place_2, unit='km'):
+        """
+        Return the great-circle distance between *place_1* and *place_2*,
+        in the *unit* specified.
+
+        The default unit is ``'km'``, but ``'m'``, ``'mi'``, and ``'ft'`` can
+        also be specified.
+        """
+        pickled_place_1 = self._pickle(place_1)
+        pickled_place_2 = self._pickle(place_2)
+        try:
+            return self.redis.geodist(
+                self.key, pickled_place_1, pickled_place_2, unit=unit
+            )
+        except TypeError:
+            return None
+
+    def get_hash(self, place):
+        """
+        Return the Geohash of *place*.
+        If it's not present in the collection, ``None`` will be returned
+        instead.
+        """
+        pickled_place = self._pickle(place)
+        try:
+            return self.redis.geohash(self.key, pickled_place)[0]
+        except (AttributeError, TypeError):
+            return None
+
+    def get_location(self, place):
+        """
+        Return a dict with the coordinates *place*. The dict's keys are
+        ``'latitude'`` and ``'longitude'``.
+        If it's not present in the collection, ``None`` will be returned
+        instead.
+        """
+        pickled_place = self._pickle(place)
+        try:
+            longitude, latitude = self.redis.geopos(self.key, pickled_place)[0]
+        except (AttributeError, TypeError):
+            return None
+
+        return {'latitude': latitude, 'longitude': longitude}
+
+    def places_within_radius(
+        self, place=None, latitude=None, longitude=None, radius=0, **kwargs
+    ):
+        """
+        Return descriptions of the places stored in the collection that are
+        within the circle specified by the given location and radius.
+        A list of dicts will be returned.
+
+        The center of the circle can be specified by the identifier of another
+        place in the collection with the *place* keyword argument.
+        Or, it can be specified by using both the *latitude* and *longitude*
+        keyword arguments.
+
+        By default the *radius* is given in kilometers, but you may also set
+        the *unit* keyword argument to ``'m'``, ``'mi'``, or ``'ft'``.
+
+        Limit the number of results returned with the *count* keyword argument.
+
+        Change the sorted order by setting the *sort* keyword argument to
+        ``b'DESC'``.
+        """
+        kwargs['withdist'] = True
+        kwargs['withcoord'] = True
+        kwargs['withhash'] = False
+        kwargs.setdefault('sort', 'ASC')
+        unit = kwargs.setdefault('unit', 'km')
+
+        # Make the query
+        if place is not None:
+            response = self.redis.georadiusbymember(
+                self.key, self._pickle(place), radius, **kwargs
+            )
+        elif (latitude is not None) and (longitude is not None):
+            response = self.redis.georadius(
+                self.key, longitude, latitude, radius, **kwargs
+            )
+        else:
+            raise ValueError(
+                'Must specify place, or both latitude and longitude'
+            )
+
+        # Assemble the result
+        ret = []
+        for item in response:
+            ret.append(
+                {
+                    'place': self._unpickle(item[0]),
+                    'distance': item[1],
+                    'unit': unit,
+                    'latitude': item[2][1],
+                    'longitude': item[2][0],
+                }
+            )
+
+        return ret
+
+    def set_location(self, place, latitude, longitude, pipe=None):
+        """
+        Set the location of *place* to the location specified by
+        *latitude* and *longitude*.
+
+        *place* can be any pickle-able Python object.
+        """
+        pipe = self.redis if pipe is None else pipe
+        pipe.geoadd(self.key, longitude, latitude, self._pickle(place))
+
     def update(self, other):
         """
         Update the collection with items from *other*. Accepts other
-        :class:`SortedSetCounter` instances, dictionaries mapping members to
-        numeric scores, or sequences of ``(member, score)`` tuples.
+        :class:`GeoDB` instances, dictionaries mapping places to
+        ``{'latitude': latitude, 'longitude': longitude}`` dicts,
+        or sequences of ``(place, latitude, longitude)`` tuples.
         """
-        def update_trans(pipe):
-            other_items = method(pipe=pipe) if use_redis else method()
+        # other is another Sorted Set
+        def update_sortedset_trans(pipe):
+            items = other._data(pipe=pipe) if use_redis else other._data()
 
             pipe.multi()
-            for member, score in other_items:
+            for member, score in items:
                 pipe.zadd(self.key, {self._pickle(member): float(score)})
+
+        # other is dict-like
+        def update_mapping_trans(pipe):
+            items = other.items(pipe=pipe) if use_redis else other.items()
+
+            pipe.multi()
+            for place, value in items:
+                self.set_location(
+                    place, value['latitude'], value['longitude'], pipe=pipe
+                )
+
+        # other is a list of tuples
+        def update_tuples_trans(pipe):
+            items = (
+                other.__iter__(pipe=pipe) if use_redis else other.__iter__()
+            )
+
+            pipe.multi()
+            for place, latitude, longitude in items:
+                self.set_location(place, latitude, longitude, pipe=pipe)
 
         watches = []
         if self._same_redis(other, RedisCollection):
@@ -358,9 +576,11 @@ class SortedSetCounter(RedisCollection):
         else:
             use_redis = False
 
-        if hasattr(other, 'items'):
-            method = other.items
+        if isinstance(other, SortedSetBase):
+            func = update_sortedset_trans
+        elif hasattr(other, 'items'):
+            func = update_mapping_trans
         elif hasattr(other, '__iter__'):
-            method = other.__iter__
+            func = update_tuples_trans
 
-        self._transaction(update_trans, *watches)
+        self._transaction(func, *watches)

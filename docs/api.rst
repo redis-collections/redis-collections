@@ -58,7 +58,12 @@ from ``redis_collections`` package.
 
 .. autoclass:: SortedSetCounter
     :members:
-    :special-members:
+    :inherited-members:
+
+.. autoclass:: GeoDB
+    :members:
+    :inherited-members:
+
 
 ----
 

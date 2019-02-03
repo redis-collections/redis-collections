@@ -11,8 +11,8 @@ Versioning
 A 1.0 release is planned. Before that happens:
 
 - Releases with significant new features or breaking changes will be tagged as
-  0.6.x, 0.7.x, etc.
-- Bug fix releases will be tagged as 0.5.x
+  0.7.x, 0.8.x, etc.
+- Bug fix releases will be tagged as 0.6.x
 
 After 1.0 is released:
 
@@ -22,6 +22,12 @@ After 1.0 is released:
 
 Breaking changes
 ----------------
+
+0.6.x
+^^^^^
+
+- The 3.1.x release of `redis-py` is now required. This isn't explicitly
+  backward-incompatible, but be aware.
 
 0.5.x
 ^^^^^
@@ -81,6 +87,13 @@ Nothing should have broken from 0.3.x to 0.4.x.
 
 New features
 ------------
+
+0.6.x
+^^^^^
+
+0.6.0 includes:
+
+- Added the ``GeoDB`` collection, a high-level interface for Redis's GEO commands.
 
 0.4.x
 ^^^^^
