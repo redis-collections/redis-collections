@@ -30,7 +30,7 @@ Releases
     - **Syncable collections**: ``SyncableDict``, ``SyncableList``, ``SyncableSet``, and others are
       collections that hold items locally (which speeds up operations),
       but can sync them with Redis (which provides persistence).
-    - **Offload to Redis**: `LRUDict`` is a dict-like collection that holds a limited number of items
+    - **Offload to Redis**: ``LRUDict`` is a dict-like collection that holds a limited number of items
       locally, pushing least-recently used items to a Redis Hash.
     - **Sorted Set collection**: ``SortedSetCounter`` is a Pythonic interface to the Redis Sorted Set
       structure. It behaves a bit like a Counter, but its values are restricted to
