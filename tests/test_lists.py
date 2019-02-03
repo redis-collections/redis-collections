@@ -527,7 +527,7 @@ class ListTest(RedisTestCase):
         self.assertEqual(redis_cached.index(['tbaker']), 3)
         self.assertEqual(redis_cached.index(['tbaker'], 4), 4)
         with self.assertRaises(ValueError):
-                redis_cached.index(['tbaker'], 0, 2)
+            redis_cached.index(['tbaker'], 0, 2)
 
         # remove (forces sync)
         redis_cached.remove(['tbaker'])

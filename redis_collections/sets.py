@@ -278,7 +278,7 @@ class Set(RedisCollection, collections_abc.MutableSet):
             check_type and
             not all(isinstance(x, collections_abc.Set) for x in others)
         ):
-                raise TypeError
+            raise TypeError
 
         def op_update_trans_pure(pipe):
             method = getattr(pipe, redis_op)
