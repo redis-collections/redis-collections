@@ -7,7 +7,8 @@ Releases
 --------
 
 - 0.6.0:
-    - **Breaking change**: This library now requires `redis-py` 3.1.0+.
+    - **Breaking change**: This library now requires a Redis server at version 2.8.0 or above.
+    - **Breaking change**: This library now depends `redis-py` version 3.1.0 or above.
     - **New collection**: Added the ``GeoDB`` collection, a high-level interface for Redis's GEO commands.
 - 0.5.2:
     - **Documentation updates**: This was a documentation-only release with no code changes from 0.5.0
