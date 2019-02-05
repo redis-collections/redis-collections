@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 sortedsets
 ~~~~~~~~~~
@@ -9,8 +8,6 @@ Redis `Sorted Set <https://redis.io/commands#sorted_set>`_ type.
 Included collections are :class:`SortedSetCounter` and :class:`GeoDB`.
 
 """
-from __future__ import division, print_function, unicode_literals
-
 from .base import RedisCollection
 
 

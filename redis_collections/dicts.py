@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 r"""
 dicts
 ~~~~~
@@ -20,8 +19,6 @@ Each collection stores its items in a Redis
     See :ref:`Hashing` for more information.
 
 """
-from __future__ import division, print_function, unicode_literals
-
 try:
     import collections.abc as collections_abc
 except ImportError:

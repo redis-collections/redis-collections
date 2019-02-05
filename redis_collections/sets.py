@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 sets
 ~~~~~
@@ -9,8 +8,6 @@ Its elements are stored in a Redis `set <http://redis.io/commands#set>`_
 structure.
 
 """
-from __future__ import division, print_function, unicode_literals
-
 try:
     import collections.abc as collections_abc
 except ImportError:

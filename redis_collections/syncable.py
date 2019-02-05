@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 syncable
 ~~~~~~~~
@@ -27,8 +26,6 @@ be loaded.
     >>> E
     {'one': 1, 'two': 2}
 """
-from __future__ import division, print_function, unicode_literals
-
 try:
     import collections.abc as collections_abc
 except ImportError:

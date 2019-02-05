@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 r"""
 lists
 ~~~~~
@@ -13,8 +12,6 @@ Each collection stores its values in a Redis
     in a collection, be sure to enable ``writeback``.
     See :ref:`Synchronization` for more information.
 """
-from __future__ import division, print_function, unicode_literals
-
 try:
     import collections.abc as collections_abc
 except ImportError:
