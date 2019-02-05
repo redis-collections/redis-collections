@@ -34,8 +34,6 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
     <https://docs.python.org/3/library/stdtypes.html#mapping-types-dict>`_ for
     usage notes.
 
-    The :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues` methods
-    from Python 2.7's dictionary type are not implemented.
     """
 
     _pickle_key = RedisCollection._pickle_3
@@ -430,8 +428,6 @@ class Counter(Dict):
     Counter inherits from Dict, so see its API documentation for information
     on other methods.
 
-    The :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues` methods
-    from Python 2.7's Counter type are not implemented.
     """
 
     def __init__(self, *args, **kwargs):
@@ -670,8 +666,6 @@ class DefaultDict(Dict):
     DefaultDict inherits from Dict, so see its API documentation for
     information on other methods.
 
-    The :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues` methods
-    from Python 2.7's Counter type are not implemented.
     """
 
     def __init__(self, *args, **kwargs):

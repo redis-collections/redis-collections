@@ -228,7 +228,6 @@ class ListTest(RedisTestCase):
         redis_list = self.create_list(data)
         redis_cached = self.create_list(data, writeback=True)
 
-        # Python 2.x lists don't have a clear method
         for L in (redis_list, redis_cached):
             L[0] = 'Zero'
             L.clear()
