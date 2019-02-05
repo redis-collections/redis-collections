@@ -389,6 +389,10 @@ class GeoDB(SortedSetBase):
 
     This allows for quick approximations of distances between places, and
     for quick searching within a given radius.
+
+    .. note::
+        This class requires Redis server version 3.2.0 or greater.
+
     """
 
     def __init__(self, *args, **kwargs):
