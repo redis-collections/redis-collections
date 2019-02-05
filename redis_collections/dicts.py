@@ -23,8 +23,6 @@ import collections.abc as collections_abc
 import collections
 import operator
 
-import six
-
 from .base import RedisCollection
 
 
@@ -40,13 +38,8 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
     from Python 2.7's dictionary type are not implemented.
     """
 
-    if six.PY2:
-        _pickle_key = RedisCollection._pickle_2
-        _unpickle_key = RedisCollection._unpickle_2
-    else:
-        _pickle_key = RedisCollection._pickle_3
-        _unpickle_key = RedisCollection._unpickle
-
+    _pickle_key = RedisCollection._pickle_3
+    _unpickle_key = RedisCollection._unpickle
     _pickle_value = RedisCollection._pickle_3
 
     class __missing_value:
@@ -146,7 +139,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
         pickled_values = self.redis.hmget(self.key, *pickled_keys)
 
         ret = []
-        for k, v in six.moves.zip(keys, pickled_values):
+        for k, v in zip(keys, pickled_values):
             value = self.cache.get(k, self._unpickle(v))
             ret.append(value)
 

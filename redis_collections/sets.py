@@ -12,8 +12,6 @@ import collections.abc as collections_abc
 from functools import reduce
 import operator
 
-import six
-
 from .base import RedisCollection
 
 
@@ -25,11 +23,7 @@ class Set(RedisCollection, collections_abc.MutableSet):
     <https://docs.python.org/3/library/stdtypes.html#set>`_ for usage notes.
     """
 
-    if six.PY2:
-        _pickle = RedisCollection._pickle_2
-        _unpickle = RedisCollection._unpickle_2
-    else:
-        _pickle = RedisCollection._pickle_3
+    _pickle = RedisCollection._pickle_3
 
     def __init__(self, *args, **kwargs):
         """

@@ -17,7 +17,6 @@ import collections
 import itertools
 import uuid
 
-import six
 from redis import ResponseError
 
 from .base import RedisCollection
@@ -147,7 +146,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
             # Steps must be done index by index
             if index.step is not None:
                 pipe.multi()
-                for i in list(six.moves.xrange(len_self))[index]:
+                for i in list(range(len_self))[index]:
                     pipe.lset(self.key, i, self.__marker)
                 pipe.lrem(self.key, 0, self.__marker)
             # Slice covers entire range: delete the whole list
@@ -284,10 +283,10 @@ class List(RedisCollection, collections_abc.MutableSequence):
             # Loop through each index for slices with steps
             if index.step is not None:
                 new_values = list(value)
-                change_indexes = six.moves.xrange(start, stop, step)
+                change_indexes = range(start, stop, step)
                 if len(new_values) != len(change_indexes):
                     raise ValueError
-                for i, v in six.moves.zip(change_indexes, new_values):
+                for i, v in zip(change_indexes, new_values):
                     pipe.lset(self.key, i, self._pickle(v))
             # For slices without steps retrieve the items to the left and right
             # of the slice, clear the collection, then re-insert the items
@@ -490,7 +489,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
                 self._sync_helper(pipe)
 
             n = self.__len__(pipe)
-            for i in six.moves.xrange(n // 2):
+            for i in range(n // 2):
                 left = pipe.lindex(self.key, i)
                 right = pipe.lindex(self.key, n - i - 1)
                 pipe.lset(self.key, i, right)
@@ -569,7 +568,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
             if self_len != other_len:
                 return False
 
-            for v_self, v_other in six.moves.zip(self_values, other_values):
+            for v_self, v_other in zip(self_values, other_values):
                 if v_self != v_other:
                     return False
 
@@ -613,7 +612,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
             pipe.multi()
 
             # Write the values repeatedly
-            for __ in six.moves.xrange(times - 1):
+            for __ in range(times - 1):
                 pipe.rpush(self.key, *pickled_values)
 
         self._transaction(imul_trans)
@@ -871,11 +870,11 @@ class Deque(List):
             # When n is positive we can use the built-in Redis command
             if forward:
                 pipe.multi()
-                for __ in six.moves.xrange(steps):
+                for __ in range(steps):
                     pipe.rpoplpush(self.key, self.key)
             # When n is negative we must use Python
             else:
-                for __ in six.moves.xrange(steps):
+                for __ in range(steps):
                     pickled_value = pipe.lpop(self.key)
                     pipe.rpush(self.key, pickled_value)
 

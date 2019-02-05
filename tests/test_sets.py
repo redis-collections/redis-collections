@@ -3,8 +3,6 @@ from fractions import Fraction
 import unittest
 import sys
 
-import six
-
 from redis_collections import List, Set
 
 from .base import RedisTestCase
@@ -456,7 +454,7 @@ class SetTest(RedisTestCase):
         redis_set = self.create_set()
 
         expected_elements = set()
-        for i in six.moves.range(1000):
+        for i in range(1000):
             elem = str(i)
             expected_elements.add(elem)
             redis_set.add(elem)
