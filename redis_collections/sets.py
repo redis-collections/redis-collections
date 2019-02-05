@@ -18,7 +18,6 @@ except ImportError:
 
 from functools import reduce
 import operator
-import random
 
 import six
 
@@ -162,10 +161,6 @@ class Set(RedisCollection, collections_abc.MutableSet):
         :param k: Size of the sample, defaults to 1.
         :rtype: :class:`list`
 
-        .. note::
-            This method is not available on the Python :class:`set`.
-            When Redis version < 2.6 is being used the whole set is stored
-            in memory and the sample is computed in Python.
         """
         # k == 0: no work to do
         if k == 0:
@@ -174,16 +169,8 @@ class Set(RedisCollection, collections_abc.MutableSet):
         elif k == 1:
             results = [self.redis.srandmember(self.key)]
         # k != 1, Redis version >= 2.6: compute in Redis
-        elif self.redis_version >= (2, 6, 0):
-            results = self.redis.srandmember(self.key, k)
-        # positive k, Redis version < 2.6: sample without replacement
-        elif k > 1:
-            seq = list(self.__iter__())
-            return random.sample(seq, min(k, len(seq)))
-        # negative k, Redis version < 2.6: sample with replacement
         else:
-            seq = list(self.__iter__())
-            return [random.choice(seq) for __ in six.moves.xrange(abs(k))]
+            results = self.redis.srandmember(self.key, k)
 
         return [self._unpickle(x) for x in results]
 

@@ -8,12 +8,12 @@ __license__ = 'ISC'
 __copyright__ = 'Copyright 2013-? Honza Javorek'
 
 
-from .base import RedisCollection  # NOQA
-from .dicts import DefaultDict, Dict, Counter  # NOQA
-from .lists import Deque, List  # NOQA
-from .sets import Set  # NOQA
-from .sortedsets import GeoDB, SortedSetCounter  # NOQA
-from .syncable import (  # NOQA
+from .base import RedisCollection
+from .dicts import DefaultDict, Dict, Counter
+from .lists import Deque, List
+from .sets import Set
+from .sortedsets import GeoDB, SortedSetCounter
+from .syncable import (
     LRUDict,
     SyncableDict,
     SyncableCounter,

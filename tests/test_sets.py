@@ -383,21 +383,16 @@ class SetTest(RedisTestCase):
         self.assertEqual(s.random_sample(), ['a'])
 
         s = self.create_set('ab')
-        for redis_version in [(2, 6, 0), (2, 4, 0)]:
-            # Test both the Redis implementation and Python implementation
-            if s.redis_version >= (2, 6, 0):
-                s._redis_version = redis_version
+        self.assertEqual(sorted(s.random_sample(2)), ['a', 'b'])
+        self.assertEqual(sorted(s.random_sample(3)), ['a', 'b'])
 
-            self.assertEqual(sorted(s.random_sample(2)), ['a', 'b'])
-            self.assertEqual(sorted(s.random_sample(3)), ['a', 'b'])
-
-            # Negative k samples with replacement. With two items this should
-            # eventually break.
-            while True:
-                actual = sorted(s.random_sample(-2))
-                expected = ['a', 'b']
-                if actual == expected:
-                    break
+        # Negative k samples with replacement. With two items this should
+        # eventually break.
+        while True:
+            actual = sorted(s.random_sample(-2))
+            expected = ['a', 'b']
+            if actual == expected:
+                break
 
     def test_add_unicode(self):
         for init in (self.create_set, set):
