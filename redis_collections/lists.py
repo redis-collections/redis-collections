@@ -12,11 +12,7 @@ Each collection stores its values in a Redis
     in a collection, be sure to enable ``writeback``.
     See :ref:`Synchronization` for more information.
 """
-try:
-    import collections.abc as collections_abc
-except ImportError:
-    import collections as collections_abc
-
+import collections.abc as collections_abc
 import collections
 import itertools
 import uuid

@@ -26,11 +26,7 @@ be loaded.
     >>> E
     {'one': 1, 'two': 2}
 """
-try:
-    import collections.abc as collections_abc
-except ImportError:
-    import collections as collections_abc
-
+import collections.abc as collections_abc
 import collections
 
 from .dicts import Counter, DefaultDict, Dict
