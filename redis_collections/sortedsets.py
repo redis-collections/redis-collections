@@ -170,7 +170,7 @@ class SortedSetCounter(SortedSetBase):
         """
         data = args[0] if args else kwargs.pop('data', None)
 
-        super(SortedSetCounter, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if data:
             self.update(data)
@@ -395,7 +395,7 @@ class GeoDB(SortedSetBase):
     def __init__(self, *args, **kwargs):
         data = args[0] if args else kwargs.pop('data', None)
 
-        super(GeoDB, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if data:
             self.update(data)

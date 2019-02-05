@@ -49,7 +49,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
 
     _pickle_value = RedisCollection._pickle_3
 
-    class __missing_value(object):
+    class __missing_value:
         def __repr__(self):
             # Specified here so that the documentation shows a useful string
             # for methods that take __marker as a keyword argument
@@ -90,7 +90,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
         """
         data = args[0] if args else kwargs.pop('data', None)
         writeback = kwargs.pop('writeback', False)
-        super(Dict, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.writeback = writeback
         self.cache = {}
@@ -106,7 +106,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
     def __iter__(self, pipe=None):
         """Return an iterator over the keys of the dictionary."""
         pipe = self.redis if pipe is None else pipe
-        for k, v in six.iteritems(self._data(pipe)):
+        for k, v in self._data(pipe).items():
             yield k
 
     def __contains__(self, key):
@@ -204,7 +204,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
         (without checking the local cache).
         """
         pipe = self.redis if pipe is None else pipe
-        items = six.iteritems(pipe.hgetall(self.key))
+        items = pipe.hgetall(self.key).items()
 
         return {self._unpickle_key(k): self._unpickle(v) for k, v in items}
 
@@ -215,7 +215,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
     def iteritems(self, pipe=None):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
         pipe = self.redis if pipe is None else pipe
-        for k, v in six.iteritems(self._data(pipe)):
+        for k, v in self._data(pipe).items():
             yield k, self.cache.get(k, v)
 
     def keys(self):
@@ -473,7 +473,7 @@ class Counter(Dict):
                           method.
         :type writeback: bool
         """
-        super(Counter, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def __missing__(self, key):
         return 0
@@ -511,7 +511,7 @@ class Counter(Dict):
                 data.update(other)
 
             pickled_data = {}
-            for k, v in six.iteritems(data):
+            for k, v in data.items():
                 pickled_key = self._pickle_key(k)
                 pickled_value = self._pickle_value(op(self.get(k, 0), v))
                 pickled_data[pickled_key] = pickled_value
@@ -565,7 +565,7 @@ class Counter(Dict):
         missing values.
         """
         try:
-            super(Counter, self).__delitem__(key)
+            super().__delitem__(key)
         except KeyError:
             pass
 
@@ -601,7 +601,7 @@ class Counter(Dict):
 
             # Otherwise we need to update `self` in this transaction
             pickled_data = {}
-            for key, value in six.iteritems(result):
+            for key, value in result.items():
                 pickled_key = self._pickle_key(key)
                 pickled_value = self._pickle_value(value)
                 pickled_data[pickled_key] = pickled_value
@@ -714,7 +714,7 @@ class DefaultDict(Dict):
         else:
             default_factory = None
 
-        super(DefaultDict, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         if default_factory is None:
             pass

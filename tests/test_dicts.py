@@ -22,7 +22,7 @@ class DictTest(RedisTestCase):
         for k, v in [
             ('a', 1),
             (b'a', 2),
-            (u'a', 3),
+            ('a', 3),
             (1, 'one'),
             (1.0, 'one point zero'),
         ]:
@@ -45,26 +45,26 @@ class DictTest(RedisTestCase):
         init_seq = [
             ('a', 1),
             (b'a', 2),
-            (u'a', 3),
+            ('a', 3),
             (1, 'one'),
             (1.0, 'one point zero'),
         ]
         redis_dict = self.create_dict(init_seq)
         python_dict = dict(init_seq)
-        six.assertCountEqual(self, redis_dict.items(), python_dict.items())
+        self.assertCountEqual(redis_dict.items(), python_dict.items())
 
         init_dict = dict(
             [
                 ('a', 1),
                 (b'a', 2),
-                (u'a', 3),
+                ('a', 3),
                 (1, 'one'),
                 (1.0, 'one point zero'),
             ]
         )
         redis_dict = self.create_dict(init_dict)
         python_dict = dict(init_dict)
-        six.assertCountEqual(self, redis_dict.items(), python_dict.items())
+        self.assertCountEqual(redis_dict.items(), python_dict.items())
 
     def test_key(self):
         d1 = self.create_dict()
@@ -80,7 +80,7 @@ class DictTest(RedisTestCase):
         for k, v in [
             ('a', 1),
             (b'a', 2),
-            (u'a', 3),
+            ('a', 3),
             (1, 'one'),
             (1.0, 'one point zero'),
         ]:

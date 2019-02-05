@@ -14,11 +14,11 @@ import pickle
 import redis
 import six
 
-NUMERIC_TYPES = six.integer_types + (float, Decimal, Fraction, complex)
+NUMERIC_TYPES = (int,) + (float, Decimal, Fraction, complex)
 
 
 @six.add_metaclass(abc.ABCMeta)
-class RedisCollection(object):
+class RedisCollection:
     """Abstract class providing backend functionality for all the other
     Redis collections.
     """
@@ -99,7 +99,7 @@ class RedisCollection(object):
         # byte strings. This method encodes unicode types to str to help match
         # Python's behavior.
         # The length of {b'a', u'a'} is 1 on Python 2.x and 2 on Python 3.x
-        if isinstance(data, six.text_type):
+        if isinstance(data, str):
             data = data.encode('utf-8')
 
         return self._pickle_3(data)
@@ -133,7 +133,7 @@ class RedisCollection(object):
         # Because we encoded text data in the pickle method, we should decode
         # it on the way back out
         data = pickle.loads(string) if string else None
-        if isinstance(data, six.binary_type):
+        if isinstance(data, bytes):
             try:
                 data = data.decode('utf-8')
             except UnicodeDecodeError:
@@ -262,4 +262,4 @@ class RedisCollection(object):
     def __repr__(self):
         cls_name = self.__class__.__name__
         data = self._repr_data()
-        return '<redis_collections.%s at %s %s>' % (cls_name, self.key, data)
+        return '<redis_collections.{} at {} {}>'.format(cls_name, self.key, data)

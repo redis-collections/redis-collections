@@ -49,7 +49,7 @@ class Set(RedisCollection, collections_abc.MutableSet):
         :type key: str
         """
         data = args[0] if args else kwargs.pop('data', None)
-        super(Set, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if data:
             self.update(data)

@@ -411,7 +411,7 @@ class SetTest(RedisTestCase):
             complex(1.0, 0.0),
             Decimal(1.0),
             Fraction(2, 2),
-            u'a',
+            'a',
             b'a',
             'a',
         ]:
