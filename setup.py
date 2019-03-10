@@ -1,24 +1,10 @@
-# -*- coding: utf-8 -*-
-from __future__ import division, print_function, unicode_literals
-
 import io
 import os
 import re
 import subprocess
 import sys
 
-try:
-    from setuptools import setup, find_packages
-except ImportError:
-    from distutils.core import setup, find_packages  # NOQA
-
-# Hack to prevent stupid "TypeError: 'NoneType' object is not callable"
-# error in multiprocessing/util.py _exit_function when running `python
-# setup.py test`
-try:
-    import multiprocessing  # NOQA
-except ImportError:
-    pass
+from setuptools import setup, find_packages
 
 
 base_path = os.path.dirname(__file__)
@@ -49,7 +35,8 @@ setup(
     license='ISC',
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
-    install_requires=['redis>=3.1.0,<4.0.0', 'six>=1.0.0,<2.0.0'],
+    python_requires='>=3.4',
+    install_requires=['redis>=3.1.0,<4.0.0'],
     zip_safe=False,
     keywords=['redis', 'persistence'],
     classifiers=(
@@ -57,7 +44,6 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: ISC License (ISCL)',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Topic :: Database',
     )

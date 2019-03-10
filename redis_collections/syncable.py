@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 syncable
 ~~~~~~~~
@@ -27,13 +26,7 @@ be loaded.
     >>> E
     {'one': 1, 'two': 2}
 """
-from __future__ import division, print_function, unicode_literals
-
-try:
-    import collections.abc as collections_abc
-except ImportError:
-    import collections as collections_abc
-
+import collections.abc as collections_abc
 import collections
 
 from .dicts import Counter, DefaultDict, Dict
@@ -41,7 +34,7 @@ from .lists import Deque, List
 from .sets import Set
 
 
-class _SyncableBase(object):
+class _SyncableBase:
     @property
     def redis(self):
         return self.persistence.redis
@@ -69,7 +62,7 @@ class SyncableDict(_SyncableBase, dict):
     def __init__(self, **kwargs):
         self.persistence = Dict(**kwargs)
 
-        super(SyncableDict, self).__init__()
+        super().__init__()
         self.update(self.persistence)
 
     def sync(self):
@@ -90,7 +83,7 @@ class SyncableCounter(_SyncableBase, collections.Counter):
     def __init__(self, **kwargs):
         self.persistence = Counter(**kwargs)
 
-        super(SyncableCounter, self).__init__()
+        super().__init__()
         self.update(self.persistence)
 
     def sync(self):
@@ -111,7 +104,7 @@ class SyncableDefaultDict(_SyncableBase, collections.defaultdict):
     def __init__(self, *args, **kwargs):
         self.persistence = DefaultDict(*args, **kwargs)
 
-        super(SyncableDefaultDict, self).__init__(args[0] if args else None)
+        super().__init__(args[0] if args else None)
         self.update(self.persistence)
 
     def sync(self):
@@ -131,7 +124,7 @@ class SyncableList(_SyncableBase, list):
     def __init__(self, **kwargs):
         self.persistence = List(**kwargs)
 
-        super(SyncableList, self).__init__()
+        super().__init__()
         self.extend(self.persistence)
 
     def sync(self):
@@ -151,7 +144,7 @@ class SyncableDeque(_SyncableBase, collections.deque):
     def __init__(self, iterable=None, maxlen=None, **kwargs):
         self.persistence = Deque(iterable=iterable, maxlen=maxlen, **kwargs)
 
-        super(SyncableDeque, self).__init__(maxlen=self.persistence.maxlen)
+        super().__init__(maxlen=self.persistence.maxlen)
         self.extend(self.persistence)
 
     def sync(self):
@@ -171,7 +164,7 @@ class SyncableSet(_SyncableBase, set):
     def __init__(self, **kwargs):
         self.persistence = Set(**kwargs)
 
-        super(SyncableSet, self).__init__()
+        super().__init__()
         self.update(self.persistence)
 
     def sync(self):
@@ -212,7 +205,7 @@ class LRUDict(_SyncableBase, collections_abc.MutableMapping):
         self.cache = collections.OrderedDict()
         self.persistence = Dict(**kwargs)
 
-        super(LRUDict, self).__init__()
+        super().__init__()
         self.update(self.persistence)
 
     def __contains__(self, key):

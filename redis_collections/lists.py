@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 r"""
 lists
 ~~~~~
@@ -13,18 +12,11 @@ Each collection stores its values in a Redis
     in a collection, be sure to enable ``writeback``.
     See :ref:`Synchronization` for more information.
 """
-from __future__ import division, print_function, unicode_literals
-
-try:
-    import collections.abc as collections_abc
-except ImportError:
-    import collections as collections_abc
-
+import collections.abc as collections_abc
 import collections
 import itertools
 import uuid
 
-import six
 from redis import ResponseError
 
 from .base import RedisCollection
@@ -62,7 +54,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         """
         data = args[0] if args else kwargs.pop('data', None)
         writeback = kwargs.pop('writeback', False)
-        super(List, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.__marker = uuid.uuid4().hex
         self.writeback = writeback
@@ -80,7 +72,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
 
         if self.writeback:
             value = self.cache.get(0, value)
-            items = six.iteritems(self.cache)
+            items = self.cache.items()
             self.cache = {i - 1: v for i, v in items if i != 0}
 
         return value
@@ -101,7 +93,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
                 raise IndexError
             pickled_value = pipe.rpop(self.key)
             value = self.cache.get(cache_index, self._unpickle(pickled_value))
-            items = six.iteritems(self.cache)
+            items = self.cache.items()
             self.cache = {i: v for i, v in items if i != cache_index}
 
             return value
@@ -125,7 +117,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
             if self.writeback:
                 value = self.cache.get(cache_index, value)
                 new_cache = {}
-                for i, v in six.iteritems(self.cache):
+                for i, v in self.cache.items():
                     if i < cache_index:
                         new_cache[i] = v
                     elif i > cache_index:
@@ -154,7 +146,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
             # Steps must be done index by index
             if index.step is not None:
                 pipe.multi()
-                for i in list(six.moves.xrange(len_self))[index]:
+                for i in list(range(len_self))[index]:
                     pipe.lset(self.key, i, self.__marker)
                 pipe.lrem(self.key, 0, self.__marker)
             # Slice covers entire range: delete the whole list
@@ -291,10 +283,10 @@ class List(RedisCollection, collections_abc.MutableSequence):
             # Loop through each index for slices with steps
             if index.step is not None:
                 new_values = list(value)
-                change_indexes = six.moves.xrange(start, stop, step)
+                change_indexes = range(start, stop, step)
                 if len(new_values) != len(change_indexes):
                     raise ValueError
-                for i, v in six.moves.zip(change_indexes, new_values):
+                for i, v in zip(change_indexes, new_values):
                     pipe.lset(self.key, i, self._pickle(v))
             # For slices without steps retrieve the items to the left and right
             # of the slice, clear the collection, then re-insert the items
@@ -423,7 +415,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         pipe = self.redis if pipe is None else pipe
         pipe.lpush(self.key, self._pickle(value))
         if self.writeback:
-            self.cache = {k + 1: v for k, v in six.iteritems(self.cache)}
+            self.cache = {k + 1: v for k, v in self.cache.items()}
             self.cache[0] = value
 
     def _insert_middle(self, index, value, pipe=None):
@@ -442,7 +434,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
 
         if self.writeback:
             new_cache = {}
-            for i, v in six.iteritems(self.cache):
+            for i, v in self.cache.items():
                 if i < cache_index:
                     new_cache[i] = v
                 elif i >= cache_index:
@@ -497,7 +489,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
                 self._sync_helper(pipe)
 
             n = self.__len__(pipe)
-            for i in six.moves.xrange(n // 2):
+            for i in range(n // 2):
                 left = pipe.lindex(self.key, i)
                 right = pipe.lindex(self.key, n - i - 1)
                 pipe.lset(self.key, i, right)
@@ -576,7 +568,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
             if self_len != other_len:
                 return False
 
-            for v_self, v_other in six.moves.zip(self_values, other_values):
+            for v_self, v_other in zip(self_values, other_values):
                 if v_self != v_other:
                     return False
 
@@ -590,7 +582,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
             return self._transaction(eq_trans)
 
     def __mul__(self, times):
-        if not isinstance(times, six.integer_types):
+        if not isinstance(times, int):
             raise TypeError
 
         return self._python_cls(self.__iter__()) * times
@@ -599,7 +591,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         return self.__mul__(times)
 
     def __imul__(self, times):
-        if not isinstance(times, six.integer_types):
+        if not isinstance(times, int):
             raise TypeError
 
         # If multiplying by 1 there's no work to do
@@ -620,7 +612,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
             pipe.multi()
 
             # Write the values repeatedly
-            for __ in six.moves.xrange(times - 1):
+            for __ in range(times - 1):
                 pipe.rpush(self.key, *pickled_values)
 
         self._transaction(imul_trans)
@@ -631,7 +623,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         return '[{}]'.format(', '.join(items))
 
     def _sync_helper(self, pipe):
-        for i, v in six.iteritems(self.cache):
+        for i, v in self.cache.items():
             pipe.lset(self.key, i, self._pickle(v))
 
         self.cache = {}
@@ -697,14 +689,14 @@ class Deque(List):
         if iterable is not None:
             kwargs['data'] = iterable
 
-        if (maxlen is not None) and not isinstance(maxlen, six.integer_types):
+        if (maxlen is not None) and not isinstance(maxlen, int):
             raise TypeError('an integer is required')
 
         if (maxlen is not None) and maxlen < 0:
             raise ValueError('maxlen must be non-negative')
 
         self.maxlen = maxlen
-        super(Deque, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     # Magic methods
 
@@ -712,19 +704,19 @@ class Deque(List):
         if isinstance(index, slice):
             raise TypeError
 
-        return super(Deque, self).__delitem__(index)
+        return super().__delitem__(index)
 
     def __getitem__(self, index):
         if isinstance(index, slice):
             raise TypeError
 
-        return super(Deque, self).__getitem__(index)
+        return super().__getitem__(index)
 
     def __setitem__(self, index, value):
         if isinstance(index, slice):
             raise TypeError
 
-        return super(Deque, self).__setitem__(index, value)
+        return super().__setitem__(index, value)
 
     # Named methods
 
@@ -741,7 +733,7 @@ class Deque(List):
         # Pop from the left
         pipe.lpop(self.key)
         if self.writeback:
-            items = six.iteritems(self.cache)
+            items = self.cache.items()
             self.cache = {i - 1: v for i, v in items if i != 0}
 
     def append(self, value):
@@ -755,7 +747,7 @@ class Deque(List):
         # Append on the left
         len_self = pipe.lpush(self.key, self._pickle(value))
         if self.writeback:
-            self.cache = {k + 1: v for k, v in six.iteritems(self.cache)}
+            self.cache = {k + 1: v for k, v in self.cache.items()}
             self.cache[0] = value
 
         # Check the length restriction
@@ -766,7 +758,7 @@ class Deque(List):
         pipe.rpop(self.key)
         if self.writeback:
             cache_index = len_self - 1
-            items = six.iteritems(self.cache)
+            items = self.cache.items()
             self.cache = {i: v for i, v in items if i != cache_index}
 
     def appendleft(self, value):
@@ -878,11 +870,11 @@ class Deque(List):
             # When n is positive we can use the built-in Redis command
             if forward:
                 pipe.multi()
-                for __ in six.moves.xrange(steps):
+                for __ in range(steps):
                     pipe.rpoplpush(self.key, self.key)
             # When n is negative we must use Python
             else:
-                for __ in six.moves.xrange(steps):
+                for __ in range(steps):
                     pickled_value = pipe.lpop(self.key)
                     pipe.rpush(self.key, pickled_value)
 
@@ -919,7 +911,7 @@ class Deque(List):
         return self
 
     def __mul__(self, times):
-        if not isinstance(times, six.integer_types):
+        if not isinstance(times, int):
             raise TypeError
 
         return self._python_cls(self.__iter__(), self.maxlen) * times

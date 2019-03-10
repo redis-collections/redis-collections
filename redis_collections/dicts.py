@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 r"""
 dicts
 ~~~~~
@@ -20,17 +19,9 @@ Each collection stores its items in a Redis
     See :ref:`Hashing` for more information.
 
 """
-from __future__ import division, print_function, unicode_literals
-
-try:
-    import collections.abc as collections_abc
-except ImportError:
-    import collections as collections_abc
-
+import collections.abc as collections_abc
 import collections
 import operator
-
-import six
 
 from .base import RedisCollection
 
@@ -43,20 +34,13 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
     <https://docs.python.org/3/library/stdtypes.html#mapping-types-dict>`_ for
     usage notes.
 
-    The :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues` methods
-    from Python 2.7's dictionary type are not implemented.
     """
 
-    if six.PY2:
-        _pickle_key = RedisCollection._pickle_2
-        _unpickle_key = RedisCollection._unpickle_2
-    else:
-        _pickle_key = RedisCollection._pickle_3
-        _unpickle_key = RedisCollection._unpickle
-
+    _pickle_key = RedisCollection._pickle_3
+    _unpickle_key = RedisCollection._unpickle
     _pickle_value = RedisCollection._pickle_3
 
-    class __missing_value(object):
+    class __missing_value:
         def __repr__(self):
             # Specified here so that the documentation shows a useful string
             # for methods that take __marker as a keyword argument
@@ -97,7 +81,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
         """
         data = args[0] if args else kwargs.pop('data', None)
         writeback = kwargs.pop('writeback', False)
-        super(Dict, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.writeback = writeback
         self.cache = {}
@@ -113,7 +97,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
     def __iter__(self, pipe=None):
         """Return an iterator over the keys of the dictionary."""
         pipe = self.redis if pipe is None else pipe
-        for k, v in six.iteritems(self._data(pipe)):
+        for k, v in self._data(pipe).items():
             yield k
 
     def __contains__(self, key):
@@ -153,7 +137,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
         pickled_values = self.redis.hmget(self.key, *pickled_keys)
 
         ret = []
-        for k, v in six.moves.zip(keys, pickled_values):
+        for k, v in zip(keys, pickled_values):
             value = self.cache.get(k, self._unpickle(v))
             ret.append(value)
 
@@ -211,7 +195,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
         (without checking the local cache).
         """
         pipe = self.redis if pipe is None else pipe
-        items = six.iteritems(pipe.hgetall(self.key))
+        items = pipe.hgetall(self.key).items()
 
         return {self._unpickle_key(k): self._unpickle(v) for k, v in items}
 
@@ -222,7 +206,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
     def iteritems(self, pipe=None):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
         pipe = self.redis if pipe is None else pipe
-        for k, v in six.iteritems(self._data(pipe)):
+        for k, v in self._data(pipe).items():
             yield k, self.cache.get(k, v)
 
     def keys(self):
@@ -444,8 +428,6 @@ class Counter(Dict):
     Counter inherits from Dict, so see its API documentation for information
     on other methods.
 
-    The :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues` methods
-    from Python 2.7's Counter type are not implemented.
     """
 
     def __init__(self, *args, **kwargs):
@@ -480,7 +462,7 @@ class Counter(Dict):
                           method.
         :type writeback: bool
         """
-        super(Counter, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def __missing__(self, key):
         return 0
@@ -518,7 +500,7 @@ class Counter(Dict):
                 data.update(other)
 
             pickled_data = {}
-            for k, v in six.iteritems(data):
+            for k, v in data.items():
                 pickled_key = self._pickle_key(k)
                 pickled_value = self._pickle_value(op(self.get(k, 0), v))
                 pickled_data[pickled_key] = pickled_value
@@ -572,7 +554,7 @@ class Counter(Dict):
         missing values.
         """
         try:
-            super(Counter, self).__delitem__(key)
+            super().__delitem__(key)
         except KeyError:
             pass
 
@@ -608,7 +590,7 @@ class Counter(Dict):
 
             # Otherwise we need to update `self` in this transaction
             pickled_data = {}
-            for key, value in six.iteritems(result):
+            for key, value in result.items():
                 pickled_key = self._pickle_key(key)
                 pickled_value = self._pickle_value(value)
                 pickled_data[pickled_key] = pickled_value
@@ -684,8 +666,6 @@ class DefaultDict(Dict):
     DefaultDict inherits from Dict, so see its API documentation for
     information on other methods.
 
-    The :func:`viewitems`, :func:`viewkeys`, and :func:`viewvalues` methods
-    from Python 2.7's Counter type are not implemented.
     """
 
     def __init__(self, *args, **kwargs):
@@ -721,7 +701,7 @@ class DefaultDict(Dict):
         else:
             default_factory = None
 
-        super(DefaultDict, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         if default_factory is None:
             pass

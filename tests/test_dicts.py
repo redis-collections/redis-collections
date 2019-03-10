@@ -1,12 +1,6 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-from __future__ import division, print_function, unicode_literals
-
 import collections
 import operator
 import unittest
-
-import six
 
 from redis_collections import Counter, DefaultDict, Dict, List
 
@@ -26,7 +20,7 @@ class DictTest(RedisTestCase):
         for k, v in [
             ('a', 1),
             (b'a', 2),
-            (u'a', 3),
+            ('a', 3),
             (1, 'one'),
             (1.0, 'one point zero'),
         ]:
@@ -41,34 +35,32 @@ class DictTest(RedisTestCase):
         d['e'] = 'f'
         d[1] = 'g'
         self.assertEqual(d.getmany('a', 'e', 1.0, 'x'), ['b', 'f', 'g', None])
-
-        if not six.PY2:
-            self.assertEqual(d.getmany(b'a', b'c'), [None, None])
+        self.assertEqual(d.getmany(b'a', b'c'), [None, None])
 
     def test_init(self):
         init_seq = [
             ('a', 1),
             (b'a', 2),
-            (u'a', 3),
+            ('a', 3),
             (1, 'one'),
             (1.0, 'one point zero'),
         ]
         redis_dict = self.create_dict(init_seq)
         python_dict = dict(init_seq)
-        six.assertCountEqual(self, redis_dict.items(), python_dict.items())
+        self.assertCountEqual(redis_dict.items(), python_dict.items())
 
         init_dict = dict(
             [
                 ('a', 1),
                 (b'a', 2),
-                (u'a', 3),
+                ('a', 3),
                 (1, 'one'),
                 (1.0, 'one point zero'),
             ]
         )
         redis_dict = self.create_dict(init_dict)
         python_dict = dict(init_dict)
-        six.assertCountEqual(self, redis_dict.items(), python_dict.items())
+        self.assertCountEqual(redis_dict.items(), python_dict.items())
 
     def test_key(self):
         d1 = self.create_dict()
@@ -84,7 +76,7 @@ class DictTest(RedisTestCase):
         for k, v in [
             ('a', 1),
             (b'a', 2),
-            (u'a', 3),
+            ('a', 3),
             (1, 'one'),
             (1.0, 'one point zero'),
         ]:
@@ -105,12 +97,10 @@ class DictTest(RedisTestCase):
             with self.assertRaises(KeyError):
                 del D[2]
 
-        # b'a' and 'a' hash to the same thing and are equal in Python 2
         # b'a' and 'a' hash to the same thing but aren't equal in Python 3
-        if not six.PY2:
-            del redis_dict[b'a']
-            del python_dict[b'a']
-            self.assertEqual(redis_dict, python_dict)
+        del redis_dict[b'a']
+        del python_dict[b'a']
+        self.assertEqual(redis_dict, python_dict)
 
     def test_in(self):
         redis_dict = self.create_dict()
@@ -123,11 +113,7 @@ class DictTest(RedisTestCase):
             self.assertIn(1.0, D)
             self.assertIn(1, D)
             self.assertNotIn('b', D)
-
-            if six.PY2:
-                self.assertIn(b'a', D)
-            else:
-                self.assertNotIn(b'a', D)
+            self.assertNotIn(b'a', D)
 
     def test_items(self):
         d = self.create_dict()
@@ -207,12 +193,11 @@ class DictTest(RedisTestCase):
             self.assertEqual(D.pop('a', b'default'), b'default')
             self.assertRaises(KeyError, D.pop, 'a')
 
-            if not six.PY2:
-                D['a'] = 1
-                D[b'a'] = 2
-                self.assertEqual(D.pop('a'), 1)
-                self.assertNotIn('a', D)
-                self.assertIn(b'a', D)
+            D['a'] = 1
+            D[b'a'] = 2
+            self.assertEqual(D.pop('a'), 1)
+            self.assertNotIn('a', D)
+            self.assertIn(b'a', D)
 
     def test_popitem(self):
         redis_dict = self.create_dict()
@@ -224,12 +209,11 @@ class DictTest(RedisTestCase):
             self.assertNotIn('a', D)
             self.assertRaises(KeyError, D.popitem)
 
-            if not six.PY2:
-                D['a'] = 1
-                D[b'a'] = 2
-                self.assertEqual(D.popitem(), ('a', 1))
-                self.assertNotIn('a', D)
-                self.assertIn(b'a', D)
+            D['a'] = 1
+            D[b'a'] = 2
+            self.assertEqual(D.popitem(), ('a', 1))
+            self.assertNotIn('a', D)
+            self.assertIn(b'a', D)
 
     def test_setdefault(self):
         d = self.create_dict()
@@ -411,7 +395,7 @@ class DictTest(RedisTestCase):
         redis_dict = self.create_dict()
 
         expected_dict = {}
-        for i in six.moves.range(1000):
+        for i in range(1000):
             expected_dict[i] = i * 100.0
             redis_dict[i] = i * 100.0
 
@@ -663,14 +647,12 @@ class CounterTest(RedisTestCase):
         python_counter &= collections.Counter('cdddd')
         self.assertEqual(redis_counter, python_counter)
 
-    @unittest.skipIf(six.PY2, 'Test applies to Python 3+ only')
     def test_pos(self):
         redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
         python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})
 
         self.assertEqual(+redis_counter, +python_counter)
 
-    @unittest.skipIf(six.PY2, 'Test applies to Python 3+ only')
     def test_neg(self):
         redis_counter = self.create_counter({'a': 1, 'b': -2, 'c': 3})
         python_counter = collections.Counter({'a': 1, 'b': -2, 'c': 3})

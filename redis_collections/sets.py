@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 sets
 ~~~~~
@@ -9,17 +8,9 @@ Its elements are stored in a Redis `set <http://redis.io/commands#set>`_
 structure.
 
 """
-from __future__ import division, print_function, unicode_literals
-
-try:
-    import collections.abc as collections_abc
-except ImportError:
-    import collections as collections_abc
-
+import collections.abc as collections_abc
 from functools import reduce
 import operator
-
-import six
 
 from .base import RedisCollection
 
@@ -32,11 +23,7 @@ class Set(RedisCollection, collections_abc.MutableSet):
     <https://docs.python.org/3/library/stdtypes.html#set>`_ for usage notes.
     """
 
-    if six.PY2:
-        _pickle = RedisCollection._pickle_2
-        _unpickle = RedisCollection._unpickle_2
-    else:
-        _pickle = RedisCollection._pickle_3
+    _pickle = RedisCollection._pickle_3
 
     def __init__(self, *args, **kwargs):
         """
@@ -56,7 +43,7 @@ class Set(RedisCollection, collections_abc.MutableSet):
         :type key: str
         """
         data = args[0] if args else kwargs.pop('data', None)
-        super(Set, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if data:
             self.update(data)

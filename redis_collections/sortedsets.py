@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 sortedsets
 ~~~~~~~~~~
@@ -9,8 +8,6 @@ Redis `Sorted Set <https://redis.io/commands#sorted_set>`_ type.
 Included collections are :class:`SortedSetCounter` and :class:`GeoDB`.
 
 """
-from __future__ import division, print_function, unicode_literals
-
 from .base import RedisCollection
 
 
@@ -173,7 +170,7 @@ class SortedSetCounter(SortedSetBase):
         """
         data = args[0] if args else kwargs.pop('data', None)
 
-        super(SortedSetCounter, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if data:
             self.update(data)
@@ -398,7 +395,7 @@ class GeoDB(SortedSetBase):
     def __init__(self, *args, **kwargs):
         data = args[0] if args else kwargs.pop('data', None)
 
-        super(GeoDB, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if data:
             self.update(data)
