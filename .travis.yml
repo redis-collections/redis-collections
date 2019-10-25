@@ -1,11 +1,11 @@
 language: "python"
-dist: xenial
 
 python:
-    - "3.4"
     - "3.5"
     - "3.6"
     - "3.7"
+    - "3.8"
+    - "pypy3"
 
 script:
     - "pip install --upgrade coveralls flake8"
