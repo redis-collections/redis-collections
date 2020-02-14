@@ -331,6 +331,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
                 pickled_data[self._pickle_key(k)] = self._pickle_value(v)
 
             if pickled_data:
+                pipe.multi()
                 pipe.hmset(self.key, pickled_data)
 
         if use_redis:
@@ -506,6 +507,7 @@ class Counter(Dict):
                 pickled_data[pickled_key] = pickled_value
 
             if pickled_data:
+                pipe.multi()
                 pipe.hmset(self.key, pickled_data)
 
             if self.writeback:

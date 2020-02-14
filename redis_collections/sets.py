@@ -310,6 +310,8 @@ class Set(RedisCollection, collections_abc.MutableSet):
             raise TypeError
 
         def xor_trans_pure(pipe):
+            pipe.multi()
+
             diff_1_key = self._create_key()
             pipe.sdiffstore(diff_1_key, self.key, other.key)
 
@@ -320,7 +322,8 @@ class Set(RedisCollection, collections_abc.MutableSet):
                 pipe.sunionstore(self.key, diff_1_key, diff_2_key)
                 ret = None
             else:
-                ret = pipe.sunion(diff_1_key, diff_2_key)
+                pipe.sunion(diff_1_key, diff_2_key)
+                ret = pipe.execute()[-1]
                 ret = {self._unpickle(x) for x in ret}
 
             pipe.delete(diff_1_key, diff_2_key)
@@ -337,6 +340,7 @@ class Set(RedisCollection, collections_abc.MutableSet):
             result = self_values ^ other_values
 
             if update:
+                pipe.multi()
                 pipe.delete(self.key)
                 pipe.sadd(self.key, *(self._pickle(x) for x in result))
                 return None
