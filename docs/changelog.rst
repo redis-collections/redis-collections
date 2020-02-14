@@ -6,6 +6,8 @@ Changelog
 Releases
 --------
 
+- 0.7.1:
+    - This is a bugfix release to pin the `redis-py` dependency to below 3.4.0. A future version will add support for `redis-py` 3.4.0 and above.
 - 0.7.0:
     - **Breaking change**: This library now supports Python versions 3.4 and later. The last version with Python 2.7 support is 0.6.0.
 - 0.6.0:
