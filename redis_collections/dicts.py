@@ -276,13 +276,14 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
         a :exc:`KeyError`.
         """
         def popitem_trans(pipe):
+            pipe.multi()
             try:
-                pickled_key = pipe.hkeys(self.key)[0]
+                pipe.hkeys(self.key)
+                pickled_key = pipe.execute()[-1][0]
             except IndexError:
                 raise KeyError
 
             # pop its value
-            pipe.multi()
             pipe.hget(self.key, pickled_key)
             pipe.hdel(self.key, pickled_key)
             pickled_value, __ = pipe.execute()

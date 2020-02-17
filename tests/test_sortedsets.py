@@ -249,6 +249,21 @@ class GeoDBTestCase(RedisTestCase):
         kwargs['redis'] = self.redis
         return GeoDB(*args, **kwargs)
 
+    def test_init(self):
+        data = {
+            'St. Louis': {'latitude': 38.6270, 'longitude': -90.1994},
+            'Sydney': {'latitude': -33.8562, 'longitude': 151.2153},
+        }
+        geodb = self.create_geodb(data)
+
+        response = geodb.get_location('Sydney')
+        self.assertAlmostEqual(response['latitude'], -33.8562, places=4)
+        self.assertAlmostEqual(response['longitude'], 151.2153, places=4)
+
+        response = geodb.get_location('St. Louis')
+        self.assertAlmostEqual(response['latitude'], 38.6270, places=4)
+        self.assertAlmostEqual(response['longitude'], -90.1994, places=4)
+
     def test_getitem(self):
         geodb = self.create_geodb()
         geodb.set_location('St. Louis', 38.6270, -90.1994)
@@ -308,6 +323,7 @@ class GeoDBTestCase(RedisTestCase):
         geodb = self.create_geodb()
         geodb.set_location('St. Louis', 38.6270, -90.1994)
         self.assertEqual(geodb.get_hash('St. Louis'), '9yzgeryf9d0')
+        self.assertIsNone(geodb.get_hash('Unknown'))
 
     def test_get_set_location(self):
         geodb = self.create_geodb()
@@ -345,6 +361,9 @@ class GeoDBTestCase(RedisTestCase):
             place='St. Louis', radius=7530, sort='DESC'
         )
         self.assertEqual(response[0]['place'], 'Bahia')
+
+        with self.assertRaises(ValueError):
+            geodb.places_within_radius()
 
     def test_update(self):
         geodb_1 = self.create_geodb()

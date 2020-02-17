@@ -459,9 +459,8 @@ class SetTest(RedisTestCase):
             expected_elements.add(elem)
             redis_set.add(elem)
 
-        actual_elements = list(redis_set)
+        actual_elements = list(redis_set.scan_elements())
         self.assertTrue(len(actual_elements) >= len(expected_elements))
-
         self.assertEqual(set(actual_elements), expected_elements)
 
 

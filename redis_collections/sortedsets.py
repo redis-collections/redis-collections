@@ -30,15 +30,9 @@ class SortedSetBase(RedisCollection):
 
     # Magic methods
 
-    def __contains__(self, member, pipe=None):
+    def __contains__(self, member):
         """Return ``True`` if *member* is present, else ``False``."""
-        pipe = self.redis if pipe is None else pipe
-        if isinstance(pipe, Pipeline):
-            pipe.zscore(self.key, self._pickle(member))
-            score = pipe.execute()[-1]
-        else:
-            score = pipe.zscore(self.key, self._pickle(member))
-
+        score = self.redis.zscore(self.key, self._pickle(member))
         return score is not None
 
     def __iter__(self, pipe=None):

@@ -449,18 +449,11 @@ class List(RedisCollection, collections_abc.MutableSequence):
             self.cache = {k + 1: v for k, v in self.cache.items()}
             self.cache[0] = value
 
-    def _insert_middle(self, index, value, pipe=None):
-        # Insert *value* at *index*.
-        pipe = self.redis if pipe is None else pipe
-
+    def _insert_middle(self, index, value, pipe):
         # First, retrieve everything from the index to the end.
         __, cache_index = self._normalize_index(index, pipe)
-
-        if isinstance(pipe, Pipeline):
-            pipe.lrange(self.key, cache_index, -1)
-            right_values = pipe.execute()[-1]
-        else:
-            right_values = pipe.lrange(self.key, cache_index, -1)
+        pipe.lrange(self.key, cache_index, -1)
+        right_values = pipe.execute()[-1]
 
         # Next, zap everything after the index. Finally, insert the new value
         # and then re-insert the items from before.
