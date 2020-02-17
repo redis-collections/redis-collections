@@ -12,6 +12,8 @@ import collections.abc as collections_abc
 from functools import reduce
 import operator
 
+from redis.client import Pipeline
+
 from .base import RedisCollection
 
 
@@ -50,7 +52,12 @@ class Set(RedisCollection, collections_abc.MutableSet):
 
     def _data(self, pipe=None):
         pipe = self.redis if pipe is None else pipe
-        return (self._unpickle(x) for x in pipe.smembers(self.key))
+        if isinstance(pipe, Pipeline):
+            pipe.smembers(self.key)
+            members = pipe.execute()[-1]
+        else:
+            members = pipe.smembers(self.key)
+        return (self._unpickle(x) for x in members)
 
     def _repr_data(self):
         items = (repr(v) for v in self.__iter__())
@@ -61,7 +68,12 @@ class Set(RedisCollection, collections_abc.MutableSet):
     def __contains__(self, value, pipe=None):
         """Test for membership of *value* in the set."""
         pipe = self.redis if pipe is None else pipe
-        return bool(pipe.sismember(self.key, self._pickle(value)))
+        if isinstance(pipe, Pipeline):
+            pipe.sismember(self.key, self._pickle(value))
+            is_member = pipe.execute()[-1]
+        else:
+            is_member = pipe.sismember(self.key, self._pickle(value))
+        return bool(is_member)
 
     def __iter__(self, pipe=None):
         """Return an iterator over elements of the set."""
@@ -71,7 +83,12 @@ class Set(RedisCollection, collections_abc.MutableSet):
     def __len__(self, pipe=None):
         """Return cardinality of the set."""
         pipe = self.redis if pipe is None else pipe
-        return pipe.scard(self.key)
+        if isinstance(pipe, Pipeline):
+            pipe.scard(self.key)
+            ret = pipe.execute()[-1]
+        else:
+            ret = pipe.scard(self.key)
+        return ret
 
     # Named methods
 
@@ -108,9 +125,13 @@ class Set(RedisCollection, collections_abc.MutableSet):
         :rtype: boolean
         """
         def isdisjoint_trans_pure(pipe):
-            return not pipe.sinter(self.key, other.key)
+            pipe.multi()
+            pipe.sinter(self.key, other.key)
+            result = pipe.execute()[-1]
+            return not result
 
         def isdisjoint_trans_mixed(pipe):
+            pipe = pipe.multi()
             self_values = set(self.__iter__(pipe))
             if use_redis:
                 other_values = set(other.__iter__(pipe))
@@ -196,12 +217,16 @@ class Set(RedisCollection, collections_abc.MutableSet):
             raise TypeError
 
         def ge_trans_pure(pipe):
+            pipe.multi()
             if not op(self.__len__(pipe), other.__len__(pipe)):
                 return False
 
-            return not pipe.sdiff(other.key, self.key)
+            pipe.sdiff(other.key, self.key)
+            sdiff = pipe.execute()[-1]
+            return not sdiff
 
         def ge_trans_mixed(pipe):
+            pipe.multi()
             len_other = other.__len__(pipe) if use_redis else len(other)
             if not op(self.__len__(pipe), len_other):
                 return False
@@ -223,12 +248,16 @@ class Set(RedisCollection, collections_abc.MutableSet):
             raise TypeError
 
         def le_trans_pure(pipe):
+            pipe.multi()
             if not op(self.__len__(pipe), other.__len__(pipe)):
                 return False
 
-            return not pipe.sdiff(self.key, other.key)
+            pipe.sdiff(self.key, other.key)
+            sdiff = pipe.execute()[-1]
+            return not sdiff
 
         def le_trans_mixed(pipe):
+            pipe.multi()
             len_other = other.__len__(pipe) if use_redis else len(other)
             if not op(self.__len__(pipe), len_other):
                 return False
@@ -255,17 +284,19 @@ class Set(RedisCollection, collections_abc.MutableSet):
             raise TypeError
 
         def op_update_trans_pure(pipe):
+            pipe.multi()
             method = getattr(pipe, redis_op)
             if not update:
-                result = method(self.key, *other_keys)
+                method(self.key, *other_keys)
+                result = pipe.execute()[-1]
                 return {self._unpickle(x) for x in result}
 
             temp_key = self._create_key()
-            pipe.multi()
             method(temp_key, self.key, *other_keys)
             pipe.rename(temp_key, self.key)
 
         def op_update_trans_mixed(pipe):
+            pipe.multi()
             self_values = set(self.__iter__(pipe))
             other_values = []
             for other in others:
@@ -278,7 +309,6 @@ class Set(RedisCollection, collections_abc.MutableSet):
                 return reduce(op, other_values, self_values)
 
             new_values = reduce(op, other_values, self_values)
-            pipe.multi()
             pipe.delete(self.key)
             for v in new_values:
                 pipe.sadd(self.key, self._pickle(v))
@@ -310,6 +340,7 @@ class Set(RedisCollection, collections_abc.MutableSet):
             raise TypeError
 
         def xor_trans_pure(pipe):
+            pipe.multi()
             diff_1_key = self._create_key()
             pipe.sdiffstore(diff_1_key, self.key, other.key)
 
@@ -320,7 +351,8 @@ class Set(RedisCollection, collections_abc.MutableSet):
                 pipe.sunionstore(self.key, diff_1_key, diff_2_key)
                 ret = None
             else:
-                ret = pipe.sunion(diff_1_key, diff_2_key)
+                pipe.sunion(diff_1_key, diff_2_key)
+                ret = pipe.execute()[-1]
                 ret = {self._unpickle(x) for x in ret}
 
             pipe.delete(diff_1_key, diff_2_key)
@@ -328,6 +360,7 @@ class Set(RedisCollection, collections_abc.MutableSet):
             return ret
 
         def xor_trans_mixed(pipe):
+            pipe.multi()
             self_values = set(self.__iter__(pipe))
             if use_redis:
                 other_values = set(other.__iter__(pipe))

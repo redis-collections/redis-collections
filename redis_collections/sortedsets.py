@@ -8,13 +8,19 @@ Redis `Sorted Set <https://redis.io/commands#sorted_set>`_ type.
 Included collections are :class:`SortedSetCounter` and :class:`GeoDB`.
 
 """
+from redis.client import Pipeline
+
 from .base import RedisCollection
 
 
 class SortedSetBase(RedisCollection):
     def _data(self, pipe=None):
         pipe = self.redis if pipe is None else pipe
-        items = pipe.zrange(self.key, 0, -1, withscores=True)
+        if isinstance(pipe, Pipeline):
+            pipe.zrange(self.key, 0, -1, withscores=True)
+            items = pipe.execute()[-1]
+        else:
+            items = pipe.zrange(self.key, 0, -1, withscores=True)
 
         return [(self._unpickle(member), score) for member, score in items]
 
@@ -27,7 +33,11 @@ class SortedSetBase(RedisCollection):
     def __contains__(self, member, pipe=None):
         """Return ``True`` if *member* is present, else ``False``."""
         pipe = self.redis if pipe is None else pipe
-        score = pipe.zscore(self.key, self._pickle(member))
+        if isinstance(pipe, Pipeline):
+            pipe.zscore(self.key, self._pickle(member))
+            score = pipe.execute()[-1]
+        else:
+            score = pipe.zscore(self.key, self._pickle(member))
 
         return score is not None
 
@@ -84,9 +94,9 @@ class SortedSetBase(RedisCollection):
         numeric scores, or sequences of ``(member, score)`` tuples.
         """
         def update_trans(pipe):
+            pipe.multi()
             other_items = method(pipe=pipe) if use_redis else method()
 
-            pipe.multi()
             for member, score in other_items:
                 pipe.zadd(self.key, {self._pickle(member): float(score)})
 
@@ -256,8 +266,10 @@ class SortedSetCounter(SortedSetBase):
         default = float(default)
 
         def get_or_set_score_trans(pipe):
+            pipe.multi()
             pickled_member = self._pickle(member)
-            score = pipe.zscore(self.key, pickled_member)
+            pipe.zscore(self.key, pickled_member)
+            score = pipe.execute()[-1]
 
             if score is None:
                 pipe.zadd(self.key, {self._pickle(member): default})
@@ -310,19 +322,22 @@ class SortedSetCounter(SortedSetBase):
     def items_by_score(
         self, min_score=None, max_score=None, reverse=False, pipe=None
     ):
-        pipe = self.redis if pipe is None else pipe
-
         min_score = float('-inf') if min_score is None else float(min_score)
         max_score = float('inf') if max_score is None else float(max_score)
 
         if reverse:
-            results = pipe.zrevrangebyscore(
-                self.key, max_score, min_score, withscores=True
-            )
+            method = pipe.zrevrangebyscore
+            args = self.key, max_score, min_score
         else:
-            results = pipe.zrangebyscore(
-                self.key, min_score, max_score, withscores=True
-            )
+            method = pipe.zrangebyscore
+            args = self.key, min_score, max_score
+
+        pipe = self.redis if pipe is None else pipe
+        if isinstance(pipe, Pipeline):
+            method(*args, withscores=True)
+            results = pipe.execute()[-1]
+        else:
+            results = method(*args, withscores=True)
 
         return [(self._unpickle(member), score) for member, score in results]
 
@@ -544,17 +559,15 @@ class GeoDB(SortedSetBase):
         """
         # other is another Sorted Set
         def update_sortedset_trans(pipe):
-            items = other._data(pipe=pipe) if use_redis else other._data()
-
             pipe.multi()
+            items = other._data(pipe=pipe) if use_redis else other._data()
             for member, score in items:
                 pipe.zadd(self.key, {self._pickle(member): float(score)})
 
         # other is dict-like
         def update_mapping_trans(pipe):
-            items = other.items(pipe=pipe) if use_redis else other.items()
-
             pipe.multi()
+            items = other.items(pipe=pipe) if use_redis else other.items()
             for place, value in items:
                 self.set_location(
                     place, value['latitude'], value['longitude'], pipe=pipe
@@ -562,11 +575,10 @@ class GeoDB(SortedSetBase):
 
         # other is a list of tuples
         def update_tuples_trans(pipe):
+            pipe.multi()
             items = (
                 other.__iter__(pipe=pipe) if use_redis else other.__iter__()
             )
-
-            pipe.multi()
             for place, latitude, longitude in items:
                 self.set_location(place, latitude, longitude, pipe=pipe)
 
