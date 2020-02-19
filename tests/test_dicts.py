@@ -404,6 +404,12 @@ class DictTest(RedisTestCase):
 
         self.assertTrue(dict(items), expected_dict)
 
+    def test_redis_version(self):
+        redis_dict = self.create_dict()
+        actual = '.'.join(str(c) for c in redis_dict.redis_version)
+        expected = self.redis.info()['redis_version']
+        self.assertEqual(actual, expected)
+
 
 class CounterTest(RedisTestCase):
 

@@ -18,6 +18,7 @@ import itertools
 import uuid
 
 from redis import ResponseError
+from redis.client import Pipeline
 
 from .base import RedisCollection
 
@@ -88,10 +89,12 @@ class List(RedisCollection, collections_abc.MutableSequence):
         # If writeback is enabled we'll need the size of the list; compute that
         # in a transaction
         def pop_right_trans(pipe):
+            pipe.multi()
             len_self, cache_index = self._normalize_index(-1, pipe=pipe)
             if len_self == 0:
                 raise IndexError
-            pickled_value = pipe.rpop(self.key)
+            pipe.rpop(self.key)
+            pickled_value = pipe.execute()[-1]
             value = self.cache.get(cache_index, self._unpickle(pickled_value))
             items = self.cache.items()
             self.cache = {i: v for i, v in items if i != cache_index}
@@ -103,14 +106,17 @@ class List(RedisCollection, collections_abc.MutableSequence):
     def _pop_middle(self, index):
         # Retrieve the value at *index*, remove it, and return it.
         def pop_middle_trans(pipe):
+            pipe.multi()
             len_self, cache_index = self._normalize_index(index, pipe)
             if (cache_index < 0) or (cache_index >= len_self):
                 raise IndexError
 
             # Retrieve the value at index, then overwrite it with a special
             # marker, and then remove the marker.
-            value = self._unpickle(pipe.lindex(self.key, index))
-            pipe.multi()
+            pipe.lindex(self.key, index)
+            pickled_value = pipe.execute()[-1]
+            value = self._unpickle(pickled_value)
+
             pipe.lset(self.key, index, self.__marker)
             pipe.lrem(self.key, 1, self.__marker)
 
@@ -131,6 +137,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
     def _del_slice(self, index):
         # Delete the values associated with the slice object *index*
         def del_slice_trans(pipe):
+            pipe.multi()
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
             )
@@ -145,7 +152,6 @@ class List(RedisCollection, collections_abc.MutableSequence):
 
             # Steps must be done index by index
             if index.step is not None:
-                pipe.multi()
                 for i in list(range(len_self))[index]:
                     pipe.lset(self.key, i, self.__marker)
                 pipe.lrem(self.key, 0, self.__marker)
@@ -160,8 +166,9 @@ class List(RedisCollection, collections_abc.MutableSequence):
                 pipe.ltrim(self.key, 0, start - 1)
             # Slice starts and ends in the middle
             else:
-                left_values = pipe.lrange(self.key, 0, start - 1)
-                right_values = pipe.lrange(self.key, stop, -1)
+                pipe.lrange(self.key, 0, start - 1)
+                pipe.lrange(self.key, stop, -1)
+                left_values, right_values = pipe.execute()[-2:]
                 pipe.delete(self.key)
                 all_values = itertools.chain(left_values, right_values)
                 pipe.rpush(self.key, *all_values)
@@ -185,6 +192,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         # list
 
         def get_slice_trans(pipe):
+            pipe.multi()
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
             )
@@ -193,7 +201,8 @@ class List(RedisCollection, collections_abc.MutableSequence):
                 return []
 
             ret = []
-            redis_values = pipe.lrange(self.key, start, max(stop - 1, 0))
+            pipe.lrange(self.key, start, max(stop - 1, 0))
+            redis_values = pipe.execute()[-1]
             for i, v in enumerate(redis_values, start):
                 ret.append(self.cache.get(i, self._unpickle(v)))
 
@@ -228,6 +237,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         # If writeback is on we'll need to know the size of the list,
         # so we'll need to use a transaction
         def getitem_trans(pipe):
+            pipe.multi()
             len_self, cache_index = self._normalize_index(index, pipe)
 
             if (cache_index < 0) or (cache_index >= len_self):
@@ -236,7 +246,9 @@ class List(RedisCollection, collections_abc.MutableSequence):
             if cache_index in self.cache:
                 return self.cache[cache_index]
 
-            value = self._unpickle(pipe.lindex(self.key, index))
+            pipe.lindex(self.key, index)
+            pickled_value = pipe.execute()[-1]
+            value = self._unpickle(pickled_value)
             self.cache[cache_index] = value
             return value
 
@@ -248,7 +260,12 @@ class List(RedisCollection, collections_abc.MutableSequence):
         (without checking the local cache).
         """
         pipe = self.redis if pipe is None else pipe
-        return [self._unpickle(v) for v in pipe.lrange(self.key, 0, -1)]
+        if isinstance(pipe, Pipeline):
+            pipe.lrange(self.key, 0, -1)
+            values = pipe.execute()[-1]
+        else:
+            values = pipe.lrange(self.key, 0, -1)
+        return [self._unpickle(v) for v in values]
 
     def __iter__(self, pipe=None):
         """
@@ -260,7 +277,13 @@ class List(RedisCollection, collections_abc.MutableSequence):
     def __len__(self, pipe=None):
         """Return the length of this collection."""
         pipe = self.redis if pipe is None else pipe
-        return pipe.llen(self.key)
+        if isinstance(pipe, Pipeline):
+            pipe.llen(self.key)
+            ret = pipe.execute()[-1]
+        else:
+            ret = pipe.llen(self.key)
+
+        return ret
 
     def __reversed__(self):
         """
@@ -272,6 +295,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         # Set the values for the indexes associated with the slice object
         # *index* to the contents of the iterable *value*
         def set_slice_trans(pipe):
+            pipe.multi()
             start, stop, step, forward, len_self = self._normalize_slice(
                 index, pipe
             )
@@ -295,14 +319,16 @@ class List(RedisCollection, collections_abc.MutableSequence):
                 if start == 0:
                     left_values = []
                 else:
-                    left_values = pipe.lrange(self.key, 0, start - 1)
+                    pipe.lrange(self.key, 0, start - 1)
+                    left_values = pipe.execute()[-1]
 
                 middle_values = (self._pickle(v) for v in value)
 
                 if stop == len_self:
                     right_values = []
                 else:
-                    right_values = pipe.lrange(self.key, stop, -1)
+                    pipe.lrange(self.key, stop, -1)
+                    right_values = pipe.execute()[-1]
 
                 pipe.delete(self.key)
                 all_values = itertools.chain(
@@ -322,11 +348,13 @@ class List(RedisCollection, collections_abc.MutableSequence):
             return self._set_slice(index, value)
 
         def setitem_trans(pipe):
+            pipe.multi()
             if self.writeback:
                 __, cache_index = self._normalize_index(index, pipe=pipe)
 
             try:
                 pipe.lset(self.key, index, self._pickle(value))
+                pipe.execute()
             except ResponseError:
                 raise IndexError
 
@@ -377,8 +405,10 @@ class List(RedisCollection, collections_abc.MutableSequence):
         collection.
         """
         def extend_trans(pipe):
+            pipe.multi()
             values = list(other.__iter__(pipe)) if use_redis else other
-            len_self = pipe.rpush(self.key, *(self._pickle(v) for v in values))
+            pipe.rpush(self.key, *(self._pickle(v) for v in values))
+            len_self = pipe.execute()[-1]
             if self.writeback:
                 for i, v in enumerate(values, len_self - len(values)):
                     self.cache[i] = v
@@ -397,6 +427,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         index such that ``s[index] == value`` and ``start <= index < stop``.
         """
         def index_trans(pipe):
+            pipe.multi()
             len_self, normal_start = self._normalize_index(start or 0, pipe)
             __, normal_stop = self._normalize_index(stop or len_self, pipe)
             for i, v in enumerate(self.__iter__(pipe=pipe)):
@@ -418,17 +449,14 @@ class List(RedisCollection, collections_abc.MutableSequence):
             self.cache = {k + 1: v for k, v in self.cache.items()}
             self.cache[0] = value
 
-    def _insert_middle(self, index, value, pipe=None):
-        # Insert *value* at *index*.
-        pipe = self.redis if pipe is None else pipe
-
+    def _insert_middle(self, index, value, pipe):
         # First, retrieve everything from the index to the end.
         __, cache_index = self._normalize_index(index, pipe)
-        right_values = pipe.lrange(self.key, cache_index, -1)
+        pipe.lrange(self.key, cache_index, -1)
+        right_values = pipe.execute()[-1]
 
         # Next, zap everything after the index. Finally, insert the new value
         # and then re-insert the items from before.
-        pipe.multi()
         pipe.ltrim(self.key, 0, cache_index - 1)
         pipe.rpush(self.key, self._pickle(value), *right_values)
 
@@ -450,6 +478,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
             return self._insert_left(value)
 
         def insert_middle_trans(pipe):
+            pipe.multi()
             self._insert_middle(index, value, pipe=pipe)
 
         return self._transaction(insert_middle_trans)
@@ -469,11 +498,14 @@ class List(RedisCollection, collections_abc.MutableSequence):
     def remove(self, value):
         """Remove the first occurence of *value*."""
         def remove_trans(pipe):
+            pipe.multi()
+
             # If we're caching, we'll need to synchronize before removing.
             if self.writeback:
                 self._sync_helper(pipe)
 
-            delete_count = pipe.lrem(self.key, 1, self._pickle(value))
+            pipe.lrem(self.key, 1, self._pickle(value))
+            delete_count = pipe.execute()[-1]
             if delete_count == 0:
                 raise ValueError
 
@@ -485,13 +517,15 @@ class List(RedisCollection, collections_abc.MutableSequence):
         retrieved from Redis at a time).
         """
         def reverse_trans(pipe):
+            pipe.multi()
             if self.writeback:
                 self._sync_helper(pipe)
 
             n = self.__len__(pipe)
             for i in range(n // 2):
-                left = pipe.lindex(self.key, i)
-                right = pipe.lindex(self.key, n - i - 1)
+                pipe.lindex(self.key, i)
+                pipe.lindex(self.key, n - i - 1)
+                left, right = pipe.execute()[-2:]
                 pipe.lset(self.key, i, right)
                 pipe.lset(self.key, n - i - 1, left)
 
@@ -507,6 +541,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
             in memory.
          """
         def sort_trans(pipe):
+            pipe.multi()
             values = list(self.__iter__(pipe))
             values.sort(key=key, reverse=reverse)
 
@@ -523,6 +558,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         self, other, use_redis=False, swap_args=False, **kwargs
     ):
         def add_helper_trans(pipe):
+            pipe.multi()
             self_values = self._python_cls(self.__iter__(pipe), **kwargs)
             if use_redis:
                 other_values = self._python_cls(other.__iter__(pipe), **kwargs)
@@ -555,6 +591,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
             return False
 
         def eq_trans(pipe):
+            pipe.multi()
             self_values = self.__iter__(pipe)
             self_len = self.__len__(pipe)
 
@@ -599,6 +636,8 @@ class List(RedisCollection, collections_abc.MutableSequence):
             return self
 
         def imul_trans(pipe):
+            pipe.multi()
+
             # If multiplying by 0 or a negative number all values are deleted
             if times <= 0:
                 self.clear(pipe)
@@ -608,8 +647,8 @@ class List(RedisCollection, collections_abc.MutableSequence):
                 self._sync_helper(pipe)
 
             # Pull in pickled values
-            pickled_values = pipe.lrange(self.key, 0, -1)
-            pipe.multi()
+            pipe.lrange(self.key, 0, -1)
+            pickled_values = pipe.execute()[-1]
 
             # Write the values repeatedly
             for __ in range(times - 1):
@@ -722,7 +761,8 @@ class Deque(List):
 
     def _append_helper(self, value, pipe):
         # Append on the right
-        len_self = pipe.rpush(self.key, self._pickle(value))
+        pipe.rpush(self.key, self._pickle(value))
+        len_self = pipe.execute()[-1]
         if self.writeback:
             self.cache[len_self - 1] = value
 
@@ -739,13 +779,15 @@ class Deque(List):
     def append(self, value):
         """Add *value* to the right side of the collection."""
         def append_trans(pipe):
+            pipe.multi()
             self._append_helper(value, pipe)
 
         self._transaction(append_trans)
 
     def _appendleft_helper(self, value, pipe):
         # Append on the left
-        len_self = pipe.lpush(self.key, self._pickle(value))
+        pipe.lpush(self.key, self._pickle(value))
+        len_self = pipe.execute()[-1]
         if self.writeback:
             self.cache = {k + 1: v for k, v in self.cache.items()}
             self.cache[0] = value
@@ -764,6 +806,7 @@ class Deque(List):
     def appendleft(self, value):
         """Add *value* to the left side of the collection."""
         def appendleft_trans(pipe):
+            pipe.multi()
             self._appendleft_helper(value, pipe)
 
         self._transaction(appendleft_trans)
@@ -790,6 +833,7 @@ class Deque(List):
         the iterable *other*.
         """
         def extend_trans(pipe):
+            pipe.multi()
             values = list(other.__iter__(pipe)) if use_redis else other
             for v in values:
                 self._append_helper(v, pipe)
@@ -808,6 +852,7 @@ class Deque(List):
         of the given values.
         """
         def extendleft_trans(pipe):
+            pipe.multi()
             values = list(other.__iter__(pipe)) if use_redis else other
             for v in values:
                 self._appendleft_helper(v, pipe)
@@ -826,6 +871,7 @@ class Deque(List):
         raise ``IndexError``.
         """
         def insert_trans(pipe):
+            pipe.multi()
             len_self = self.__len__(pipe)
             if (self.maxlen is not None) and (len_self >= self.maxlen):
                 raise IndexError
@@ -859,6 +905,8 @@ class Deque(List):
             return
 
         def rotate_trans(pipe):
+            pipe.multi()
+
             # Synchronize the cache before rotating
             if self.writeback:
                 self._sync_helper(pipe)
@@ -869,13 +917,13 @@ class Deque(List):
 
             # When n is positive we can use the built-in Redis command
             if forward:
-                pipe.multi()
                 for __ in range(steps):
                     pipe.rpoplpush(self.key, self.key)
             # When n is negative we must use Python
             else:
                 for __ in range(steps):
-                    pickled_value = pipe.lpop(self.key)
+                    pipe.lpop(self.key)
+                    pickled_value = pipe.execute()[-1]
                     pipe.rpush(self.key, pickled_value)
 
         forward = n >= 0
