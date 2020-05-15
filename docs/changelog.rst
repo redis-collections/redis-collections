@@ -6,8 +6,10 @@ Changelog
 Releases
 --------
 
+- 0.8.1:
+    - **Version compatibility**: This library now supports `redis-py` version 3.5.x. The minimum support version remains 3.0.0.
 - 0.8.0:
-    - **Version compatibility**: This library now supports `redis-py` versions 3.4.0 and above.
+    - **Version compatibility**: This library now supports `redis-py` version 3.4.x. The minimum support version remains 3.0.0.
 - 0.7.1:
     - **Version compatibility**: This is a bugfix release to pin the `redis-py` dependency to below 3.4.0. A future version will add support for `redis-py` 3.4.0 and above.
 - 0.7.0:
