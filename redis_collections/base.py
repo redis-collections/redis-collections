@@ -149,6 +149,13 @@ class RedisCollection(metaclass=abc.ABCMeta):
             self_kwargs.get('db', 0) == other_kwargs.get('db', 0)
         )
 
+    def _hmset(self, mapping, pipe=None):
+        pipe = self.redis if pipe is None else pipe
+        try:
+            return pipe.hset(self.key, mapping=mapping)
+        except TypeError:
+            return pipe.hmset(self.key, mapping)
+
     def _normalize_index(self, index, pipe=None):
         """Convert negative indexes into their positive equivalents."""
         pipe = self.redis if pipe is None else pipe
