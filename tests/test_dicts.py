@@ -411,6 +411,48 @@ class DictTest(RedisTestCase):
         expected = self.redis.info()['redis_version']
         self.assertEqual(actual, expected)
 
+    @unittest.skipIf(sys.version_info < (3, 9), 'merge requires Python 3.9+')
+    def test_merge_operator(self):
+        orig_data = {'a': 0, 'b': 0}
+        new_data = {'b': 1, 'c': 1}
+
+        python_orig = orig_data.copy()
+        python_new = new_data.copy()
+
+        redis_orig = self.create_dict(orig_data)
+        redis_new = self.create_dict(new_data)
+
+        for orig, new in [
+            (python_orig, python_new),
+            (redis_orig, redis_new),
+            (redis_orig, python_new),
+            (python_new, redis_orig),
+        ]:
+            self.assertEqual(orig | new, {'a': 0, 'b': 1, 'c': 1})
+
+    @unittest.skipIf(sys.version_info < (3, 9), 'merge requires Python 3.9+')
+    def test_update_operator(self):
+        d = self.create_dict({'a': 'b'})
+
+        # built-in dicts
+        d |= {'c': 42, 'x': 38}
+        self.assertEqual(
+            sorted(d.items()), [('a', 'b'), ('c', 42), ('x', 38)]
+        )
+
+        # list of tuples
+        d |= ([('a', 'g')])
+        self.assertEqual(
+            sorted(d.items()), [('a', 'g'), ('c', 42), ('x', 38)]
+        )
+
+        # Update from another redis_collections class
+        redis_list = List([('a', 'h')], redis=self.redis)
+        d |= redis_list
+        self.assertEqual(
+            sorted(d.items()), [('a', 'h'), ('c', 42), ('x', 38)]
+        )
+
 
 class CounterTest(RedisTestCase):
 
