@@ -1,5 +1,6 @@
 import collections
 import operator
+import sys
 import unittest
 
 from redis_collections import Counter, DefaultDict, Dict, List
@@ -567,7 +568,7 @@ class CounterTest(RedisTestCase):
         # Fail for non-counter types
         for c in (redis_counter, python_counter):
             with self.assertRaises(TypeError):
-                op(c, {'a': 2, 'b': 2, 'c': 2})
+                op(c, ('a', 2, 'b', 2, 'c', 2))
 
     def test_add(self):
         self._test_op(operator.add)
