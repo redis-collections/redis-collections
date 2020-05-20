@@ -187,7 +187,6 @@ class DictTest(RedisTestCase):
         redis_dict = self.create_dict()
         python_dict = {}
         for D in (redis_dict, python_dict):
-            D = self.create_dict()
             D['a'] = 1
             self.assertEqual(D.pop('a'), 1)
             self.assertNotIn('a', D)
@@ -204,17 +203,10 @@ class DictTest(RedisTestCase):
         redis_dict = self.create_dict()
         python_dict = {}
         for D in (redis_dict, python_dict):
-            D = self.create_dict()
             D['a'] = 1
             self.assertEqual(D.popitem(), ('a', 1))
             self.assertNotIn('a', D)
             self.assertRaises(KeyError, D.popitem)
-
-            D['a'] = 1
-            D[b'a'] = 2
-            self.assertEqual(D.popitem(), ('a', 1))
-            self.assertNotIn('a', D)
-            self.assertIn(b'a', D)
 
     def test_setdefault(self):
         d = self.create_dict()
