@@ -381,19 +381,18 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
     def _merge_helper(self, other, swap=False):
         def _or_trans(pipe):
             pipe.multi()
-            left, right = (other, self) if swap else (self, other)
             new = {k: v for k, v in left.iteritems(pipe=pipe)}
             new.update({k: v for k, v in right.iteritems(pipe=pipe)})
             return new
 
+        left, right = (other, self) if swap else (self, other)
         if self._same_redis(other, self.__class__):
-            ret = self._transaction(_or_trans, other.key)
+            new = self._transaction(_or_trans, other.key)
         else:
-            ret = dict(self.iteritems())
-            ret.update(other)
-            return ret
+            new = {k: v for k, v in left.items()}
+            new.update({k: v for k, v in right.items()})
 
-        return ret
+        return new
 
     def __or__(self, other):
         """Merge the *other* dictionary into the current one, overwriting

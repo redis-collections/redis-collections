@@ -418,7 +418,7 @@ class DictTest(RedisTestCase):
             (python_orig, python_new),
             (redis_orig, redis_new),
             (redis_orig, python_new),
-            (python_new, redis_orig),
+            (python_orig, redis_new),
         ]:
             self.assertEqual(orig | new, {'a': 0, 'b': 1, 'c': 1})
 
