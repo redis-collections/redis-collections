@@ -113,7 +113,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
 
         def eq_trans(pipe):
             pipe.multi()
-            self_items = self.iteritems(pipe)
+            self_items = self.items(pipe)
             other_items = other.items(pipe) if use_redis else other.items()
 
             return dict(self_items) == dict(other_items)
@@ -207,36 +207,18 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
         return {self._unpickle_key(k): self._unpickle(v) for k, v in items}
 
     def items(self, pipe=None):
-        """Return a copy of the dictionary's list of ``(key, value)`` pairs."""
-        return list(self.iteritems(pipe))
-
-    def iteritems(self, pipe=None):
         """Return an iterator over the dictionary's ``(key, value)`` pairs."""
         pipe = self.redis if pipe is None else pipe
         for k, v in self._data(pipe).items():
             yield k, self.cache.get(k, v)
 
     def keys(self):
-        """Return a copy of the dictionary's list of keys."""
-        return list(self.__iter__())
-
-    def iter(self):
-        """Return an iterator over the keys of the dictionary.
-        This is a shortcut for :func:`iterkeys()`.
-        """
-        return self.__iter__()
-
-    def iterkeys(self):
         """Return an iterator over the dictionary's keys."""
         return self.__iter__()
 
     def values(self):
         """Return a copy of the dictionary's list of values."""
-        return [v for k, v in self.iteritems()]
-
-    def itervalues(self):
-        """Return an iterator over the dictionary's values."""
-        return (v for k, v in self.iteritems())
+        return (v for k, v in self.items())
 
     def pop(self, key, default=__marker):
         """If *key* is in the dictionary, remove it and return its value,
@@ -324,7 +306,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
             pipe.multi()
             data = {}
             if isinstance(other, Dict):
-                data.update(other.iteritems(pipe))
+                data.update(other.items(pipe))
             elif isinstance(other, RedisCollection):
                 data.update(other.__iter__(pipe))
             else:
@@ -501,7 +483,7 @@ class Counter(Dict):
             pipe.multi()
             data = {}
             if isinstance(other, Dict):
-                data.update(other.iteritems(pipe))
+                data.update(other.items(pipe))
             elif isinstance(other, RedisCollection):
                 data.update(collections.Counter(other.__iter__(pipe)))
             else:
@@ -566,20 +548,27 @@ class Counter(Dict):
         except KeyError:
             pass
 
-    def _op_helper(self, other, op, swap_args=False, inplace=False):
+    def _op_helper(
+        self,
+        other,
+        op,
+        swap_args=False,
+        inplace=False,
+        check_type=collections.Counter,
+    ):
         def op_trans(pipe):
             pipe.multi()
 
             # Get a collections.Counter copy of `self`
             self_counter = collections.Counter(
-                {k: v for k, v in self.iteritems(pipe=pipe)}
+                {k: v for k, v in self.items(pipe=pipe)}
             )
 
             # If `other` is also Redis-backed we'll want to pull its values
             # with the same transaction-provided pipeline as for `self`.
             if isinstance(other, Dict):
                 other_counter = collections.Counter(
-                    {k: v for k, v in other.iteritems(pipe=pipe)}
+                    {k: v for k, v in other.items(pipe=pipe)}
                 )
             else:
                 other_counter = other
@@ -613,7 +602,7 @@ class Counter(Dict):
             result = self._transaction(op_trans)
         elif self._same_redis(other, RedisCollection):
             result = self._transaction(op_trans, other.key)
-        elif isinstance(other, collections.Counter):
+        elif isinstance(other, check_type):
             result = self._transaction(op_trans)
         else:
             raise TypeError('Unsupported type {}'.format(type(other)))
@@ -633,7 +622,11 @@ class Counter(Dict):
         return self._op_helper(other, operator.sub, swap_args=True)
 
     def __or__(self, other):
-        return self._op_helper(other, operator.or_)
+        return self._op_helper(
+            other,
+            operator.or_,
+            check_type=collections_abc.MutableMapping
+        )
 
     def __ror__(self, other):
         return self._op_helper(other, operator.or_, swap_args=True)
