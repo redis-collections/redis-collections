@@ -1,5 +1,6 @@
 import collections
 import operator
+import sys
 import unittest
 
 from redis_collections import Counter, DefaultDict, Dict, List
@@ -186,7 +187,6 @@ class DictTest(RedisTestCase):
         redis_dict = self.create_dict()
         python_dict = {}
         for D in (redis_dict, python_dict):
-            D = self.create_dict()
             D['a'] = 1
             self.assertEqual(D.pop('a'), 1)
             self.assertNotIn('a', D)
@@ -203,17 +203,10 @@ class DictTest(RedisTestCase):
         redis_dict = self.create_dict()
         python_dict = {}
         for D in (redis_dict, python_dict):
-            D = self.create_dict()
             D['a'] = 1
             self.assertEqual(D.popitem(), ('a', 1))
             self.assertNotIn('a', D)
             self.assertRaises(KeyError, D.popitem)
-
-            D['a'] = 1
-            D[b'a'] = 2
-            self.assertEqual(D.popitem(), ('a', 1))
-            self.assertNotIn('a', D)
-            self.assertIn(b'a', D)
 
     def test_setdefault(self):
         d = self.create_dict()
@@ -410,6 +403,48 @@ class DictTest(RedisTestCase):
         expected = self.redis.info()['redis_version']
         self.assertEqual(actual, expected)
 
+    @unittest.skipIf(sys.version_info < (3, 9), 'merge requires Python 3.9+')
+    def test_merge_operator(self):
+        orig_data = {'a': 0, 'b': 0}
+        new_data = {'b': 1, 'c': 1}
+
+        python_orig = orig_data.copy()
+        python_new = new_data.copy()
+
+        redis_orig = self.create_dict(orig_data)
+        redis_new = self.create_dict(new_data)
+
+        for orig, new in [
+            (python_orig, python_new),
+            (redis_orig, redis_new),
+            (redis_orig, python_new),
+            (python_orig, redis_new),
+        ]:
+            self.assertEqual(orig | new, {'a': 0, 'b': 1, 'c': 1})
+
+    @unittest.skipIf(sys.version_info < (3, 9), 'merge requires Python 3.9+')
+    def test_update_operator(self):
+        d = self.create_dict({'a': 'b'})
+
+        # built-in dicts
+        d |= {'c': 42, 'x': 38}
+        self.assertEqual(
+            sorted(d.items()), [('a', 'b'), ('c', 42), ('x', 38)]
+        )
+
+        # list of tuples
+        d |= ([('a', 'g')])
+        self.assertEqual(
+            sorted(d.items()), [('a', 'g'), ('c', 42), ('x', 38)]
+        )
+
+        # Update from another redis_collections class
+        redis_list = List([('a', 'h')], redis=self.redis)
+        d |= redis_list
+        self.assertEqual(
+            sorted(d.items()), [('a', 'h'), ('c', 42), ('x', 38)]
+        )
+
 
 class CounterTest(RedisTestCase):
 
@@ -567,7 +602,7 @@ class CounterTest(RedisTestCase):
         # Fail for non-counter types
         for c in (redis_counter, python_counter):
             with self.assertRaises(TypeError):
-                op(c, {'a': 2, 'b': 2, 'c': 2})
+                op(c, ('a', 2, 'b', 2, 'c', 2))
 
     def test_add(self):
         self._test_op(operator.add)
