@@ -25,6 +25,10 @@ be loaded.
     >>> E = SyncableDict(key='f4a78a6faacb4d8e97829f9888ac6740')
     >>> E
     {'one': 1, 'two': 2}
+
+The underlying :class:`RedisCollection` instance can be accessed from the
+``persistence`` attribute.
+
 """
 import collections.abc as collections_abc
 import collections
