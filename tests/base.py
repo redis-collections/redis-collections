@@ -17,8 +17,10 @@ class RedisTestCase(unittest.TestCase):
             f'redis://{REDIS_HOST}:{REDIS_PORT}', db=self.db
         )
         if self.redis.dbsize():
-            raise EnvironmentError('Redis database number %d is not empty, '
-                                   'tests could harm your data.' % self.db)
+            raise EnvironmentError(
+                'Redis database number %d is not empty, '
+                'tests could harm your data.' % self.db
+            )
 
     def tearDown(self):
         self.redis.flushdb()

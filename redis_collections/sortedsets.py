@@ -87,6 +87,7 @@ class SortedSetBase(RedisCollection):
         :class:`SortedSetBase` instances, dictionaries mapping members to
         numeric scores, or sequences of ``(member, score)`` tuples.
         """
+
         def update_trans(pipe):
             pipe.multi()
             other_items = method(pipe=pipe) if use_redis else method()

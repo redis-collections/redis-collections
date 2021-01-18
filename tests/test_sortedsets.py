@@ -4,7 +4,6 @@ from .base import RedisTestCase
 
 
 class SortedSetCounterTestCase(RedisTestCase):
-
     def create_sortedset(self, *args, **kwargs):
         kwargs['redis'] = self.redis
         return SortedSetCounter(*args, **kwargs)
@@ -93,9 +92,7 @@ class SortedSetCounterTestCase(RedisTestCase):
         self.assertEqual(ssc.count_between(4.0, 2.0), 0)
 
     def test_discard_between(self):
-        items = [
-            ('0', 1), ('1', 2), ('2', 4), ('3', 8), ('4', 16), ('5', 32)
-        ]
+        items = [('0', 1), ('1', 2), ('2', 4), ('3', 8), ('4', 16), ('5', 32)]
 
         ssc_1 = self.create_sortedset(items)
         ssc_1.discard_between(min_rank=1)
@@ -187,9 +184,7 @@ class SortedSetCounterTestCase(RedisTestCase):
         self.assertRaises(ValueError, ssc.increment_score, 'member_1', '!')
 
     def test_items(self):
-        items = [
-            ('0', 1), ('1', 2), ('2', 4), ('3', 8), ('4', 16), ('5', 32)
-        ]
+        items = [('0', 1), ('1', 2), ('2', 4), ('3', 8), ('4', 16), ('5', 32)]
         ssc = self.create_sortedset(items)
 
         self.assertEqual(ssc.items(), items[:])
@@ -352,7 +347,10 @@ class GeoDBTestCase(RedisTestCase):
 
         # Test latitude & longitude, units
         response = geodb.places_within_radius(
-            latitude=38.6, longitude=-90.2, radius=100, unit='mi',
+            latitude=38.6,
+            longitude=-90.2,
+            radius=100,
+            unit='mi',
         )
         self.assertEqual(response[0]['place'], 'St. Louis')
 

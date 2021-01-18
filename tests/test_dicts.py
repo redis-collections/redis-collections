@@ -9,7 +9,6 @@ from .base import RedisTestCase
 
 
 class DictTest(RedisTestCase):
-
     def create_dict(self, *args, **kwargs):
         kwargs['redis'] = self.redis
         return Dict(*args, **kwargs)
@@ -227,15 +226,11 @@ class DictTest(RedisTestCase):
         self.assertEqual(sorted(d.items()), [('a', 'b'), ('c', 42)])
 
         d.update({'x': 38})
-        self.assertEqual(
-            sorted(d.items()), [('a', 'b'), ('c', 42), ('x', 38)]
-        )
+        self.assertEqual(sorted(d.items()), [('a', 'b'), ('c', 42), ('x', 38)])
 
         # Update from list of tuples
         d.update([('a', 'g')])
-        self.assertEqual(
-            sorted(d.items()), [('a', 'g'), ('c', 42), ('x', 38)]
-        )
+        self.assertEqual(sorted(d.items()), [('a', 'g'), ('c', 42), ('x', 38)])
 
         # Update from kwargs
         d.update(c=None)
@@ -428,26 +423,19 @@ class DictTest(RedisTestCase):
 
         # built-in dicts
         d |= {'c': 42, 'x': 38}
-        self.assertEqual(
-            sorted(d.items()), [('a', 'b'), ('c', 42), ('x', 38)]
-        )
+        self.assertEqual(sorted(d.items()), [('a', 'b'), ('c', 42), ('x', 38)])
 
         # list of tuples
-        d |= ([('a', 'g')])
-        self.assertEqual(
-            sorted(d.items()), [('a', 'g'), ('c', 42), ('x', 38)]
-        )
+        d |= [('a', 'g')]
+        self.assertEqual(sorted(d.items()), [('a', 'g'), ('c', 42), ('x', 38)])
 
         # Update from another redis_collections class
         redis_list = List([('a', 'h')], redis=self.redis)
         d |= redis_list
-        self.assertEqual(
-            sorted(d.items()), [('a', 'h'), ('c', 42), ('x', 38)]
-        )
+        self.assertEqual(sorted(d.items()), [('a', 'h'), ('c', 42), ('x', 38)])
 
 
 class CounterTest(RedisTestCase):
-
     def create_counter(self, *args, **kwargs):
         kwargs['redis'] = self.redis
         return Counter(*args, **kwargs)
@@ -513,7 +501,12 @@ class CounterTest(RedisTestCase):
         for init in (self.create_counter, collections.Counter):
             c = init('abbcccddddeeeeeffffff')
             counts = [
-                ('f', 6), ('e', 5), ('d', 4), ('c', 3), ('b', 2), ('a', 1)
+                ('f', 6),
+                ('e', 5),
+                ('d', 4),
+                ('c', 3),
+                ('b', 2),
+                ('a', 1),
             ]
             self.assertEqual(c.most_common(), counts)
             self.assertEqual(c.most_common(1), counts[:1])
@@ -702,7 +695,6 @@ class CounterTest(RedisTestCase):
 
 
 class DefaultDictTest(RedisTestCase):
-
     def create_ddict(self, *args, **kwargs):
         kwargs['redis'] = self.redis
         return DefaultDict(*args, **kwargs)
