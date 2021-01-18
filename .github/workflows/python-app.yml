@@ -10,6 +10,15 @@ jobs:
       matrix:
         python-version: [3.6, 3.7, 3.8, 3.9.0]
 
+    services:
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
