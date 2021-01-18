@@ -37,7 +37,7 @@ jobs:
         coverage run --include="redis_collections/*.py" -m unittest
     - name: Check coverage
       run: |
-        coverage report --show-missing --fail-under=99.9
+        coverage report --show-missing --fail-under=99
       env:
         REDIS_HOST: redis
         REDIS_PORT: 6379
