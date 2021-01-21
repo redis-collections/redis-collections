@@ -122,6 +122,8 @@ Maintainers
 License: ISC
 ------------
 
-© 2013-? Honza Javorek <mail@honzajavorek>
+© 2013-? Honza Javorek <mail@honzajavorek.cz>
 
 This work is licensed under `ISC license <https://en.wikipedia.org/wiki/ISC_license>`_.
+
+This library is not affiliated with `Redis Labs <https://redislabs.com/>`__, `Redis <https://redis.io/>`__, or `redis-py <https://github.com/andymccurdy/redis-py>`__. Govern yourself accordingly!
