@@ -15,7 +15,6 @@ from .base import RedisTestCase
 
 
 class SyncableTest(RedisTestCase):
-
     def create_collection(self, cls, *args, **kwargs):
         kwargs['redis'] = self.redis
         return cls(*args, **kwargs)
@@ -184,7 +183,6 @@ class SyncableTest(RedisTestCase):
 
 
 class LRUDictTest(RedisTestCase):
-
     def create_lru_dict(self, *args, **kwargs):
         kwargs['redis'] = self.redis
         return LRUDict(*args, **kwargs)
@@ -243,7 +241,7 @@ class LRUDictTest(RedisTestCase):
         self.assertIn('a', lru_dict.persistence)
         self.assertEqual(
             lru_dict.cache,
-            collections.OrderedDict([('b', 2), ('c', 3), ('d', 4)])
+            collections.OrderedDict([('b', 2), ('c', 3), ('d', 4)]),
         )
 
         # Retrieving a local item moves it to the rightmost position
@@ -251,7 +249,7 @@ class LRUDictTest(RedisTestCase):
         self.assertIn('a', lru_dict.persistence)
         self.assertEqual(
             lru_dict.cache,
-            collections.OrderedDict([('c', 3), ('d', 4), ('b', 2)])
+            collections.OrderedDict([('c', 3), ('d', 4), ('b', 2)]),
         )
 
         # Retrieiving a remote item brings it to the rightmost position in the
@@ -260,14 +258,14 @@ class LRUDictTest(RedisTestCase):
         self.assertIn('c', lru_dict.persistence)
         self.assertEqual(
             lru_dict.cache,
-            collections.OrderedDict([('d', 4), ('b', 2), ('a', 1)])
+            collections.OrderedDict([('d', 4), ('b', 2), ('a', 1)]),
         )
 
         self.assertEqual(lru_dict['c'], 3)
         self.assertIn('d', lru_dict.persistence)
         self.assertEqual(
             lru_dict.cache,
-            collections.OrderedDict([('b', 2), ('a', 1), ('c', 3)])
+            collections.OrderedDict([('b', 2), ('a', 1), ('c', 3)]),
         )
 
         # Retrieving unknown items raises KeyError

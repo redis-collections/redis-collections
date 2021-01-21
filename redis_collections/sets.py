@@ -124,6 +124,7 @@ class Set(RedisCollection, collections_abc.MutableSet):
         :param other: Any kind of iterable.
         :rtype: boolean
         """
+
         def isdisjoint_trans_pure(pipe):
             pipe.multi()
             pipe.sinter(self.key, other.key)
@@ -277,9 +278,8 @@ class Set(RedisCollection, collections_abc.MutableSet):
     def _op_update_helper(
         self, others, op, redis_op, update=False, check_type=False
     ):
-        if (
-            check_type and
-            not all(isinstance(x, collections_abc.Set) for x in others)
+        if check_type and not all(
+            isinstance(x, collections_abc.Set) for x in others
         ):
             raise TypeError
 

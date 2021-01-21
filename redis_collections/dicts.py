@@ -47,6 +47,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
             # Specified here so that the documentation shows a useful string
             # for methods that take __marker as a keyword argument
             return '<missing value>'
+
     __marker = __missing_value()
 
     def __init__(self, *args, **kwargs):
@@ -275,6 +276,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
         the dictionary is empty, calling :func:`popitem` raises
         a :exc:`KeyError`.
         """
+
         def popitem_trans(pipe):
             pipe.multi()
             try:
@@ -289,7 +291,8 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
             pickled_value, __ = pipe.execute()
 
             return (
-                self._unpickle_key(pickled_key), self._unpickle(pickled_value)
+                self._unpickle_key(pickled_key),
+                self._unpickle(pickled_value),
             )
 
         key, value = self._transaction(popitem_trans)

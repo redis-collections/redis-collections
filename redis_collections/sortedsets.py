@@ -3,7 +3,7 @@ sortedsets
 ~~~~~~~~~~
 
 The `sortedsets` module contains collections based on the
-Redis `Sorted Set <https://redis.io/commands#sorted_set>`_ type.
+Redis `Sorted Set <https://redis.io/commands#sorted_set>`__ type.
 
 Included collections are :class:`SortedSetCounter` and :class:`GeoDB`.
 
@@ -87,6 +87,7 @@ class SortedSetBase(RedisCollection):
         :class:`SortedSetBase` instances, dictionaries mapping members to
         numeric scores, or sequences of ``(member, score)`` tuples.
         """
+
         def update_trans(pipe):
             pipe.multi()
             other_items = method(pipe=pipe) if use_redis else method()

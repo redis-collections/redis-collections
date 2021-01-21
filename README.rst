@@ -2,14 +2,6 @@
 Redis Collections
 =================
 
-.. image:: https://travis-ci.org/honzajavorek/redis-collections.svg?branch=master
-   :target: https://travis-ci.org/honzajavorek/redis-collections
-
-.. image:: https://coveralls.io/repos/github/honzajavorek/redis-collections/badge.svg?branch=master
-   :target: https://coveralls.io/github/honzajavorek/redis-collections?branch=master
-
-
-
 `redis-collections` is a Python library that provides a high-level
 interface to `Redis <http://redis.io/>`_, the excellent key-value store.
 
