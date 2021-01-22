@@ -181,8 +181,3 @@ sublclass a collection and override its :func:`_create_key` method.
 If you don't like how  :mod:`pickle` does serialization, you may override the
 ``_pickle*`` and ``_unpickle*`` methods on the collection classes.
 Using other serializers will limit the objects you can store or retrieve.
-
-.. note::
-    On Python 2, the :mod:`pickle` module is used instead of the
-    :mod:`cPickle` module. This is intentional - see
-    `issue #83 <https://github.com/honzajavorek/redis-collections/issues/83>`_.
