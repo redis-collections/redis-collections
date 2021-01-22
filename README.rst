@@ -122,7 +122,8 @@ Maintainers
 License: ISC
 ------------
 
-© 2013-? Honza Javorek <mail@honzajavorek.cz>
+© 2016-? Bo Bayles <bbayles@gmail.com> and contributors
+© 2013-2016 Honza Javorek <mail@honzajavorek.cz> and contributors
 
 This work is licensed under `ISC license <https://en.wikipedia.org/wiki/ISC_license>`_.
 
