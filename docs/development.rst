@@ -35,17 +35,3 @@ Philosophy
     The earliest supported version of Redis is the one that ships with the
     oldest supported LTS release of Ubuntu Linux (see
     `packages.ubuntu.com <http://packages.ubuntu.com/redis-server>`_).
-
-Maintainers
------------
-
-- Bo Bayles (`@bbayles <http://github.com/bbayles>`_)
-- Honza Javorek (`@honzajavorek <http://github.com/honzajavorek>`_)
-
-License: ISC
-------------
-
-© 2013-? Honza Javorek <mail@honzajavorek>
-
-This work is licensed under `ISC license
-<https://en.wikipedia.org/wiki/ISC_license>`_.
