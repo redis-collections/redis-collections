@@ -8,7 +8,7 @@ Releases
 
 - 0.9.0:
     - **Breaking change**: The Python 2-style methods ``.iteritems()``, ``.iterkeys()``, and ``.itervalues()`` have been removed from ``Dict`` and its subclasses. The ``.iter()`` method was also removed.
-    - **Version compatibility**: This library now supports Python 3.5 and higher.
+    - **Version compatibility**: This library now supports Python 3.6 and higher.
     - **Dictionary merge and update operators**: ``Dict`` instances now support the ``|`` and ``|=`` operations. See `PEP 584 <https://www.python.org/dev/peps/pep-0584/>`_ for details.
 - 0.8.1:
     - **Version compatibility**: This library now supports `redis-py` version 3.5.x. The minimum supported version remains 3.1.0.
@@ -60,7 +60,7 @@ Versioning
 A 1.0 release is planned. Before that happens:
 
 - Releases with significant new features or breaking changes will be tagged as
-  0.9.x, 0.10.x, etc.
+  0.10.x, 0.11.x, etc.
 - Bug fix releases will be tagged as 0.8.x
 
 After 1.0 is released:
