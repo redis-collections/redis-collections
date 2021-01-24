@@ -25,6 +25,10 @@ be loaded.
     >>> E = SyncableDict(key='f4a78a6faacb4d8e97829f9888ac6740')
     >>> E
     {'one': 1, 'two': 2}
+
+The underlying :class:`RedisCollection` instance can be accessed from the
+``persistence`` attribute.
+
 """
 import collections.abc as collections_abc
 import collections
@@ -76,7 +80,7 @@ class SyncableCounter(_SyncableBase, collections.Counter):
     Redis.
 
     See Python's `Counter documentation
-    <https://docs.python.org/3/library/collections.html#collections.Counter>`_
+    <https://docs.python.org/3/library/collections.html#collections.Counter>`__
     for details.
     """
 
@@ -118,7 +122,7 @@ class SyncableList(_SyncableBase, list):
 
     See Python's `list documentation
     <https://docs.python.org/3/library/stdtypes.html
-    #sequence-types-list-tuple-range>`_ for details.
+    #sequence-types-list-tuple-range>`__ for details.
     """
 
     def __init__(self, **kwargs):
@@ -158,7 +162,7 @@ class SyncableSet(_SyncableBase, set):
 
     See Python's `set documentation
     <https://docs.python.org/3/library/stdtypes.html
-    #set-types-set-frozenset>`_ for details.
+    #set-types-set-frozenset>`__ for details.
     """
 
     def __init__(self, **kwargs):

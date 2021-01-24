@@ -12,7 +12,6 @@ PYTHON_VERSION = (sys.version_info[0], sys.version_info[1])
 
 
 class SetTest(RedisTestCase):
-
     def create_set(self, *args, **kwargs):
         kwargs['redis'] = self.redis
         return Set(*args, **kwargs)
@@ -68,7 +67,10 @@ class SetTest(RedisTestCase):
             self.assertRaises(TypeError, s_1.isdisjoint, None)
 
     def test_eq_le_lt_issubset(self):
-        for init in (self.create_set, set,):
+        for init in (
+            self.create_set,
+            set,
+        ):
             s_1 = init([1, 2])
             s_2 = init([1, 2, 3, 4])
             s_3 = {1, 2, 3, 4}
@@ -479,8 +481,7 @@ class SubClassTest(SetTest):
         s1 = self.create_set('abc')
         s2 = s1.copy()
         self.assertEqual(s2.__class__, _Set)
-        self.assertEqual(sorted(s1),
-                         sorted(s2))
+        self.assertEqual(sorted(s1), sorted(s2))
 
 
 if __name__ == '__main__':

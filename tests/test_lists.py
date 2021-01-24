@@ -11,7 +11,6 @@ PYTHON_VERSION = (sys.version_info[0], sys.version_info[1])
 
 
 class ListTest(RedisTestCase):
-
     def create_list(self, *args, **kwargs):
         kwargs['redis'] = self.redis
         return List(*args, **kwargs)
@@ -157,7 +156,17 @@ class ListTest(RedisTestCase):
             self.assertEqual(next(python_iter), v)
 
     def test_len(self):
-        for data, expected in [(tuple(), 0), ((0,), 1), ((0, 1,), 2)]:
+        for data, expected in [
+            (tuple(), 0),
+            ((0,), 1),
+            (
+                (
+                    0,
+                    1,
+                ),
+                2,
+            ),
+        ]:
             redis_list = self.create_list(data)
             redis_cached = self.create_list(data, writeback=True)
             python_list = list(data)
@@ -267,7 +276,10 @@ class ListTest(RedisTestCase):
             self.assertEqual(L.count('A'), 0)
 
     def test_extend(self):
-        data = (0, 1,)
+        data = (
+            0,
+            1,
+        )
         redis_cached = self.create_list(data, writeback=True)
         redis_list = self.create_list(data)
         python_list = list(data)
@@ -443,9 +455,7 @@ class ListTest(RedisTestCase):
         python_list[0]['one'] = 2
 
         self.assertEqual(redis_cached[0], python_list[0])
-        self.assertEqual(
-            list(redis_cached), list(python_list)
-        )
+        self.assertEqual(list(redis_cached), list(python_list))
         self.assertEqual(
             list(reversed(redis_cached)), list(reversed(python_list))
         )
@@ -471,13 +481,12 @@ class ListTest(RedisTestCase):
 
         self.assertEqual(
             redis_cached.cache,
-            {0: ['whartnell'], 1: ['ptroughton'], 2: ['jpertwee']}
+            {0: ['whartnell'], 1: ['ptroughton'], 2: ['jpertwee']},
         )
 
         # __iter__
         self.assertEqual(
-            list(redis_cached),
-            [['whartnell'], ['ptroughton'], ['jpertwee']]
+            list(redis_cached), [['whartnell'], ['ptroughton'], ['jpertwee']]
         )
 
         # __getitem__
@@ -564,7 +573,6 @@ class ListTest(RedisTestCase):
 
 
 class DequeTest(RedisTestCase):
-
     def create_deque(self, *args, **kwargs):
         kwargs['redis'] = self.redis
         return Deque(*args, **kwargs)

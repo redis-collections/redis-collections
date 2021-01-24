@@ -30,6 +30,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
     See Python's `list documentation
     <https://docs.python.org/3/library/stdtypes.html#list>`_ for usage notes.
     """
+
     _python_cls = list
 
     def __init__(self, *args, **kwargs):
@@ -404,6 +405,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         Adds the values from the iterable *other* to the end of this
         collection.
         """
+
         def extend_trans(pipe):
             pipe.multi()
             values = list(other.__iter__(pipe)) if use_redis else other
@@ -426,6 +428,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         If *start* or *stop* are provided, return the smallest
         index such that ``s[index] == value`` and ``start <= index < stop``.
         """
+
         def index_trans(pipe):
             pipe.multi()
             len_self, normal_start = self._normalize_index(start or 0, pipe)
@@ -497,6 +500,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
 
     def remove(self, value):
         """Remove the first occurence of *value*."""
+
         def remove_trans(pipe):
             pipe.multi()
 
@@ -516,6 +520,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
         Reverses the items of this collection "in place" (only two values are
         retrieved from Redis at a time).
         """
+
         def reverse_trans(pipe):
             pipe.multi()
             if self.writeback:
@@ -539,7 +544,8 @@ class List(RedisCollection, collections_abc.MutableSequence):
         .. note::
             This sort requires all items to be retrieved from Redis and stored
             in memory.
-         """
+        """
+
         def sort_trans(pipe):
             pipe.multi()
             values = list(self.__iter__(pipe))
@@ -554,9 +560,7 @@ class List(RedisCollection, collections_abc.MutableSequence):
 
         return self._transaction(sort_trans)
 
-    def _add_helper(
-        self, other, use_redis=False, swap_args=False, **kwargs
-    ):
+    def _add_helper(self, other, use_redis=False, swap_args=False, **kwargs):
         def add_helper_trans(pipe):
             pipe.multi()
             self_values = self._python_cls(self.__iter__(pipe), **kwargs)
@@ -687,6 +691,7 @@ class Deque(List):
     Dequq inherits from List, so see its API documentation for
     information on other methods.
     """
+
     _python_cls = collections.deque
 
     def __init__(self, iterable=None, maxlen=None, **kwargs):
@@ -778,6 +783,7 @@ class Deque(List):
 
     def append(self, value):
         """Add *value* to the right side of the collection."""
+
         def append_trans(pipe):
             pipe.multi()
             self._append_helper(value, pipe)
@@ -805,6 +811,7 @@ class Deque(List):
 
     def appendleft(self, value):
         """Add *value* to the left side of the collection."""
+
         def appendleft_trans(pipe):
             pipe.multi()
             self._appendleft_helper(value, pipe)
@@ -832,6 +839,7 @@ class Deque(List):
         Extend the right side of the the collection by appending values from
         the iterable *other*.
         """
+
         def extend_trans(pipe):
             pipe.multi()
             values = list(other.__iter__(pipe)) if use_redis else other
@@ -851,6 +859,7 @@ class Deque(List):
         the iterable *other*. Note that the appends will reverse the order
         of the given values.
         """
+
         def extendleft_trans(pipe):
             pipe.multi()
             values = list(other.__iter__(pipe)) if use_redis else other
@@ -870,6 +879,7 @@ class Deque(List):
         If the insertion would the collection to grow beyond ``maxlen``,
         raise ``IndexError``.
         """
+
         def insert_trans(pipe):
             pipe.multi()
             len_self = self.__len__(pipe)
@@ -937,9 +947,7 @@ class Deque(List):
             raise TypeError
 
         if self._same_redis(other, RedisCollection):
-            return self._add_helper(
-                other, use_redis=True, maxlen=self.maxlen
-            )
+            return self._add_helper(other, use_redis=True, maxlen=self.maxlen)
 
         return self._add_helper(other, maxlen=self.maxlen)
 
@@ -947,9 +955,7 @@ class Deque(List):
         if not isinstance(other, (self.__class__, self._python_cls)):
             raise TypeError
 
-        return self._add_helper(
-            other, swap_args=True, maxlen=other.maxlen
-        )
+        return self._add_helper(other, swap_args=True, maxlen=other.maxlen)
 
     def __iadd__(self, other):
         if not isinstance(other, (self.__class__, self._python_cls)):

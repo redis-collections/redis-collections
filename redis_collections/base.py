@@ -18,8 +18,10 @@ class RedisCollection(metaclass=abc.ABCMeta):
     Redis collections.
     """
 
-    not_impl_msg = ('Cannot be implemented efficiently or atomically '
-                    'due to limitations in Redis command set.')
+    not_impl_msg = (
+        'Cannot be implemented efficiently or atomically '
+        'due to limitations in Redis command set.'
+    )
 
     @abc.abstractmethod
     def __init__(
@@ -143,10 +145,10 @@ class RedisCollection(metaclass=abc.ABCMeta):
         other_kwargs = other.redis.connection_pool.connection_kwargs
 
         return (
-            self_kwargs.get('host') == other_kwargs.get('host') and
-            self_kwargs.get('port') == other_kwargs.get('port') and
-            self_kwargs.get('path') == other_kwargs.get('path') and
-            self_kwargs.get('db', 0) == other_kwargs.get('db', 0)
+            self_kwargs.get('host') == other_kwargs.get('host')
+            and self_kwargs.get('port') == other_kwargs.get('port')
+            and self_kwargs.get('path') == other_kwargs.get('path')
+            and self_kwargs.get('db', 0) == other_kwargs.get('db', 0)
         )
 
     def _hmset(self, mapping, pipe=None):

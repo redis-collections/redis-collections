@@ -47,6 +47,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
             # Specified here so that the documentation shows a useful string
             # for methods that take __marker as a keyword argument
             return '<missing value>'
+
     __marker = __missing_value()
 
     def __init__(self, *args, **kwargs):
@@ -257,6 +258,7 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
         the dictionary is empty, calling :func:`popitem` raises
         a :exc:`KeyError`.
         """
+
         def popitem_trans(pipe):
             pipe.multi()
             try:
@@ -271,7 +273,8 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
             pickled_value, __ = pipe.execute()
 
             return (
-                self._unpickle_key(pickled_key), self._unpickle(pickled_value)
+                self._unpickle_key(pickled_key),
+                self._unpickle(pickled_value),
             )
 
         key, value = self._transaction(popitem_trans)
@@ -359,6 +362,38 @@ class Dict(RedisCollection, collections_abc.MutableMapping):
         other.update(self)
 
         return other
+
+    def _merge_helper(self, other, swap=False):
+        def _or_trans(pipe):
+            pipe.multi()
+            new = {k: v for k, v in left.items(pipe=pipe)}
+            new.update({k: v for k, v in right.items(pipe=pipe)})
+            return new
+
+        left, right = (other, self) if swap else (self, other)
+        if self._same_redis(other, self.__class__):
+            new = self._transaction(_or_trans, other.key)
+        else:
+            new = {k: v for k, v in left.items()}
+            new.update({k: v for k, v in right.items()})
+
+        return new
+
+    def __or__(self, other):
+        """Merge the *other* dictionary into the current one, overwriting
+        existing keys. Return a dictionary with the result.
+        """
+        return self._merge_helper(other, swap=False)
+
+    def __ror__(self, other):
+        """Merge the current dictionary into *other*, overwriting
+        existing keys. Return a dictionary with the result.
+        """
+        return self._merge_helper(other, swap=True)
+
+    def __ior__(self, other):
+        self.update(other)
+        return self
 
     def clear(self, pipe=None):
         self._clear(pipe)
@@ -623,9 +658,7 @@ class Counter(Dict):
 
     def __or__(self, other):
         return self._op_helper(
-            other,
-            operator.or_,
-            check_type=collections_abc.MutableMapping
+            other, operator.or_, check_type=collections_abc.MutableMapping
         )
 
     def __ror__(self, other):

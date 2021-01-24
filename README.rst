@@ -2,14 +2,6 @@
 Redis Collections
 =================
 
-.. image:: https://travis-ci.org/honzajavorek/redis-collections.svg?branch=master
-   :target: https://travis-ci.org/honzajavorek/redis-collections
-
-.. image:: https://coveralls.io/repos/github/honzajavorek/redis-collections/badge.svg?branch=master
-   :target: https://coveralls.io/github/honzajavorek/redis-collections?branch=master
-
-
-
 `redis-collections` is a Python library that provides a high-level
 interface to `Redis <http://redis.io/>`_, the excellent key-value store.
 
@@ -130,6 +122,9 @@ Maintainers
 License: ISC
 ------------
 
-© 2013-? Honza Javorek <mail@honzajavorek>
+© 2016-? Bo Bayles <bbayles@gmail.com> and contributors
+© 2013-2016 Honza Javorek <mail@honzajavorek.cz> and contributors
 
 This work is licensed under `ISC license <https://en.wikipedia.org/wiki/ISC_license>`_.
+
+This library is not affiliated with `Redis Labs <https://redislabs.com/>`__, `Redis <https://redis.io/>`__, or `redis-py <https://github.com/andymccurdy/redis-py>`__. Govern yourself accordingly!
