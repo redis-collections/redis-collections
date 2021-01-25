@@ -31,7 +31,7 @@ setup(
     long_description=io.open('README.rst', encoding='utf-8').read(),
     author=meta['author'],
     author_email='mail@honzajavorek.cz',
-    url='https://github.com/honzajavorek/redis-collections',
+    url='https://github.com/redis-collections/redis-collections',
     license='ISC',
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
