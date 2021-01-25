@@ -26,13 +26,13 @@ Releases
     - **Breaking change**: This library now requires `redis-py` 3.0.0+.
     - **Breaking change**: Data is now pickled using the highest protocol version supported by Python.
       You can specify the ``pickle_protocol`` with a keyword argument - see :ref:`usage-notes`.
-      To connect to a collection created with an older version of this package, set ``pickle_protocol=None``. See also `PR #101 <https://github.com/honzajavorek/redis-collections/pull/101>`_.
+      To connect to a collection created with an older version of this package, set ``pickle_protocol=None``. See also `PR #101 <https://github.com/redis-collections/redis-collections/pull/101>`_.
     - **Python support**: Python 3.3 is no longer supported.
 - 0.4.2:
     - **Domain sockets support**: This is a bugfix release that enables connecting to a Redis server over a Unix domain socket.
 - 0.4.1:
     - **SCAN methods**: Redis-specific ``scan_`` methods on ``Dict`` (and its subclassess), ``Set``,
-      and ``SortedSetCounter``. See `PR #97 <https://github.com/honzajavorek/redis-collections/pull/97>`_ for
+      and ``SortedSetCounter``. See `PR #97 <https://github.com/redis-collections/redis-collections/pull/97>`_ for
       details.
     - **Initialization changes**: Collections no longer query Redis at instantiation - thanks to ArminGruner.
 - 0.4.0:
@@ -46,7 +46,7 @@ Releases
       floating point numbers.
     - **Version compatibility**: ``Set.random_sample`` now works for Redis servers under version 2.6.0
 
-See the `GitHub Releases page <https://github.com/honzajavorek/redis-collections/releases>`_ for information on earlier releases.
+See the `GitHub Releases page <https://github.com/redis-collections/redis-collections/releases>`_ for information on earlier releases.
 
 Versioning
 ----------
