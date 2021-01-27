@@ -1,8 +1,6 @@
 import io
 import os
 import re
-import subprocess
-import sys
 
 from setuptools import setup, find_packages
 
@@ -14,14 +12,6 @@ base_path = os.path.dirname(__file__)
 meta_file = os.path.join(base_path, 'redis_collections/__init__.py')
 meta_file_contents = io.open(meta_file, encoding='utf-8').read()
 meta = dict(re.findall(r'__([^_]+)__ = \'([^\']*)\'', meta_file_contents))
-
-
-# release a version, publish to GitHub and PyPI
-if sys.argv[-1] == 'publish':
-    subprocess.check_call(['git', 'tag', 'v' + meta['version']])
-    subprocess.check_call(['git', 'push', '--tags', 'origin', 'master:master'])
-    # ...the rest happens on Travis CI
-    sys.exit()
 
 
 setup(

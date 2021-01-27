@@ -445,12 +445,9 @@ class GeoDB(SortedSetBase):
         """
         pickled_place_1 = self._pickle(place_1)
         pickled_place_2 = self._pickle(place_2)
-        try:
-            return self.redis.geodist(
-                self.key, pickled_place_1, pickled_place_2, unit=unit
-            )
-        except TypeError:
-            return None
+        return self.redis.geodist(
+            self.key, pickled_place_1, pickled_place_2, unit=unit
+        )
 
     def get_hash(self, place):
         """
@@ -459,10 +456,7 @@ class GeoDB(SortedSetBase):
         instead.
         """
         pickled_place = self._pickle(place)
-        try:
-            return self.redis.geohash(self.key, pickled_place)[0]
-        except (AttributeError, TypeError):
-            return None
+        return self.redis.geohash(self.key, pickled_place)[0]
 
     def get_location(self, place):
         """

@@ -120,9 +120,8 @@ class DictTest(RedisTestCase):
         d['a'] = 'b'
         d['c'] = 'd'
         self.assertEqual(sorted(d.items()), [('a', 'b'), ('c', 'd')])
-        self.assertEqual(sorted(d.iteritems()), [('a', 'b'), ('c', 'd')])
         try:
-            next(d.iteritems())
+            next(d.items())
         except AttributeError:
             self.fail()
 
@@ -147,10 +146,8 @@ class DictTest(RedisTestCase):
         d['a'] = 'b'
         d['c'] = 'd'
         self.assertEqual(sorted(d.keys()), ['a', 'c'])
-        self.assertEqual(sorted(d.iterkeys()), ['a', 'c'])
-        self.assertEqual(sorted(d.iter()), ['a', 'c'])
         try:
-            next(d.iter())
+            next(d.keys())
         except AttributeError:
             self.fail()
 
@@ -159,27 +156,26 @@ class DictTest(RedisTestCase):
         d['a'] = 'b'
         d['c'] = 'd'
         self.assertEqual(sorted(d.values()), ['b', 'd'])
-        self.assertEqual(sorted(d.itervalues()), ['b', 'd'])
         try:
-            next(d.itervalues())
+            next(d.values())
         except AttributeError:
             self.fail()
 
     def test_fromkeys(self):
         d = Dict.fromkeys(['a', 'b', 'c', 'd'], redis=self.redis)
         self.assertEqual(sorted(d.keys()), ['a', 'b', 'c', 'd'])
-        self.assertEqual(d.values(), [None] * 4)
+        self.assertEqual(list(d.values()), [None] * 4)
 
         d = Dict.fromkeys(['a', 'b', 'c', 'd'], 'be happy', redis=self.redis)
         self.assertEqual(sorted(d.keys()), ['a', 'b', 'c', 'd'])
-        self.assertEqual(d.values(), ['be happy'] * 4)
+        self.assertEqual(list(d.values()), ['be happy'] * 4)
 
     def test_clear(self):
         d = self.create_dict()
         d['a'] = 'b'
         d['c'] = 'd'
         d.clear()
-        self.assertEqual(d.items(), [])
+        self.assertEqual(list(d.items()), [])
         self.assertEqual(self.redis.dbsize(), 0)
 
     def test_pop(self):
@@ -287,8 +283,8 @@ class DictTest(RedisTestCase):
 
         # The mutated value should be reflected in items, values
         redis_cached['key_1'].append(2)
-        self.assertEqual(redis_cached.items(), [('key_1', [1, 2])])
-        self.assertEqual(redis_cached.values(), [([1, 2])])
+        self.assertEqual(list(redis_cached.items()), [('key_1', [1, 2])])
+        self.assertEqual(list(redis_cached.values()), [([1, 2])])
 
         # sync-ing should push changes to Redis and clear the cache
         self.assertEqual(redis_cached._data()['key_1'], [1])
@@ -567,7 +563,7 @@ class CounterTest(RedisTestCase):
         c.update({('tuple', 'key'): 2})
         self.assertEqual(c[('tuple', 'key')], 2)
 
-    def _test_op(self, op):
+    def _test_op(self, op, dicts_work=False):
         redis_counter = self.create_counter('abbccc')
         python_counter = collections.Counter('abbccc')
 
@@ -593,9 +589,13 @@ class CounterTest(RedisTestCase):
         )
 
         # Fail for non-counter types
-        for c in (redis_counter, python_counter):
-            with self.assertRaises(TypeError):
-                op(c, ('a', 2, 'b', 2, 'c', 2))
+        D = {'a': 2, 'b': 2, 'c': 2}
+        if dicts_work:
+            self.assertEqual(op(python_counter, D), op(redis_counter, D))
+        else:
+            for C in (redis_counter, python_counter):
+                with self.assertRaises(TypeError):
+                    op(C, D)
 
     def test_add(self):
         self._test_op(operator.add)
@@ -611,9 +611,16 @@ class CounterTest(RedisTestCase):
         self.assertTrue(isinstance(result, collections.Counter))
         self.assertEqual(result, {'c': 1})
 
+    @unittest.skipIf(sys.version_info >= (3, 9), 'Python 3.8 and below')
     def test_or(self):
-        self._test_op(operator.or_)
+        self._test_op(operator.or_, dicts_work=False)
+        result = self.create_counter('abbccc') | self.create_counter('aabbcc')
+        self.assertTrue(isinstance(result, collections.Counter))
+        self.assertEqual(result, {'a': 2, 'b': 2, 'c': 3})
 
+    @unittest.skipIf(sys.version_info < (3, 9), 'Python 3.9 and above')
+    def test_or_three_nine(self):
+        self._test_op(operator.or_, dicts_work=True)
         result = self.create_counter('abbccc') | self.create_counter('aabbcc')
         self.assertTrue(isinstance(result, collections.Counter))
         self.assertEqual(result, {'a': 2, 'b': 2, 'c': 3})
