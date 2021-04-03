@@ -700,6 +700,16 @@ class CounterTest(RedisTestCase):
 
         self.assertEqual(-redis_counter, -python_counter)
 
+    def test_with(self):
+        with self.create_counter({'a': 1, 'b': 2}) as C:
+            key = C.key
+            self.assertEqual(C['a'], 1)
+            self.assertEqual(C['b'], 2)
+
+        with self.create_counter(key=key) as C:
+            self.assertEqual(C['a'], 1)
+            self.assertEqual(C['b'], 2)
+
 
 class DefaultDictTest(RedisTestCase):
     def create_ddict(self, *args, **kwargs):

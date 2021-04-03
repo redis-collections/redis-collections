@@ -574,6 +574,12 @@ class Counter(Dict):
         if kwargs:
             self._update_helper(kwargs, operator.sub)
 
+    def sync(self):
+        self.writeback = False
+        super()._update_helper(self.cache)
+        self.cache = {}
+        self.writeback = True
+
     def __delitem__(self, key):
         """Like :func:`dict.__delitem__`, but does not raise KeyError for
         missing values.
