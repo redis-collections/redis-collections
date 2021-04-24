@@ -431,6 +431,13 @@ class DictTest(RedisTestCase):
         self.assertEqual(sorted(d.items()), [('a', 'h'), ('c', 42), ('x', 38)])
 
 
+    def test_hmset(self):
+        d = self.create_dict(hmset_command='hset')
+        if d.redis_version < (4, 0 , 0):
+            self.skipTest('Test required redis >= 4.0.0')
+        d.update({1: 2, 3: 4})
+
+
 class CounterTest(RedisTestCase):
     def create_counter(self, *args, **kwargs):
         kwargs['redis'] = self.redis
