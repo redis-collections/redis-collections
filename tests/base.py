@@ -14,7 +14,7 @@ class RedisTestCase(unittest.TestCase):
 
     def setUp(self):
         self.redis = redis.StrictRedis.from_url(
-            f'redis://{REDIS_HOST}:{REDIS_PORT}', db=self.db
+            'redis://{}:{}'.format(REDIS_HOST, REDIS_PORT), db=self.db
         )
         if self.redis.dbsize():
             raise EnvironmentError(
