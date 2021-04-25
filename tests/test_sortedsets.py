@@ -1,4 +1,4 @@
-from redis_collections import GeoDB, SortedSetCounter
+from redis_collections import Dict, GeoDB, SortedSetCounter
 
 from .base import RedisTestCase
 
@@ -240,6 +240,12 @@ class SortedSetCounterTestCase(RedisTestCase):
 
 
 class GeoDBTestCase(RedisTestCase):
+    def setUp(self):
+        super().setUp()
+        d = Dict(redis=self.redis)
+        if d.redis_version < (3, 2, 0):
+            self.skipTest('Test requires redis >= 3.2.0')
+
     def create_geodb(self, *args, **kwargs):
         kwargs['redis'] = self.redis
         return GeoDB(*args, **kwargs)

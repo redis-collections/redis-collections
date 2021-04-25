@@ -6,6 +6,8 @@ Changelog
 Releases
 --------
 
+- 0.9.1:
+    - **Version compatibility** - The collection classes now accept a ``hmset_command`` keyword argument. This is set to ``hmset`` for compatibility with Redis server versions before 4.0.0. Set it to ``hset`` to avoid a ``DeprecationWarning`` from `redis-py`.
 - 0.9.0:
     - **Breaking change**: The Python 2-style methods ``.iteritems()``, ``.iterkeys()``, and ``.itervalues()`` have been removed from ``Dict`` and its subclasses. The ``.iter()`` method was also removed.
     - **Version compatibility**: This library now supports Python 3.6 and higher.

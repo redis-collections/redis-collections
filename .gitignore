@@ -28,3 +28,5 @@ _build
 # Environment
 .env
 
+# Redis
+dump.rdb

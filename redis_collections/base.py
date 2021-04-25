@@ -25,7 +25,11 @@ class RedisCollection(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def __init__(
-        self, redis=None, key=None, pickle_protocol=pickle.HIGHEST_PROTOCOL
+        self,
+        redis=None,
+        key=None,
+        pickle_protocol=pickle.HIGHEST_PROTOCOL,
+        hmset_command='hmset',
     ):
         """
         :param data: Initial data.
@@ -39,10 +43,16 @@ class RedisCollection(metaclass=abc.ABCMeta):
         :param pickle_protocol: The version number of the pickle protocol to
                                 use. The default is the highest version
                                 supported by the current Python process.
+        :param hmset_command: The command to use for setting multiple values
+                              in a hash. By default this is ``'hmset'``, which
+                              will raise a ``DeprecationWarning`` on recent
+                              versions of `redis-py`. Set to `'hset'` to
+                              avoid this warning.
         :type key: str
         """
         self.redis = self._create_redis() if redis is None else redis
         self._redis_version = None  # Determined if needed and cached
+        self._hset_command = hmset_command
         self.key = key or self._create_key()
 
         self.pickle_protocol = pickle_protocol
@@ -153,10 +163,8 @@ class RedisCollection(metaclass=abc.ABCMeta):
 
     def _hmset(self, mapping, pipe=None):
         pipe = self.redis if pipe is None else pipe
-        try:
-            return pipe.hset(self.key, mapping=mapping)
-        except TypeError:
-            return pipe.hmset(self.key, mapping)
+        cmd = getattr(pipe, self._hset_command)
+        return cmd(self.key, mapping=mapping)
 
     def _normalize_index(self, index, pipe=None):
         """Convert negative indexes into their positive equivalents."""
