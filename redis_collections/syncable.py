@@ -29,6 +29,12 @@ be loaded.
 The underlying :class:`RedisCollection` instance can be accessed from the
 ``persistence`` attribute.
 
+.. note::
+    The synchronization process will transfer all local items to a new
+    key in Redis and then overwrite the original key with the
+    `RENAME <https://redis.io/commands/rename>`__ operation.
+    This might not be appropriate for very large collections.
+
 """
 import collections.abc as collections_abc
 import collections
@@ -70,8 +76,8 @@ class SyncableDict(_SyncableBase, dict):
         self.update(self.persistence)
 
     def sync(self):
-        self.persistence.clear()
-        self.persistence.update(self)
+        tempdict = Dict(redis=self.redis, data=self)
+        self.redis.rename(tempdict.key, self.key)
 
 
 class SyncableCounter(_SyncableBase, collections.Counter):
@@ -91,8 +97,8 @@ class SyncableCounter(_SyncableBase, collections.Counter):
         self.update(self.persistence)
 
     def sync(self):
-        self.persistence.clear()
-        self.persistence.update(self)
+        tempcounter = Counter(redis=self.redis, data=self)
+        self.redis.rename(tempcounter.key, self.key)
 
 
 class SyncableDefaultDict(_SyncableBase, collections.defaultdict):
@@ -112,8 +118,8 @@ class SyncableDefaultDict(_SyncableBase, collections.defaultdict):
         self.update(self.persistence)
 
     def sync(self):
-        self.persistence.clear()
-        self.persistence.update(self)
+        tempddict = DefaultDict(redis=self.redis, data=self)
+        self.redis.rename(tempddict.key, self.key)
 
 
 class SyncableList(_SyncableBase, list):
@@ -132,8 +138,8 @@ class SyncableList(_SyncableBase, list):
         self.extend(self.persistence)
 
     def sync(self):
-        self.persistence.clear()
-        self.persistence.extend(self)
+        templist = List(redis=self.redis, data=self)
+        self.redis.rename(templist.key, self.key)
 
 
 class SyncableDeque(_SyncableBase, collections.deque):
@@ -152,8 +158,8 @@ class SyncableDeque(_SyncableBase, collections.deque):
         self.extend(self.persistence)
 
     def sync(self):
-        self.persistence.clear()
-        self.persistence.extend(self)
+        tempq = Deque(redis=self.redis, data=self)
+        self.redis.rename(tempq.key, self.key)
 
 
 class SyncableSet(_SyncableBase, set):
@@ -172,8 +178,8 @@ class SyncableSet(_SyncableBase, set):
         self.update(self.persistence)
 
     def sync(self):
-        self.persistence.clear()
-        self.persistence.update(self)
+        tempset = Set(redis=self.redis, data=self)
+        self.redis.rename(tempset.key, self.key)
 
 
 class LRUDict(_SyncableBase, collections_abc.MutableMapping):
