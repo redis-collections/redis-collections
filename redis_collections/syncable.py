@@ -59,6 +59,10 @@ class _SyncableBase:
     def __exit__(self, exc_type, exc_value, traceback):
         self.sync()
 
+    def sync(self):
+        temp_collection = self.persistence_cls(redis=self.redis, data=self)
+        self.redis.rename(temp_collection.key, self.key)
+
 
 class SyncableDict(_SyncableBase, dict):
     """
@@ -69,15 +73,12 @@ class SyncableDict(_SyncableBase, dict):
     details.
     """
 
+    persistence_cls = Dict
+
     def __init__(self, **kwargs):
         self.persistence = Dict(**kwargs)
-
         super().__init__()
         self.update(self.persistence)
-
-    def sync(self):
-        tempdict = Dict(redis=self.redis, data=self)
-        self.redis.rename(tempdict.key, self.key)
 
 
 class SyncableCounter(_SyncableBase, collections.Counter):
@@ -90,15 +91,12 @@ class SyncableCounter(_SyncableBase, collections.Counter):
     for details.
     """
 
+    persistence_cls = Counter
+
     def __init__(self, **kwargs):
         self.persistence = Counter(**kwargs)
-
         super().__init__()
         self.update(self.persistence)
-
-    def sync(self):
-        tempcounter = Counter(redis=self.redis, data=self)
-        self.redis.rename(tempcounter.key, self.key)
 
 
 class SyncableDefaultDict(_SyncableBase, collections.defaultdict):
@@ -111,15 +109,12 @@ class SyncableDefaultDict(_SyncableBase, collections.defaultdict):
     #collections.defaultdict>`_ for details.
     """
 
+    persistence_cls = DefaultDict
+
     def __init__(self, *args, **kwargs):
         self.persistence = DefaultDict(*args, **kwargs)
-
         super().__init__(args[0] if args else None)
         self.update(self.persistence)
-
-    def sync(self):
-        tempddict = DefaultDict(redis=self.redis, data=self)
-        self.redis.rename(tempddict.key, self.key)
 
 
 class SyncableList(_SyncableBase, list):
@@ -131,15 +126,12 @@ class SyncableList(_SyncableBase, list):
     #sequence-types-list-tuple-range>`__ for details.
     """
 
+    persistence_cls = List
+
     def __init__(self, **kwargs):
         self.persistence = List(**kwargs)
-
         super().__init__()
         self.extend(self.persistence)
-
-    def sync(self):
-        templist = List(redis=self.redis, data=self)
-        self.redis.rename(templist.key, self.key)
 
 
 class SyncableDeque(_SyncableBase, collections.deque):
@@ -151,15 +143,12 @@ class SyncableDeque(_SyncableBase, collections.deque):
     for details.
     """
 
+    persistence_cls = Deque
+
     def __init__(self, iterable=None, maxlen=None, **kwargs):
         self.persistence = Deque(iterable=iterable, maxlen=maxlen, **kwargs)
-
         super().__init__(maxlen=self.persistence.maxlen)
         self.extend(self.persistence)
-
-    def sync(self):
-        tempq = Deque(redis=self.redis, data=self)
-        self.redis.rename(tempq.key, self.key)
 
 
 class SyncableSet(_SyncableBase, set):
@@ -171,15 +160,12 @@ class SyncableSet(_SyncableBase, set):
     #set-types-set-frozenset>`__ for details.
     """
 
+    persistence_cls = Set
+
     def __init__(self, **kwargs):
         self.persistence = Set(**kwargs)
-
         super().__init__()
         self.update(self.persistence)
-
-    def sync(self):
-        tempset = Set(redis=self.redis, data=self)
-        self.redis.rename(tempset.key, self.key)
 
 
 class LRUDict(_SyncableBase, collections_abc.MutableMapping):
