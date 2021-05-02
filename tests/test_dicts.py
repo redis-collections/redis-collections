@@ -377,6 +377,8 @@ class DictTest(RedisTestCase):
 
     def test_scan_items(self):
         redis_dict = self.create_dict()
+        if redis_dict.redis_version < (2, 8, 0):
+            self.skipTest('Test required redis >= 2.8.0')
 
         expected_dict = {}
         for i in range(1000):

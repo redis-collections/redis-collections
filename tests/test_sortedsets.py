@@ -211,6 +211,8 @@ class SortedSetCounterTestCase(RedisTestCase):
 
     def test_scan_items(self):
         ssc = self.create_sortedset()
+        if ssc.redis_version < (2, 8, 0):
+            self.skipTest('Test required redis >= 2.8.0')
 
         expected_dict = {}
         for i in range(1000):
@@ -344,7 +346,7 @@ class GeoDBTestCase(RedisTestCase):
         geodb.set_location('Sydney', -33.8562, 151.2153)
 
         # By default the results are sorted from nearest to farthest
-        response = geodb.places_within_radius(place='St. Louis', radius=7530)
+        response = geodb.places_within_radius(place='St. Louis', radius=9999)
         self.assertEqual(response[1]['place'], 'Berlin')
         self.assertAlmostEqual(response[1]['latitude'], 52.5200, places=4)
         self.assertAlmostEqual(response[1]['longitude'], 13.4050, places=4)
@@ -362,7 +364,7 @@ class GeoDBTestCase(RedisTestCase):
 
         # Test sort descending
         response = geodb.places_within_radius(
-            place='St. Louis', radius=7530, sort='DESC'
+            place='St. Louis', radius=9999, sort='DESC'
         )
         self.assertEqual(response[0]['place'], 'Bahia')
 
