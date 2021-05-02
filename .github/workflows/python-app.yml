@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        sw-version: [[3.6, 6.0], [3.7, 6.0], [3.8, 6.0], [3.9, 2.6], [3.9, 2.8], [3.9, 3.2], [3.9, 4.0], [3.9, 5.0], [3.9, 6.0]]
+        sw-version: [[3.6, 6.0], [3.7, 6.0], [3.8, 6.0], [3.9, 2.6], [3.9, 2.8], [3.9, 3.2], [3.9, 4.0], [3.9, 5.0], [3.9, 6.0], [3.9, latest]]
 
     services:
       redis:
@@ -36,6 +36,7 @@ jobs:
       run: |
         coverage run --include="redis_collections/*.py" -m unittest
     - name: Check coverage
+      if: "matrix.sw-version[1] == 'latest'"
       run: |
         coverage report --show-missing --fail-under=99
       env:
