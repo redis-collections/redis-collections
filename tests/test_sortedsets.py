@@ -211,6 +211,8 @@ class SortedSetCounterTestCase(RedisTestCase):
 
     def test_scan_items(self):
         ssc = self.create_sortedset()
+        if ssc.redis_version < (2, 8, 0):
+            self.skipTest('Test required redis >= 2.8.0')
 
         expected_dict = {}
         for i in range(1000):
