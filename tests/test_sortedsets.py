@@ -347,7 +347,7 @@ class GeoDBTestCase(RedisTestCase):
 
         # By default the results are sorted from nearest to farthest
         response = geodb.places_within_radius(place='St. Louis', radius=7530)
-        self.assertEqual(response[1]['place'], 'Berlin')
+        self.assertEqual(response[1]['place'], 'Berlin', geodb.places_within_radius(place='St. Louis', radius=7530))
         self.assertAlmostEqual(response[1]['latitude'], 52.5200, places=4)
         self.assertAlmostEqual(response[1]['longitude'], 13.4050, places=4)
         self.assertAlmostEqual(response[1]['distance'], 7501, delta=1)
