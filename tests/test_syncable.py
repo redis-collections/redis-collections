@@ -107,6 +107,7 @@ class SyncableTest(RedisTestCase):
         del ddict_1['A']
         ddict_1.sync()
         self.assertNotIn('A', ddict_1.persistence)
+        self.assertEqual(ddict_1['A'], 0)
 
         # The default_factory can be changed between synchronizations
         key_1 = ddict_1.key

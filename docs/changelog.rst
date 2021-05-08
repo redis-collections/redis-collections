@@ -6,6 +6,9 @@ Changelog
 Releases
 --------
 
+- 0.10.0:
+    - **Bending change**: The Syncable collections (like ``SyncableDict``) have been updated such that their ``.sync()`` methods are atomic.
+      This requires additional storage on Redis when syncing, so be aware of space constraints.
 - 0.9.1:
     - **Version compatibility** - The collection classes now accept a ``hmset_command`` keyword argument. This is set to ``hmset`` for compatibility with Redis server versions before 4.0.0. Set it to ``hset`` to avoid a ``DeprecationWarning`` from `redis-py`.
 - 0.9.0:
@@ -62,8 +65,8 @@ Versioning
 A 1.0 release is planned. Before that happens:
 
 - Releases with significant new features or breaking changes will be tagged as
-  0.10.x, 0.11.x, etc.
-- Bug fix releases will be tagged as 0.8.x
+  0.11.x, 0.12.x, etc.
+- Bug fix releases will be tagged as 0.10.x
 
 After 1.0 is released:
 

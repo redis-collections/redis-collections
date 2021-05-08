@@ -29,6 +29,12 @@ be loaded.
 The underlying :class:`RedisCollection` instance can be accessed from the
 ``persistence`` attribute.
 
+.. note::
+    The synchronization process will transfer all local items to a new
+    key in Redis and then overwrite the original key with the
+    `RENAME <https://redis.io/commands/rename>`__ operation.
+    This might not be appropriate for very large collections.
+
 """
 import collections.abc as collections_abc
 import collections
@@ -53,6 +59,10 @@ class _SyncableBase:
     def __exit__(self, exc_type, exc_value, traceback):
         self.sync()
 
+    def sync(self):
+        temp_collection = self.persistence_cls(redis=self.redis, data=self)
+        self.redis.rename(temp_collection.key, self.key)
+
 
 class SyncableDict(_SyncableBase, dict):
     """
@@ -63,15 +73,12 @@ class SyncableDict(_SyncableBase, dict):
     details.
     """
 
+    persistence_cls = Dict
+
     def __init__(self, **kwargs):
         self.persistence = Dict(**kwargs)
-
         super().__init__()
         self.update(self.persistence)
-
-    def sync(self):
-        self.persistence.clear()
-        self.persistence.update(self)
 
 
 class SyncableCounter(_SyncableBase, collections.Counter):
@@ -84,15 +91,12 @@ class SyncableCounter(_SyncableBase, collections.Counter):
     for details.
     """
 
+    persistence_cls = Counter
+
     def __init__(self, **kwargs):
         self.persistence = Counter(**kwargs)
-
         super().__init__()
         self.update(self.persistence)
-
-    def sync(self):
-        self.persistence.clear()
-        self.persistence.update(self)
 
 
 class SyncableDefaultDict(_SyncableBase, collections.defaultdict):
@@ -105,15 +109,12 @@ class SyncableDefaultDict(_SyncableBase, collections.defaultdict):
     #collections.defaultdict>`_ for details.
     """
 
+    persistence_cls = DefaultDict
+
     def __init__(self, *args, **kwargs):
         self.persistence = DefaultDict(*args, **kwargs)
-
         super().__init__(args[0] if args else None)
         self.update(self.persistence)
-
-    def sync(self):
-        self.persistence.clear()
-        self.persistence.update(self)
 
 
 class SyncableList(_SyncableBase, list):
@@ -125,15 +126,12 @@ class SyncableList(_SyncableBase, list):
     #sequence-types-list-tuple-range>`__ for details.
     """
 
+    persistence_cls = List
+
     def __init__(self, **kwargs):
         self.persistence = List(**kwargs)
-
         super().__init__()
         self.extend(self.persistence)
-
-    def sync(self):
-        self.persistence.clear()
-        self.persistence.extend(self)
 
 
 class SyncableDeque(_SyncableBase, collections.deque):
@@ -145,15 +143,12 @@ class SyncableDeque(_SyncableBase, collections.deque):
     for details.
     """
 
+    persistence_cls = Deque
+
     def __init__(self, iterable=None, maxlen=None, **kwargs):
         self.persistence = Deque(iterable=iterable, maxlen=maxlen, **kwargs)
-
         super().__init__(maxlen=self.persistence.maxlen)
         self.extend(self.persistence)
-
-    def sync(self):
-        self.persistence.clear()
-        self.persistence.extend(self)
 
 
 class SyncableSet(_SyncableBase, set):
@@ -165,15 +160,12 @@ class SyncableSet(_SyncableBase, set):
     #set-types-set-frozenset>`__ for details.
     """
 
+    persistence_cls = Set
+
     def __init__(self, **kwargs):
         self.persistence = Set(**kwargs)
-
         super().__init__()
         self.update(self.persistence)
-
-    def sync(self):
-        self.persistence.clear()
-        self.persistence.update(self)
 
 
 class LRUDict(_SyncableBase, collections_abc.MutableMapping):
