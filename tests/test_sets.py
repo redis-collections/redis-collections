@@ -403,7 +403,7 @@ class SetTest(RedisTestCase):
             self.assertEqual(s.pop(), elem_2)
 
     def test_add_equal_hashes(self):
-        redis_set = Set()
+        redis_set = self.create_set()
         python_set = set()
         for value in [
             1.0,
