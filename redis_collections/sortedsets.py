@@ -8,7 +8,10 @@ Redis `Sorted Set <https://redis.io/commands#sorted_set>`__ type.
 Included collections are :class:`SortedSetCounter` and :class:`GeoDB`.
 
 """
+import redis
+
 from redis.client import Pipeline
+from pkg_resources import parse_version
 
 from .base import RedisCollection
 
@@ -537,7 +540,11 @@ class GeoDB(SortedSetBase):
         *place* can be any pickle-able Python object.
         """
         pipe = self.redis if pipe is None else pipe
-        pipe.geoadd(self.key, longitude, latitude, self._pickle(place))
+
+        if parse_version(redis.__version__) < parse_version("4.0.0"):
+            pipe.geoadd(self.key, longitude, latitude, self._pickle(place))
+        else:
+            pipe.geoadd(self.key, (longitude, latitude, self._pickle(place)))
 
     def update(self, other):
         """
