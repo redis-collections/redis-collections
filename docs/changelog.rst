@@ -8,7 +8,7 @@ Releases
 
 - 0.11.0:
     - **Version compatibility**: This library now supports Python 3.7 and higher.
-    - **Version compatibility** - This library now supports `redis-py` version 4.x (thanks to lionelnicolas)
+    - **Version compatibility** - This library now supports `redis-py` version 4.x (thanks to lionelnicolas). The minimum supported version is now 3.5.x.
 - 0.10.0:
     - **Bending change**: The Syncable collections (like ``SyncableDict``) have been updated such that their ``.sync()`` methods are atomic.
       This requires additional storage on Redis when syncing, so be aware of space constraints.
