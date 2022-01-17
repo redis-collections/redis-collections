@@ -52,6 +52,7 @@ class RedisCollection(metaclass=abc.ABCMeta):
         """
         self.redis = self._create_redis() if redis is None else redis
         self._redis_version = None  # Determined if needed and cached
+        self._redis_py_version = None  # Determined if needed and cached
         self._hset_command = hmset_command
         self.key = key or self._create_key()
 
@@ -146,6 +147,16 @@ class RedisCollection(metaclass=abc.ABCMeta):
 
         return self._redis_version
 
+    @property
+    def redis_py_version(self):
+        # Set the redis-py version if it's not already set.
+        if self._redis_py_version is None:
+            self._redis_py_version = tuple(
+                int(x) for x in redis.__version__.split('.')
+            )
+
+        return self._redis_py_version
+
     def _same_redis(self, other, cls=None):
         cls = cls or self.__class__
         if not isinstance(other, cls):
@@ -160,6 +171,13 @@ class RedisCollection(metaclass=abc.ABCMeta):
             and self_kwargs.get('path') == other_kwargs.get('path')
             and self_kwargs.get('db', 0) == other_kwargs.get('db', 0)
         )
+
+    def _geoadd(self, longitude, latitude, data, pipe=None):
+        pipe = self.redis if pipe is None else pipe
+        if self.redis_py_version < (4, 0, 0):
+            return pipe.geoadd(self.key, longitude, latitude, data)
+        else:
+            return pipe.geoadd(self.key, (longitude, latitude, data))
 
     def _hmset(self, mapping, pipe=None):
         pipe = self.redis if pipe is None else pipe
