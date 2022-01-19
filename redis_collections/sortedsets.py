@@ -536,8 +536,7 @@ class GeoDB(SortedSetBase):
 
         *place* can be any pickle-able Python object.
         """
-        pipe = self.redis if pipe is None else pipe
-        pipe.geoadd(self.key, longitude, latitude, self._pickle(place))
+        self._geoadd(longitude, latitude, self._pickle(place), pipe=pipe)
 
     def update(self, other):
         """
