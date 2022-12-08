@@ -4,7 +4,7 @@ Sphinx==4.4.0
 # What we get
 alabaster==0.7.12
 Babel==2.9.1
-certifi==2021.10.8
+certifi==2022.12.7
 charset-normalizer==2.0.10
 docutils==0.17.1
 idna==3.3
