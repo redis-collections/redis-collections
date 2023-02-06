@@ -545,6 +545,7 @@ class GeoDB(SortedSetBase):
         ``{'latitude': latitude, 'longitude': longitude}`` dicts,
         or sequences of ``(place, latitude, longitude)`` tuples.
         """
+
         # other is another Sorted Set
         def update_sortedset_trans(pipe):
             pipe.multi()

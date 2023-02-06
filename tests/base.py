@@ -9,7 +9,6 @@ REDIS_PORT = os.environ.get('REDIS_PORT', '6379')
 
 
 class RedisTestCase(unittest.TestCase):
-
     db = 15
 
     def setUp(self):
