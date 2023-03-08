@@ -289,7 +289,7 @@ class LRUDict(_SyncableBase, collections_abc.MutableMapping):
         If *clear_cache* is ``True``, clear out the local cache after
         pushing its items to Redis.
         """
-        self.persistence.update(self)
+        self.persistence.update(self.cache)
 
         if clear_cache:
             self.cache.clear()
