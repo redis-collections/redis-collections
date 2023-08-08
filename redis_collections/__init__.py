@@ -1,5 +1,5 @@
 __title__ = 'redis-collections'
-__version__ = '0.11.0'
+__version__ = '0.12.0'
 __author__ = 'Honza Javorek'
 __license__ = 'ISC'
 __copyright__ = 'Copyright 2013-? Honza Javorek'
