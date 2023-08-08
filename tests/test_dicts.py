@@ -377,9 +377,6 @@ class DictTest(RedisTestCase):
 
     def test_scan_items(self):
         redis_dict = self.create_dict()
-        if redis_dict.redis_version < (2, 8, 0):
-            self.skipTest('Test required redis >= 2.8.0')
-
         expected_dict = {}
         for i in range(1000):
             expected_dict[i] = i * 100.0
@@ -389,12 +386,6 @@ class DictTest(RedisTestCase):
         self.assertTrue(len(items) >= 1000)
 
         self.assertTrue(dict(items), expected_dict)
-
-    def test_redis_version(self):
-        redis_dict = self.create_dict()
-        actual = '.'.join(str(c) for c in redis_dict.redis_version)
-        expected = self.redis.info()['redis_version']
-        self.assertEqual(actual, expected)
 
     @unittest.skipIf(sys.version_info < (3, 9), 'merge requires Python 3.9+')
     def test_merge_operator(self):
@@ -431,12 +422,6 @@ class DictTest(RedisTestCase):
         redis_list = List([('a', 'h')], redis=self.redis)
         d |= redis_list
         self.assertEqual(sorted(d.items()), [('a', 'h'), ('c', 42), ('x', 38)])
-
-    def test_hmset(self):
-        d = self.create_dict(hmset_command='hset')
-        if d.redis_version < (4, 0, 0):
-            self.skipTest('Test required redis >= 4.0.0')
-        d.update({1: 2, 3: 4})
 
 
 class CounterTest(RedisTestCase):
