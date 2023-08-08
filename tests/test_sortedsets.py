@@ -1,4 +1,4 @@
-from redis_collections import Dict, GeoDB, SortedSetCounter
+from redis_collections import GeoDB, SortedSetCounter
 
 from .base import RedisTestCase
 
