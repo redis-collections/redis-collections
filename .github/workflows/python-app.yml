@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        sw-version: [["3.7", "4.0"], ["3.8", "5.0"], ["3.9", "6.0"], ["3.10", "6.2"], ["3.11", "latest"]]
+        sw-version: [["3.8", "5.0"], ["3.9", "5.0"], ["3.10", "6.0"], ["3.11", "7.0"], ["3.12.0-rc.1", "latest"]]
 
     services:
       redis:
@@ -24,7 +24,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.sw-version[0] }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.sw-version[0] }}
     - name: Install dependencies
@@ -43,29 +43,29 @@ jobs:
         REDIS_HOST: redis
         REDIS_PORT: 6379
     - name: Lint with flake8
-      if: "matrix.sw-version[0] == '3.7'"
+      if: "matrix.sw-version[0] == '3.8'"
       run: |
         pip install -U flake8
         flake8 .
     - name: Check formatting with black
-      if: "matrix.sw-version[0] == '3.7'"
+      if: "matrix.sw-version[0] == '3.8'"
       run: |
         pip install -U black
         black --check .
     - name: Build docs with sphinx
-      if: "matrix.sw-version[0] == '3.7'"
+      if: "matrix.sw-version[0] == '3.8'"
       run: |
         pip install -U sphinx sphinx_rtd_theme
         sphinx-build -W -b html docs docs/_build/html
     - name: Build packages
-      if: "matrix.sw-version[0] == '3.7'"
+      if: "matrix.sw-version[0] == '3.8'"
       run: |
         pip install -U twine wheel
         python setup.py sdist bdist_wheel
         twine check dist/*
     - name: Upload packages
-      if: "matrix.sw-version[0] == '3.7'"
-      uses: actions/upload-artifact@v2
+      if: "matrix.sw-version[0] == '3.8'"
+      uses: actions/upload-artifact@v3
       with:
         name: redis-collections-packages
         path: dist/*

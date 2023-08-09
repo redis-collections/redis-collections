@@ -454,9 +454,6 @@ class SetTest(RedisTestCase):
 
     def test_scan_elements(self):
         redis_set = self.create_set()
-        if redis_set.redis_version < (2, 8, 0):
-            self.skipTest('Test required redis >= 2.8.0')
-
         expected_elements = set()
         for i in range(1000):
             elem = str(i)

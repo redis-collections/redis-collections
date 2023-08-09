@@ -712,7 +712,6 @@ class DequeTest(RedisTestCase):
             Q.extendleft(Q_limit)
             self.assertEqual(list(Q), list('cbaeffeabcd'))
 
-    @unittest.skipIf(PYTHON_VERSION < (3, 5), 'requires Python 3.5')
     def test_insert(self):
         data = 'abcd'
         for init in (self.create_deque, collections.deque):
@@ -773,7 +772,6 @@ class DequeTest(RedisTestCase):
             Q.rotate(-2)
             self.assertEqual(list(Q), list('dabc'))
 
-    @unittest.skipIf(PYTHON_VERSION < (3, 5), 'requires Python 3.5')
     def test_add(self):
         data = 'abcd'
         for init in (self.create_deque, collections.deque):
@@ -798,7 +796,6 @@ class DequeTest(RedisTestCase):
             self.assertEqual(list(result), list('dcbaabcd'))
             self.assertIsNone(result.maxlen)
 
-    @unittest.skipIf(PYTHON_VERSION < (3, 5), 'requires Python 3.5')
     def test_iadd(self):
         data = 'abcd'
         for init in (self.create_deque, collections.deque):
@@ -813,7 +810,6 @@ class DequeTest(RedisTestCase):
             Q += self.create_deque('ijkl')
             self.assertEqual(list(Q), list('fghijkl'))
 
-    @unittest.skipIf(PYTHON_VERSION < (3, 5), 'requires Python 3.5')
     def test_mul(self):
         data = 'abcd'
         for init in (self.create_deque, collections.deque):

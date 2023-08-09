@@ -25,8 +25,8 @@ setup(
     license='ISC',
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
-    python_requires='>=3.7',
-    install_requires=['redis>=3.5.0,<5.0.0'],
+    python_requires='>=3.8',
+    install_requires=['redis>=4.0.0,<6.0.0'],
     zip_safe=False,
     keywords=['redis', 'persistence'],
     classifiers=(
