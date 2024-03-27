@@ -1,18 +1,7 @@
 .. _basic-usage:
 
-Installation and examples
-=========================
-
-Installation
-------------
-
-To get started, install the library with
-`pip <https://pip.pypa.io/en/stable/>`_:
-
-.. code-block:: shell
-
-    pip install redis-collections
-
+Examples
+========
 
 Basic usage
 -----------

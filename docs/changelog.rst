@@ -6,6 +6,12 @@ Changelog
 Releases
 --------
 
+- 0.13.0:
+    - **The end**: This library has been retired. Thanks for the interest.
+- 0.12.0:
+    - **Version compatibility**: This library now supports Python 3.8 and higher.
+    - **Breaking change**: This library now requires a Redis server at version 5.0.0 or above.
+    - **Version compatibility** - This library now supports `redis-py` versions up to 6.0.0.
 - 0.11.0:
     - **Version compatibility**: This library now supports Python 3.7 and higher.
     - **Version compatibility** - This library now supports `redis-py` version 4.x (thanks to lionelnicolas). The minimum supported version is now 3.5.x.
@@ -59,20 +65,3 @@ Releases
     - **Version compatibility**: ``Set.random_sample`` now works for Redis servers under version 2.6.0
 
 See the `GitHub Releases page <https://github.com/redis-collections/redis-collections/releases>`_ for information on earlier releases.
-
-Versioning
-----------
-
-`redis-collections` is currently at version |release|.
-
-A 1.0 release is planned. Before that happens:
-
-- Releases with significant new features or breaking changes will be tagged as
-  0.11.x, 0.12.x, etc.
-- Bug fix releases will be tagged as 0.10.x
-
-After 1.0 is released:
-
-- Releases with breaking changes will be tagged as 2.0.0, 3.0.0, etc.
-- Releases with new features will be tagged as 1.1.0, 1.2.0, etc.
-- Bug fix releases will be tagged as 1.0.1, 1.0.2, etc.

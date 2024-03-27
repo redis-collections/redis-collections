@@ -4,8 +4,7 @@ Development
 ===========
 
 See the `GitHub project page
-<https://github.com/redis-collections/redis-collections/>`_ for source code, to file
-an issue, or to make a code contribution.
+<https://github.com/redis-collections/redis-collections/>`_ for source code.
 
 Philosophy
 ----------
@@ -28,10 +27,3 @@ Philosophy
 
 *   Behavior of "nested" collections is **undefined**. It is not recommended
     to create such structures. Use a collection of keys instead.
-
-*   The library will take advantage of features in new versions of Redis,
-    but will provide backports for older versions of Redis.
-
-    The earliest supported version of Redis is the one that ships with the
-    oldest supported LTS release of Ubuntu Linux (see
-    `packages.ubuntu.com <http://packages.ubuntu.com/redis-server>`_).
