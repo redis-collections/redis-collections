@@ -4,6 +4,9 @@ Redis Collections
 `redis-collections` is a Python library that provides a high-level
 interface to `Redis <http://redis.io/>`_, the excellent key-value store.
 
+As of 2024, this project is retired. These docs will remain available as
+a public archive.
+
 The library exposes several collection types that interact with Redis,
 including:
 
