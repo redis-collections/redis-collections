@@ -8,6 +8,7 @@ Redis `Sorted Set <https://redis.io/commands#sorted_set>`__ type.
 Included collections are :class:`SortedSetCounter` and :class:`GeoDB`.
 
 """
+
 from redis.client import Pipeline
 
 from .base import RedisCollection

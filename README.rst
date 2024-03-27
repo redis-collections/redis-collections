@@ -5,10 +5,12 @@ Redis Collections
 `redis-collections` is a Python library that provides a high-level
 interface to `Redis <http://redis.io/>`_, the excellent key-value store.
 
+As of 2024, this project is retired. This repository will remain available as
+a public archive.
+
 Quickstart
 ----------
 
-Install the library with ``pip install redis-collections``.
 Import the collections from the top-level ``redis_collections`` package.
 
 Standard collections
@@ -113,16 +115,10 @@ Documentation
 For more information, see
 `redis-collections.readthedocs.io <https://redis-collections.readthedocs.io/>`_
 
-Maintainers
------------
-
-- Bo Bayles (`@bbayles <http://github.com/bbayles>`_)
-- Honza Javorek (`@honzajavorek <http://github.com/honzajavorek>`_)
-
 License: ISC
 ------------
 
-© 2016-? Bo Bayles <bbayles@gmail.com> and contributors
+© 2016-2024 Bo Bayles <bbayles@gmail.com> and contributors
 © 2013-2016 Honza Javorek <mail@honzajavorek.cz> and contributors
 
 This work is licensed under `ISC license <https://en.wikipedia.org/wiki/ISC_license>`_.
