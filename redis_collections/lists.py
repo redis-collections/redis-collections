@@ -12,6 +12,7 @@ Each collection stores its values in a Redis
     in a collection, be sure to enable ``writeback``.
     See :ref:`Synchronization` for more information.
 """
+
 import collections.abc as collections_abc
 import collections
 import itertools

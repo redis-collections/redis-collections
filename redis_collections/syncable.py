@@ -36,6 +36,7 @@ The underlying :class:`RedisCollection` instance can be accessed from the
     This might not be appropriate for very large collections.
 
 """
+
 import collections.abc as collections_abc
 import collections
 

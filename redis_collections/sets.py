@@ -8,6 +8,7 @@ Its elements are stored in a Redis `set <http://redis.io/commands#set>`_
 structure.
 
 """
+
 import collections.abc as collections_abc
 from functools import reduce
 import operator

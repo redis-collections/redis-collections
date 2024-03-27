@@ -19,6 +19,7 @@ Each collection stores its items in a Redis
     See :ref:`Hashing` for more information.
 
 """
+
 import collections.abc as collections_abc
 import collections
 import operator
